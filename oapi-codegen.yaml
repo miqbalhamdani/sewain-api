@@ -1,0 +1,16 @@
+# Generator config for ../docs/openapi.yaml -> internal/http/gen.go.
+# Run it with `make generate`. Never edit the output.
+package: httpapi
+output: internal/http/gen.go
+
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+
+output-options:
+  # Required, not a preference. oapi-codegen prunes components that no path
+  # references, and the skeleton has no paths -- without this the output is an
+  # empty file. Drop it once P1-011 adds the first endpoints and every component
+  # is reachable, or keep it and stop thinking about it.
+  skip-prune: true

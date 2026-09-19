@@ -1,0 +1,43 @@
+version: "2"
+sql:
+  - engine: postgresql
+
+    # sqlc reads the schema from the migrations themselves, so the generated
+    # types cannot drift from what is actually applied. It skips the .down.sql
+    # files on its own.
+    schema: db/migrations
+    queries: db/queries
+
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/db/sqlcgen
+        sql_package: pgx/v5
+
+        # A nullable column becomes a pointer rather than a wrapper struct, so
+        # "absent" is nil and reads the same way everywhere else in the codebase
+        # does. See CLAUDE.md on omitted-versus-null.
+        emit_pointers_for_null_types: true
+
+        overrides:
+          # Without these, sqlc emits pgtype.UUID and pgtype.Timestamptz --
+          # wrapper types that would need converting at every boundary between
+          # the database and the rest of the code. internal/owner already
+          # speaks google/uuid, and CLAUDE.md mandates uuid.NewV7 for keys, so
+          # the mapping belongs here, once, rather than at each call site.
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
+
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true
