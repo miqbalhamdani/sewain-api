@@ -82,6 +82,88 @@ db/migrations/    golang-migrate, SQL polos, up + down
 
 ---
 
+## Alur satu request, dari kontrak sampai database
+
+Empat lapis dari request sampai baris, dan **dua di antaranya tidak kamu tulis** — keduanya
+digenerate, dan mengeditnya percuma karena `make generate` berikutnya menimpanya.
+
+```
+HTTP request
+     │
+     ▼
+internal/http/gen.go          ← GENERATED dari docs/openapi.yaml
+  route, tipe request/respons
+     │
+     ▼
+internal/http/<fitur>.go      ← tulis tangan
+  cek izin, decode, encode
+     │
+     ▼
+internal/<domain>/*.go        ← tulis tangan
+  aturan bisnis, dibungkus InOwnerTx
+     │
+     ▼
+internal/db/sqlcgen/          ← GENERATED dari db/queries/ + db/migrations/
+  q.db.Query(ctx, ...)
+     │
+     ▼
+PostgreSQL — RLS menyaring pakai app.owner_id
+```
+
+Contoh nyata, `GET /users`:
+
+| Lapis | Berkas | Isinya |
+|---|---|---|
+| Kontrak | `docs/openapi.yaml` | path `/users`, `operationId: listUsers` |
+| Generated | `internal/http/gen.go` | `r.Get("/api/v1/users", wrapper.ListUsers)` |
+| HTTP | `internal/http/users.go` | `requirePermission(...)`, decode, `writeJSON` |
+| Domain | `internal/auth/users.go` | `s.store.InOwnerTx(...)` lalu `sqlcgen.New(tx).ListUsers(ctx)` |
+| Generated | `internal/db/sqlcgen/users.sql.go` | `q.db.Query(ctx, listUsers)` |
+| SQL | `db/queries/users.sql` | `SELECT ... FROM users ORDER BY created_at` |
+
+### Tiga hal yang paling sering salah dipahami
+
+**1. Route tidak ada di kode, ia ada di kontrak.** Tidak ada `r.Get(...)` yang ditulis
+tangan di mana pun. Endpoint yang tidak ada di `openapi.yaml` tidak punya method di
+`gen.go`, jadi hasilnya `404` — bukan karena ada yang menolaknya, tapi karena ia memang
+tidak pernah terdaftar. Menambah endpoint **selalu** dimulai dari kontrak.
+
+**2. `sqlc` membaca migrasimu, bukan men-scaffold-nya.** Arahnya kebalikan dari
+`php artisan make:migration`. Migrasi dan query ditulis tangan, SQL polos; `sqlc` yang
+menyimpulkan tipe Go darinya (`sqlc.yaml` menyetel `schema: db/migrations`). Konsekuensinya
+bagus: mengubah kolom jadi nullable membuat `go build` gagal di setiap tempat yang
+mengandaikannya tidak. Itu fitur, bukan gangguan — pernah kejadian dengan `owners.slug`.
+
+**3. `InOwnerTx` bukan sekadar pembungkus transaksi.** Perhatikan query di
+`db/queries/`: **nol `WHERE owner_id = ...`**. Yang menyaring adalah policy RLS di
+database, dan `set_config('app.owner_id', …, true)` di `internal/db/tx.go` yang
+memberitahunya usaha mana. Memanggil `sqlcgen.New(pool).X(ctx)` langsung — melewati
+`InOwnerTx` — tidak error dan tidak bocor; ia mengembalikan **nol baris**, karena policy
+membandingkan `owner_id` dengan setting yang `NULL`. Gagal-tertutup, tapi tampil sebagai
+hasil kosong yang membingungkan. Itu sebabnya `InOwnerTx` mengembalikan
+`ErrNoOwnerContext` lebih dulu, sebelum koneksi diambil dari pool.
+
+`sqlcgen` sendiri tidak tahu ia di dalam transaksi atau tidak: `Queries` menyimpan
+`DBTX`, sebuah interface tiga method yang dipenuhi `pgx.Tx` maupun `pgxpool.Pool`.
+Disiplinnya ada di paket domain, bukan di kode generated.
+
+### Menambah endpoint, urutannya
+
+```
+1. docs/openapi.yaml        tulis tangan   ← kontrak duluan, selalu
+2. db/migrations/*.sql      tulis tangan   ← kalau butuh kolom baru
+3. db/queries/*.sql         tulis tangan
+4. make generate                           ← gen.go + sqlcgen sekaligus
+5. internal/<domain>/*.go   tulis tangan   ← aturan bisnis, terjemah error constraint
+6. internal/http/*.go       tulis tangan   ← izin, decode, encode
+7. kasus isolasi            tulis tangan   ← make test-iso merah tanpanya
+```
+
+Langkah 4 satu-satunya yang otomatis, dan langkah 7 **bukan opsional**: suite isolasi
+menelusuri route yang didaftarkan kode generated dan gagal untuk yang tidak punya entri.
+
+---
+
 ## Isolasi owner — aturan yang paling penting
 
 Setiap tabel bertenant punya `owner_id`, `ENABLE ROW LEVEL SECURITY` **dan** `FORCE ROW LEVEL
