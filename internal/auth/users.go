@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -25,8 +27,23 @@ import (
 // and zero rows is a 404 -- there is no ownership check in Go and none wanted,
 // because a check that can be forgotten is a check that will be (BR-001).
 
+// Account is one user as this package talks about them.
+//
+// Not the sqlc row type: that one is regenerated from the migrations, so
+// letting it out would make a column rename ripple into the HTTP layer. The
+// three queries below return the same six columns, so they share one type --
+// and password_hash is not among them, here or in the queries.
+type Account struct {
+	ID          uuid.UUID
+	Email       string
+	Name        string
+	Role        string
+	Status      string
+	LastLoginAt *time.Time
+}
+
 // ListUsers returns the accounts in the caller's rental.
-func (s *Service) ListUsers(ctx context.Context) ([]sqlcgen.ListUsersRow, error) {
+func (s *Service) ListUsers(ctx context.Context) ([]Account, error) {
 	var rows []sqlcgen.ListUsersRow
 	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
 		var err error
@@ -36,7 +53,15 @@ func (s *Service) ListUsers(ctx context.Context) ([]sqlcgen.ListUsersRow, error)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
-	return rows, nil
+
+	// An empty slice, never nil: the contract types this as a list, and a
+	// client that has to handle both shapes will handle one of them wrong.
+	accounts := make([]Account, 0, len(rows))
+	for _, row := range rows {
+		accounts = append(accounts,
+			accountOf(row.ID, row.Email, row.Name, row.Role, row.Status, row.LastLoginAt))
+	}
+	return accounts, nil
 }
 
 // InviteUser creates an account that has no password yet.
@@ -44,15 +69,15 @@ func (s *Service) ListUsers(ctx context.Context) ([]sqlcgen.ListUsersRow, error)
 // The row is what the invitee later accepts; sending the invitation is S1-084's
 // job, not this one. Until then the account exists, is visible to the owner, and
 // cannot log in -- password_hash is NULL and Login refuses it.
-func (s *Service) InviteUser(ctx context.Context, ownerID uuid.UUID, email, name, role string) (sqlcgen.InviteUserRow, error) {
+func (s *Service) InviteUser(ctx context.Context, ownerID uuid.UUID, email, name, role string) (Account, error) {
 	if role != RoleOwner && role != RoleOperator {
-		return sqlcgen.InviteUserRow{}, apperrors.ValidationFailed(
+		return Account{}, apperrors.ValidationFailed(
 			"role is either owner or operator.")
 	}
 
 	id, err := uuid.NewV7()
 	if err != nil {
-		return sqlcgen.InviteUserRow{}, fmt.Errorf("new user id: %w", err)
+		return Account{}, fmt.Errorf("new user id: %w", err)
 	}
 
 	var row sqlcgen.InviteUserRow
@@ -68,29 +93,29 @@ func (s *Service) InviteUser(ctx context.Context, ownerID uuid.UUID, email, name
 		// that is what buys login its missing business parameter (BR-004).
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.ConstraintName == "users_email_key" {
-			return sqlcgen.InviteUserRow{}, apperrors.EmailTaken().WithCause(err)
+			return Account{}, apperrors.EmailTaken().WithCause(err)
 		}
-		return sqlcgen.InviteUserRow{}, fmt.Errorf("invite user: %w", err)
+		return Account{}, fmt.Errorf("invite user: %w", err)
 	}
-	return row, nil
+	return accountOf(row.ID, row.Email, row.Name, row.Role, row.Status, row.LastLoginAt), nil
 }
 
 // UpdateUser changes a role or a status, and nothing else.
 //
 // email and owner_id are absent from the query on purpose: one user belongs to
 // exactly one rental, and the address is what points at it when they log in.
-func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, role, status *string) (sqlcgen.UpdateUserRow, error) {
+func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, role, status *string) (Account, error) {
 	if role == nil && status == nil {
-		return sqlcgen.UpdateUserRow{}, apperrors.ValidationFailed(
+		return Account{}, apperrors.ValidationFailed(
 			"Send at least one of role or status.")
 	}
 	if role != nil && *role != RoleOwner && *role != RoleOperator {
-		return sqlcgen.UpdateUserRow{}, apperrors.ValidationFailed(
+		return Account{}, apperrors.ValidationFailed(
 			"role is either owner or operator.")
 	}
 	// 'invited' is the server's to set, once, when the account is created.
 	if status != nil && *status != "active" && *status != "disabled" {
-		return sqlcgen.UpdateUserRow{}, apperrors.ValidationFailed(
+		return Account{}, apperrors.ValidationFailed(
 			"status is either active or disabled.")
 	}
 
@@ -103,12 +128,12 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, role, status *st
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlcgen.UpdateUserRow{}, notFoundUser()
+		return Account{}, notFoundUser()
 	}
 	if err != nil {
-		return sqlcgen.UpdateUserRow{}, fmt.Errorf("update user: %w", err)
+		return Account{}, fmt.Errorf("update user: %w", err)
 	}
-	return row, nil
+	return accountOf(row.ID, row.Email, row.Name, row.Role, row.Status, row.LastLoginAt), nil
 }
 
 // DisableUser flips status to disabled. It never deletes the row.
@@ -146,4 +171,13 @@ func (s *Service) DisableUser(ctx context.Context, id uuid.UUID) error {
 
 func notFoundUser() error {
 	return apperrors.NotFound("No such user in this business.")
+}
+
+// accountOf is the one place a database row becomes an Account. The three
+// queries return the same six columns, so they share one converter.
+func accountOf(id uuid.UUID, email, name, role, status string, lastLoginAt *time.Time) Account {
+	return Account{
+		ID: id, Email: email, Name: name,
+		Role: role, Status: status, LastLoginAt: lastLoginAt,
+	}
 }

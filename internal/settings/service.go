@@ -30,13 +30,45 @@ type Service struct {
 
 func New(store *db.Store) *Service { return &Service{store: store} }
 
+// Knobs is one rental's settings as this package talks about them.
+//
+// Not the sqlc row type: that one is regenerated from the migrations, so
+// letting it out of this package would make a column rename ripple into the
+// HTTP layer. The conversion lives here, once.
+type Knobs struct {
+	Slug                       *string
+	BookingCodePrefix          string
+	RequirePaymentBeforePickup bool
+	DraftExpiryHours           int
+	PaymentDueHours            int
+	NoShowToleranceHours       int
+	NotifyPickupReminder       bool
+	NotifyReturnReminder       bool
+	NotifyOverdueReminder      bool
+}
+
+// Patch is what a caller is changing. A nil field means the key was absent and
+// the stored value stands -- absent and null are not the same thing, and the
+// query COALESCEs on exactly this distinction.
+type Patch struct {
+	Slug                       *string
+	BookingCodePrefix          *string
+	RequirePaymentBeforePickup *bool
+	DraftExpiryHours           *int
+	PaymentDueHours            *int
+	NoShowToleranceHours       *int
+	NotifyPickupReminder       *bool
+	NotifyReturnReminder       *bool
+	NotifyOverdueReminder      *bool
+}
+
 // Get reads this rental's knobs. The id comes from the owner context, never
 // from the request -- owners has no RLS to fall back on (it IS the tenant), so
 // the WHERE clause is the whole of the isolation here.
-func (s *Service) Get(ctx context.Context) (sqlcgen.GetSettingsRow, error) {
+func (s *Service) Get(ctx context.Context) (Knobs, error) {
 	ownerID, ok := owner.FromContext(ctx)
 	if !ok {
-		return sqlcgen.GetSettingsRow{}, db.ErrNoOwnerContext
+		return Knobs{}, db.ErrNoOwnerContext
 	}
 
 	var row sqlcgen.GetSettingsRow
@@ -46,9 +78,9 @@ func (s *Service) Get(ctx context.Context) (sqlcgen.GetSettingsRow, error) {
 		return err
 	})
 	if err != nil {
-		return sqlcgen.GetSettingsRow{}, fmt.Errorf("get settings: %w", err)
+		return Knobs{}, fmt.Errorf("get settings: %w", err)
 	}
-	return row, nil
+	return Knobs(knobsOf(row)), nil
 }
 
 // Update applies the knobs the caller actually sent.
@@ -57,23 +89,60 @@ func (s *Service) Get(ctx context.Context) (sqlcgen.GetSettingsRow, error) {
 // 000004 already refuse a bad prefix, a zero payment_due_hours, and a negative
 // tolerance; re-stating them here would give two places to disagree. What this
 // does is translate the refusal into the error code the contract names.
-func (s *Service) Update(ctx context.Context, arg sqlcgen.UpdateSettingsParams) (sqlcgen.UpdateSettingsRow, error) {
+func (s *Service) Update(ctx context.Context, p Patch) (Knobs, error) {
 	ownerID, ok := owner.FromContext(ctx)
 	if !ok {
-		return sqlcgen.UpdateSettingsRow{}, db.ErrNoOwnerContext
+		return Knobs{}, db.ErrNoOwnerContext
 	}
-	arg.ID = ownerID
 
 	var row sqlcgen.UpdateSettingsRow
 	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
 		var err error
-		row, err = sqlcgen.New(tx).UpdateSettings(ctx, arg)
+		row, err = sqlcgen.New(tx).UpdateSettings(ctx, sqlcgen.UpdateSettingsParams{
+			ID:                         ownerID,
+			Slug:                       p.Slug,
+			BookingCodePrefix:          p.BookingCodePrefix,
+			RequirePaymentBeforePickup: p.RequirePaymentBeforePickup,
+			DraftExpiryHours:           int32Ptr(p.DraftExpiryHours),
+			PaymentDueHours:            int32Ptr(p.PaymentDueHours),
+			NoShowToleranceHours:       int32Ptr(p.NoShowToleranceHours),
+			NotifyPickupReminder:       p.NotifyPickupReminder,
+			NotifyReturnReminder:       p.NotifyReturnReminder,
+			NotifyOverdueReminder:      p.NotifyOverdueReminder,
+		})
 		return err
 	})
 	if err != nil {
-		return sqlcgen.UpdateSettingsRow{}, translate(err)
+		return Knobs{}, translate(err)
 	}
-	return row, nil
+	return Knobs(knobsOf(sqlcgen.GetSettingsRow(row))), nil
+}
+
+// knobsOf is the one place a database row becomes a Knobs.
+//
+// The int32/int split is a column detail -- the contract says integer, the
+// column is int -- so it is converted here rather than leaking the choice to
+// every caller.
+func knobsOf(row sqlcgen.GetSettingsRow) Knobs {
+	return Knobs{
+		Slug:                       row.Slug,
+		BookingCodePrefix:          row.BookingCodePrefix,
+		RequirePaymentBeforePickup: row.RequirePaymentBeforePickup,
+		DraftExpiryHours:           int(row.DraftExpiryHours),
+		PaymentDueHours:            int(row.PaymentDueHours),
+		NoShowToleranceHours:       int(row.NoShowToleranceHours),
+		NotifyPickupReminder:       row.NotifyPickupReminder,
+		NotifyReturnReminder:       row.NotifyReturnReminder,
+		NotifyOverdueReminder:      row.NotifyOverdueReminder,
+	}
+}
+
+func int32Ptr(v *int) *int32 {
+	if v == nil {
+		return nil
+	}
+	n := int32(*v) //nolint:gosec // bounded by the schema's minimum and the column's CHECK
+	return &n
 }
 
 // translate maps a constraint violation to the code in 04-api-spec.md section 2.

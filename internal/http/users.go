@@ -37,15 +37,9 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// An empty array, never null: the contract types this as a list, and a
-	// client that has to handle both shapes will eventually handle one wrong.
 	body := make([]User, 0, len(rows))
-	for _, row := range rows {
-		body = append(body, User{
-			Id: row.ID, Email: emailOf(row.Email), Name: row.Name,
-			Role: UserRole(row.Role), Status: UserStatus(row.Status),
-			LastLoginAt: row.LastLoginAt,
-		})
+	for _, account := range rows {
+		body = append(body, userBody(account))
 	}
 	writeJSON(w, r, http.StatusOK, body)
 }
@@ -85,11 +79,7 @@ func (s *Server) inviteUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusCreated, User{
-		Id: row.ID, Email: emailOf(row.Email), Name: row.Name,
-		Role: UserRole(row.Role), Status: UserStatus(row.Status),
-		LastLoginAt: row.LastLoginAt,
-	})
+	writeJSON(w, r, http.StatusCreated, userBody(row))
 }
 
 // UpdateUser handles PATCH /users/{id}.
@@ -112,11 +102,7 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request, id uuid.UUID
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusOK, User{
-		Id: row.ID, Email: emailOf(row.Email), Name: row.Name,
-		Role: UserRole(row.Role), Status: UserStatus(row.Status),
-		LastLoginAt: row.LastLoginAt,
-	})
+	writeJSON(w, r, http.StatusOK, userBody(row))
 }
 
 // DisableUser handles DELETE /users/{id}.
@@ -134,8 +120,22 @@ func (s *Server) disableUser(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// userBody is the domain type becoming the contract type. The two happen to
+// have the same shape today; they are not the same thing, and the contract is
+// free to rename a field without the database following.
+func userBody(a auth.Account) User {
+	return User{
+		Id:          a.ID,
+		Email:       openapi_types.Email(a.Email),
+		Name:        a.Name,
+		Role:        UserRole(a.Role),
+		Status:      UserStatus(a.Status),
+		LastLoginAt: a.LastLoginAt,
+	}
+}
+
 // The generated enums are distinct named string types per operation, so the
-// three converters below exist to avoid repeating the cast at every call site.
+// converters below exist to avoid repeating the cast at every call site.
 
 func stringPtr[T ~string](v *T) *string {
 	if v == nil {
@@ -146,5 +146,3 @@ func stringPtr[T ~string](v *T) *string {
 }
 
 func statusPtr(v *UpdateUserRequestStatus) *string { return stringPtr(v) }
-
-func emailOf(s string) openapi_types.Email { return openapi_types.Email(s) }

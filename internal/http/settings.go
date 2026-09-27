@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
-	"github.com/miqbalhamdani/sewain-api/internal/db/sqlcgen"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
+	"github.com/miqbalhamdani/sewain-api/internal/settings"
 )
 
 // Owner knobs over HTTP.  (S1-009)
@@ -14,6 +14,10 @@ import (
 // PATCH /settings is the first owner-only endpoint in the system, which makes
 // it the first caller of requirePermission. An operator reaching it gets a 403
 // naming settings:write rather than a blank refusal (BR-003).
+//
+// Nothing here mentions sqlc. The generated row types are regenerated from the
+// migrations, so a column rename that reached this file would be a schema
+// change rippling into the HTTP layer. internal/settings converts, once.
 
 // GetSettings handles GET /settings.
 func (s *Server) GetSettings(w http.ResponseWriter, r *http.Request) {
@@ -21,12 +25,12 @@ func (s *Server) GetSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
-	row, err := s.settings.Get(r.Context())
+	knobs, err := s.settings.Get(r.Context())
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusOK, settingsBody(sqlcgen.UpdateSettingsRow(row)))
+	writeJSON(w, r, http.StatusOK, settingsBody(knobs))
 }
 
 // UpdateSettings handles PATCH /settings.
@@ -42,16 +46,16 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Every field is a pointer, so nil means the key was absent and the stored
-	// value stands. The query COALESCEs on exactly that, which is what keeps
-	// PATCH from behaving like a PUT that blanks whatever went unmentioned.
-	row, err := s.settings.Update(r.Context(), sqlcgen.UpdateSettingsParams{
+	// Every field is a pointer, and nil carries straight through as "the key
+	// was absent". The query COALESCEs on that, which is what keeps PATCH from
+	// behaving like a PUT that blanks whatever went unmentioned.
+	knobs, err := s.settings.Update(r.Context(), settings.Patch{
 		Slug:                       body.Slug,
 		BookingCodePrefix:          body.BookingCodePrefix,
 		RequirePaymentBeforePickup: body.RequirePaymentBeforePickup,
-		DraftExpiryHours:           int32Ptr(body.DraftExpiryHours),
-		PaymentDueHours:            int32Ptr(body.PaymentDueHours),
-		NoShowToleranceHours:       int32Ptr(body.NoShowToleranceHours),
+		DraftExpiryHours:           body.DraftExpiryHours,
+		PaymentDueHours:            body.PaymentDueHours,
+		NoShowToleranceHours:       body.NoShowToleranceHours,
 		NotifyPickupReminder:       body.NotifyPickupReminder,
 		NotifyReturnReminder:       body.NotifyReturnReminder,
 		NotifyOverdueReminder:      body.NotifyOverdueReminder,
@@ -60,30 +64,22 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusOK, settingsBody(row))
+	writeJSON(w, r, http.StatusOK, settingsBody(knobs))
 }
 
-func settingsBody(row sqlcgen.UpdateSettingsRow) Settings {
+// settingsBody is the domain type becoming the contract type. The two happen
+// to have the same shape today; they are not the same thing, and the contract
+// is free to rename a field without the database following.
+func settingsBody(k settings.Knobs) Settings {
 	return Settings{
-		Slug:                       row.Slug,
-		BookingCodePrefix:          row.BookingCodePrefix,
-		RequirePaymentBeforePickup: row.RequirePaymentBeforePickup,
-		DraftExpiryHours:           int(row.DraftExpiryHours),
-		PaymentDueHours:            int(row.PaymentDueHours),
-		NoShowToleranceHours:       int(row.NoShowToleranceHours),
-		NotifyPickupReminder:       row.NotifyPickupReminder,
-		NotifyReturnReminder:       row.NotifyReturnReminder,
-		NotifyOverdueReminder:      row.NotifyOverdueReminder,
+		Slug:                       k.Slug,
+		BookingCodePrefix:          k.BookingCodePrefix,
+		RequirePaymentBeforePickup: k.RequirePaymentBeforePickup,
+		DraftExpiryHours:           k.DraftExpiryHours,
+		PaymentDueHours:            k.PaymentDueHours,
+		NoShowToleranceHours:       k.NoShowToleranceHours,
+		NotifyPickupReminder:       k.NotifyPickupReminder,
+		NotifyReturnReminder:       k.NotifyReturnReminder,
+		NotifyOverdueReminder:      k.NotifyOverdueReminder,
 	}
-}
-
-// int32Ptr bridges the two generators: the contract says integer so
-// oapi-codegen emits int, the column is int so sqlc emits int32. One place to
-// convert beats one per field.
-func int32Ptr(v *int) *int32 {
-	if v == nil {
-		return nil
-	}
-	n := int32(*v) //nolint:gosec // bounded by the schema's minimum and the column's CHECK
-	return &n
 }
