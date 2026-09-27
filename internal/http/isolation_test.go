@@ -334,7 +334,7 @@ var newServer = func(t *testing.T) http.Handler {
 		WithMail(redis, mail.Discard{}, "http://localhost:3000")
 
 	return httpapi.NewRouter(
-		httpapi.NewServer(authSvc, settings.New(store), ratelimit.New(redis), false), signer)
+		httpapi.NewServer(authSvc, settings.New(store), ratelimit.New(redis), false), signer, redis)
 }
 
 // --- fixtures --------------------------------------------------------------

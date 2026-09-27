@@ -82,6 +82,16 @@ type routeAccess struct {
 	// users.email_verified_at is still null. Exactly six, and each one is
 	// either the way in, the way out, or the way to see which you are in.
 	preVerification bool
+
+	// idempotent marks the routes where Idempotency-Key is mandatory --
+	// 04-api-spec.md §2.1 names eight, and every one of them either creates a
+	// booking or moves money.
+	//
+	// None of them exist yet: the first is POST /bookings in S1-026. The
+	// column is here rather than in a list of its own for the reason the
+	// other two share this table -- three properties of one route belong on
+	// one line, or they drift.
+	idempotent bool
 }
 
 var routeAccessTable = map[string]routeAccess{
@@ -98,6 +108,18 @@ var routeAccessTable = map[string]routeAccess{
 	"POST /api/v1/auth/logout":              {preVerification: true},
 	"POST /api/v1/auth/verify-email/resend": {preVerification: true},
 	"GET /api/v1/me":                        {preVerification: true},
+
+	// The eight that will require Idempotency-Key (04-api-spec.md §2.1). Each
+	// arrives with the item that adds it, and adding the route without the
+	// flag is the mistake this list exists to make visible:
+	//
+	//   S1-026  POST /bookings              POST /public/bookings
+	//   S1-035  POST /bookings/{id}/pickup
+	//   S1-036  POST /bookings/{id}/return
+	//   S1-041  POST /invoices/{id}/lines
+	//   S1-042  POST /bookings/{id}/deposit/settle
+	//           POST /bookings/{id}/deposit/waive
+	//   S1-044  POST /invoices/{id}/payments
 }
 
 func accessFor(r *http.Request) routeAccess {

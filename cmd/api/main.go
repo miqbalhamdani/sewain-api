@@ -95,6 +95,7 @@ func run() error {
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(pool), ratelimit.New(redis), !config.IsDevelopment()),
 		signer,
+		redis,
 	))
 
 	addr := ":" + config.Getenv("PORT", config.DefaultPort)

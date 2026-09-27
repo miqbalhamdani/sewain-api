@@ -34,6 +34,7 @@ const (
 
 	CodeEmailNotVerified         = "email-not-verified"         // BR-006, S1-084
 	CodeVerificationTokenInvalid = "verification-token-invalid" // BR-006, S1-084
+	CodeRequestInFlight          = "request-in-flight"          // BR-090, S1-012
 )
 
 // Field is one entry in a Problem's errors array: which field, and what about
@@ -156,6 +157,20 @@ func EmailNotVerified() *Error {
 func RateLimited(detail string) *Error {
 	return &Error{Code: CodeRateLimited, Status: http.StatusTooManyRequests,
 		Title: "Too many requests", Detail: detail}
+}
+
+// RequestInFlight is the answer to a repeated Idempotency-Key whose first
+// request has not finished yet (BR-090).
+//
+// 409, and the detail says wait rather than retry. A client that retries with
+// a NEW key on seeing this has thrown away the entire point: the second key is
+// a second intent, and the booking it creates is the duplicate the header
+// existed to prevent.
+func RequestInFlight() *Error {
+	return &Error{Code: CodeRequestInFlight, Status: http.StatusConflict,
+		Title: "Request already in flight",
+		Detail: "An identical request is still being processed. Wait for it to finish; " +
+			"do not send it again with a new Idempotency-Key."}
 }
 
 // Internal wraps anything the client has no business seeing.

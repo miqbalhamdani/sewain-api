@@ -75,6 +75,43 @@ func (c *Client) GetDel(ctx context.Context, key string) (string, error) {
 	return v, nil
 }
 
+// Get reads a key without removing it.
+//
+// The counterpart to GetDel, for values that are read many times rather than
+// redeemed once -- a stored idempotency result is replayed to every retry that
+// presents the same key, not consumed by the first.
+func (c *Client) Get(ctx context.Context, key string) (string, error) {
+	v, err := c.rdb.Get(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("redis GET %s: %w", key, err)
+	}
+	return v, nil
+}
+
+// Set writes a key whether or not it exists, keeping the TTL already on it.
+//
+// KEEPTTL matters: an idempotency key is claimed when the request starts and
+// overwritten with the response when it finishes, and a plain SET would reset
+// the 24 hours from the moment of completion rather than from the moment the
+// client first asked. A slow handler would quietly extend its own window.
+func (c *Client) Set(ctx context.Context, key, value string) error {
+	if err := c.rdb.Set(ctx, key, value, redis.KeepTTL).Err(); err != nil {
+		return fmt.Errorf("redis SET %s: %w", key, err)
+	}
+	return nil
+}
+
+// Del removes a key.
+func (c *Client) Del(ctx context.Context, key string) error {
+	if err := c.rdb.Del(ctx, key).Err(); err != nil {
+		return fmt.Errorf("redis DEL %s: %w", key, err)
+	}
+	return nil
+}
+
 // Incr increments a counter and returns its new value, setting the TTL on the
 // first increment of a window.
 //

@@ -54,6 +54,7 @@ const (
 	ErrorCodeNotFound                 ErrorCode = "not-found"
 	ErrorCodePermissionDenied         ErrorCode = "permission-denied"
 	ErrorCodeRateLimited              ErrorCode = "rate-limited"
+	ErrorCodeRequestInFlight          ErrorCode = "request-in-flight"
 	ErrorCodeSlugInvalid              ErrorCode = "slug-invalid"
 	ErrorCodeSlugTaken                ErrorCode = "slug-taken"
 	ErrorCodeUnauthenticated          ErrorCode = "unauthenticated"
@@ -75,6 +76,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodePermissionDenied:
 		return true
 	case ErrorCodeRateLimited:
+		return true
+	case ErrorCodeRequestInFlight:
 		return true
 	case ErrorCodeSlugInvalid:
 		return true
