@@ -8,6 +8,7 @@ import (
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
+	"github.com/miqbalhamdani/sewain-api/internal/settings"
 )
 
 // refreshCookieName is the only place the refresh token lives on a client.
@@ -19,15 +20,16 @@ const refreshCookieName = "refresh_token"
 // looks like a decision belongs in the service, where it can be tested without
 // an HTTP request.
 type Server struct {
-	auth *auth.Service
+	auth     *auth.Service
+	settings *settings.Service
 
 	// secureCookies is false only for local development over plain HTTP, where
 	// a Secure cookie would be dropped by the browser and nothing would work.
 	secureCookies bool
 }
 
-func NewServer(authSvc *auth.Service, secureCookies bool) *Server {
-	return &Server{auth: authSvc, secureCookies: secureCookies}
+func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, secureCookies bool) *Server {
+	return &Server{auth: authSvc, settings: settingsSvc, secureCookies: secureCookies}
 }
 
 // Login handles POST /auth/login.

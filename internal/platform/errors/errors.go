@@ -19,13 +19,18 @@ import (
 // last segment of the type URI a client receives.
 const (
 	CodeValidationFailed = "validation-failed"
-	CodeVersionConflict  = "version-conflict"
-	CodeDuplicateSKU     = "duplicate-sku"
 	CodePermissionDenied = "permission-denied"
 	CodeNotFound         = "not-found"
 	CodeRateLimited      = "rate-limited"
 	CodeUnauthenticated  = "unauthenticated"
 	CodeInternal         = "internal"
+
+	// Business-rule codes. Each one is added by the backlog item that owns it,
+	// and each one is in ../docs/04-api-spec.md section 2 -- the catalogue here
+	// and the catalogue there are the same list or S1-011 is not done.
+	CodeEmailTaken  = "email-taken"  // BR-004, S1-010
+	CodeSlugTaken   = "slug-taken"   // BR-025, S1-009
+	CodeSlugInvalid = "slug-invalid" // BR-025, S1-009
 )
 
 // Field is one entry in a Problem's errors array: which field, and what about
@@ -101,12 +106,33 @@ func ValidationFailed(detail string) *Error {
 		Title: "Validation failed", Detail: detail}
 }
 
-func VersionConflict(expected, supplied int) *Error {
-	return (&Error{Code: CodeVersionConflict, Status: http.StatusConflict,
-		Title:  "Version conflict",
-		Detail: "This was changed by someone else. Reload and try again."}).
-		WithFields(Field{Name: "version", Extra: map[string]any{
-			"expected": expected, "supplied": supplied}})
+// EmailTaken is a 422, not a 409: the address is unique across the whole system
+// (BR-004), so the caller has to supply a different one rather than retry.
+//
+// It says nothing about which rental holds the address. Answering "does this
+// person have an account here" for an unauthenticated guess is the same leak
+// login already refuses to make.
+func EmailTaken() *Error {
+	return (&Error{Code: CodeEmailTaken, Status: http.StatusUnprocessableEntity,
+		Title:  "Email already in use",
+		Detail: "That email address already has an account."}).
+		WithFields(Field{Name: "email"})
+}
+
+func SlugTaken() *Error {
+	return (&Error{Code: CodeSlugTaken, Status: http.StatusUnprocessableEntity,
+		Title:  "Subdomain already taken",
+		Detail: "That subdomain is already in use by another business."}).
+		WithFields(Field{Name: "slug"})
+}
+
+// SlugInvalid covers all three schema constraints at once -- shape, punycode,
+// and the reserved list -- because the caller's next move is the same for each:
+// pick a different label.
+func SlugInvalid(detail string) *Error {
+	return (&Error{Code: CodeSlugInvalid, Status: http.StatusUnprocessableEntity,
+		Title: "Subdomain not allowed", Detail: detail}).
+		WithFields(Field{Name: "slug"})
 }
 
 // Internal wraps anything the client has no business seeing.

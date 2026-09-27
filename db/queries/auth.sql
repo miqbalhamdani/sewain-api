@@ -8,7 +8,13 @@
 -- name: GetSession :one
 -- Everything the Session response needs, in one round trip. Runs inside
 -- InOwnerTx, so RLS has already scoped users; owners has no RLS by design.
-SELECT u.id AS user_id, u.name AS user_name, u.role,
+--
+-- u.status is here for Refresh, not for the response body. Login checks the
+-- status against auth_lookup_user, but Refresh reached this row for the role
+-- alone and never looked -- so a disabled account kept minting access tokens
+-- every 15 minutes, forever. BR-004 caps a revoked session at the access token
+-- TTL, and that promise needs the column (S1-010).
+SELECT u.id AS user_id, u.name AS user_name, u.role, u.status,
        o.id AS owner_id, o.name AS owner_name, o.slug
   FROM users u
   JOIN owners o ON o.id = u.owner_id

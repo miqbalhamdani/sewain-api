@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel"
 )
 
 // Store owns the connection pool and is the entry point for every query.
@@ -24,7 +25,15 @@ type Store struct {
 // A pool that cannot be reached is an error here rather than a surprise on the
 // first query.
 func New(ctx context.Context, url string) (*Store, error) {
-	pool, err := pgxpool.New(ctx, url)
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("parse postgres url: %w", err)
+	}
+	// Every query gets a child span, so BR-092's "durasi query" is a property
+	// of the trace rather than something a handler has to remember to measure.
+	cfg.ConnConfig.Tracer = queryTracer{tracer: otel.Tracer("sewain-api/db")}
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open postgres pool: %w", err)
 	}

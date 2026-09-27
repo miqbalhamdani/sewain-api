@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
@@ -45,6 +48,16 @@ func Authenticate(signer *auth.Signer) func(http.Handler) http.Handler {
 			ctx := owner.NewContext(r.Context(), claims.OwnerID)
 			ctx = auth.NewRoleContext(ctx, claims.Role)
 			ctx = auth.NewUserContext(ctx, claims.UserID())
+
+			// BR-092 wants owner_id on the span, and this is the first moment
+			// it is known. Here rather than in InOwnerTx for two reasons: a
+			// request that never touches the database still gets the
+			// attribute, and one that runs twenty queries does not set it
+			// twenty times. `tracing` runs before this middleware, so the
+			// span in the context is the live server span.
+			trace.SpanFromContext(ctx).SetAttributes(
+				attribute.String("owner_id", claims.OwnerID.String()))
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

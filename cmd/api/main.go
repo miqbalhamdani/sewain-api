@@ -21,6 +21,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/telemetry"
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
+	"github.com/miqbalhamdani/sewain-api/internal/settings"
 )
 
 func main() {
@@ -72,9 +73,10 @@ func run() error {
 	mux.Handle("GET /healthz", newHealthHandler(
 		checker{name: "postgres", version: pool.ServerVersion},
 		checker{name: "redis", version: redis.ServerVersion},
+		objectStoreChecker(config.ObjectStoreURL()),
 	))
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
-		httpapi.NewServer(auth.NewService(pool, signer), !config.IsDevelopment()),
+		httpapi.NewServer(auth.NewService(pool, signer), settings.New(pool), !config.IsDevelopment()),
 		signer,
 	))
 

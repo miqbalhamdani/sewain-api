@@ -36,6 +36,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
+	"github.com/miqbalhamdani/sewain-api/internal/settings"
 )
 
 const (
@@ -62,6 +63,10 @@ type seeded struct {
 	password     string
 	accessToken  string
 	refreshToken string
+
+	// userID is the seeded user's own id, so a case can aim an id-taking route
+	// at owner B's row and watch it answer 404 rather than 403.
+	userID string
 }
 
 // isolationCase says how to exercise one route as owner A after owner B owns
@@ -314,7 +319,8 @@ var newServer = func(t *testing.T) http.Handler {
 		t.Fatalf("new signer: %v", err)
 	}
 	// secureCookies false: httptest speaks plain HTTP.
-	return httpapi.NewRouter(httpapi.NewServer(auth.NewService(store, signer), false), signer)
+	return httpapi.NewRouter(
+		httpapi.NewServer(auth.NewService(store, signer), settings.New(store), false), signer)
 }
 
 // --- fixtures --------------------------------------------------------------

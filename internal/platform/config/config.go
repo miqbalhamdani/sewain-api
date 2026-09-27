@@ -25,7 +25,12 @@ const (
 	DefaultAppDatabaseURL = "postgres://app_user@localhost:5432/sewain_dev?sslmode=disable"
 
 	DefaultRedisURL = "redis://localhost:6379/0"
-	DefaultPort     = "8080"
+
+	// MinIO as a single binary on the host, not a container (S1-001). In
+	// production this is R2 instead; the adapter is the same either way,
+	// because both speak S3 (S1-033).
+	DefaultObjectStoreURL = "http://localhost:9000"
+	DefaultPort           = "8080"
 
 	// Local development only. There is no safe default for a signing secret,
 	// so this one is obviously not a secret -- JWTSecret refuses it whenever
@@ -50,6 +55,8 @@ func AppDatabaseURL() string { return Getenv("APP_DATABASE_URL", DefaultAppDatab
 
 // RedisURL is the Redis DSN.
 func RedisURL() string { return Getenv("REDIS_URL", DefaultRedisURL) }
+
+func ObjectStoreURL() string { return Getenv("OBJECT_STORE_URL", DefaultObjectStoreURL) }
 
 // OTLPEndpoint is where traces are sent. Empty means nowhere: ids are still
 // real and still land in the logs, which is all there is to do before P1-001

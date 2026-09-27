@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
+	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
 )
 
 // BasePath is the prefix every contract endpoint lives under, and the only
@@ -28,7 +29,22 @@ func NewRouter(srv ServerInterface, signer *auth.Signer) http.Handler {
 	// Outermost, so a span exists before anything can fail. An error raised by
 	// the authentication middleware still carries a trace id that resolves.
 	r.Use(tracing, Authenticate(signer))
-	return HandlerFromMuxWithBaseURL(srv, r, BasePath)
+	return HandlerWithOptions(srv, ChiServerOptions{
+		BaseURL:    BasePath,
+		BaseRouter: r,
+		// The generated default is http.Error -- plain text, no trace id, and
+		// a 400 whatever went wrong. Everything else in this service answers
+		// RFC 9457, and a malformed uuid in a path is not the one place where
+		// that should stop being true (BR-092).
+		ErrorHandlerFunc: badRequest,
+	})
+}
+
+// badRequest turns the generated parameter-binding failures into the same
+// problem envelope every handler uses.
+func badRequest(w http.ResponseWriter, r *http.Request, err error) {
+	writeError(w, r, apperrors.ValidationFailed(
+		"A path or query parameter is not in the expected format.").WithCause(err))
 }
 
 // tracing starts a span per request and names it after the matched route

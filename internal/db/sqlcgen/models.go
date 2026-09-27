@@ -22,6 +22,9 @@ type Owner struct {
 	NotifyOverdueReminder      bool
 	CreatedAt                  time.Time
 	UpdatedAt                  time.Time
+	BookingCodePrefix          string
+	PaymentDueHours            int32
+	NoShowToleranceHours       int32
 }
 
 type RefreshToken struct {

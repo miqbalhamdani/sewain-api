@@ -170,6 +170,47 @@ func TestLogin(t *testing.T) {
 	})
 }
 
+// TestDisabledAccountCannotRefresh is S1-010's "sesi mati <= 15 menit".
+//
+// Login has always refused a disabled account. Refresh did not: it read the
+// user row for the role and never looked at the status, so a revoked account
+// went on minting access tokens every fifteen minutes for as long as its
+// refresh token lived -- thirty days. The cap BR-004 promises only held for
+// accounts nobody had actually revoked.
+func TestDisabledAccountCannotRefresh(t *testing.T) {
+	ctx := t.Context()
+	svc, store := newTestService(ctx, t)
+
+	ownerID, userID, email := seedUser(ctx, t, store)
+
+	session, err := svc.Login(ctx, email, testPassword)
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	// Refresh works while the account is active, so the assertion below is
+	// about the status and not about some unrelated breakage.
+	if _, err := svc.Refresh(ctx, session.RefreshToken); err != nil {
+		t.Fatalf("refresh while active: %v", err)
+	}
+
+	session, err = svc.Login(ctx, email, testPassword)
+	if err != nil {
+		t.Fatalf("second login: %v", err)
+	}
+
+	if err := store.InOwnerTx(owner.NewContext(ctx, ownerID), func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE users SET status = 'disabled' WHERE id = $1`, userID)
+		return err
+	}); err != nil {
+		t.Fatalf("disable user: %v", err)
+	}
+
+	if _, err := svc.Refresh(ctx, session.RefreshToken); !errors.Is(err, ErrUnauthenticated) {
+		t.Fatalf("refresh after disable = %v, want ErrUnauthenticated", err)
+	}
+}
+
 func TestRefreshAndLogout(t *testing.T) {
 	ctx := t.Context()
 	svc, store := newTestService(ctx, t)

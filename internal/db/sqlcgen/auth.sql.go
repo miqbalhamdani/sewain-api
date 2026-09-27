@@ -40,7 +40,7 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 
 const getSession = `-- name: GetSession :one
 
-SELECT u.id AS user_id, u.name AS user_name, u.role,
+SELECT u.id AS user_id, u.name AS user_name, u.role, u.status,
        o.id AS owner_id, o.name AS owner_name, o.slug
   FROM users u
   JOIN owners o ON o.id = u.owner_id
@@ -51,6 +51,7 @@ type GetSessionRow struct {
 	UserID    uuid.UUID
 	UserName  string
 	Role      string
+	Status    string
 	OwnerID   uuid.UUID
 	OwnerName string
 	Slug      *string
@@ -64,6 +65,12 @@ type GetSessionRow struct {
 // among generated code that all looks alike.
 // Everything the Session response needs, in one round trip. Runs inside
 // InOwnerTx, so RLS has already scoped users; owners has no RLS by design.
+//
+// u.status is here for Refresh, not for the response body. Login checks the
+// status against auth_lookup_user, but Refresh reached this row for the role
+// alone and never looked -- so a disabled account kept minting access tokens
+// every 15 minutes, forever. BR-004 caps a revoked session at the access token
+// TTL, and that promise needs the column (S1-010).
 func (q *Queries) GetSession(ctx context.Context, id uuid.UUID) (GetSessionRow, error) {
 	row := q.db.QueryRow(ctx, getSession, id)
 	var i GetSessionRow
@@ -71,6 +78,7 @@ func (q *Queries) GetSession(ctx context.Context, id uuid.UUID) (GetSessionRow, 
 		&i.UserID,
 		&i.UserName,
 		&i.Role,
+		&i.Status,
 		&i.OwnerID,
 		&i.OwnerName,
 		&i.Slug,

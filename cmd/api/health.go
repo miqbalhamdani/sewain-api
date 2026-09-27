@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -66,4 +67,42 @@ func newHealthHandler(checks ...checker) http.Handler {
 			slog.ErrorContext(ctx, "write healthz response", "error", err)
 		}
 	})
+}
+
+// objectStoreChecker reports whether the local MinIO is answering.
+//
+// A plain GET, not a signed request: liveness does not need credentials, and
+// the S3 adapter that would supply them is S1-033's, in M3. Pulling it forward
+// to colour one line of /healthz would be building the adapter early to avoid
+// writing ten lines.
+//
+// ponytail: /minio/health/live is MinIO's own endpoint and R2 does not serve
+// it, so this probe is local-only -- which is all S1-001 asks for, since
+// production has no MinIO. S1-033 replaces it with a signed HeadBucket that
+// works against both.
+func objectStoreChecker(baseURL string) checker {
+	return checker{
+		name: "objectstore",
+		version: func(ctx context.Context) (string, error) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/minio/health/live", nil)
+			if err != nil {
+				return "", err
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return "", err
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			if resp.StatusCode != http.StatusOK {
+				return "", fmt.Errorf("object store health returned %s", resp.Status)
+			}
+			// MinIO reports its product, not its build, and that is the right
+			// amount: see the note above about /healthz being reconnaissance.
+			if server := resp.Header.Get("Server"); server != "" {
+				return server, nil
+			}
+			return "ok", nil
+		},
+	}
 }

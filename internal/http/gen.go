@@ -12,15 +12,19 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for ErrorCode.
 const (
+	ErrorCodeEmailTaken       ErrorCode = "email-taken"
 	ErrorCodeInternal         ErrorCode = "internal"
 	ErrorCodeNotFound         ErrorCode = "not-found"
 	ErrorCodePermissionDenied ErrorCode = "permission-denied"
 	ErrorCodeRateLimited      ErrorCode = "rate-limited"
+	ErrorCodeSlugInvalid      ErrorCode = "slug-invalid"
+	ErrorCodeSlugTaken        ErrorCode = "slug-taken"
 	ErrorCodeUnauthenticated  ErrorCode = "unauthenticated"
 	ErrorCodeValidationFailed ErrorCode = "validation-failed"
 )
@@ -28,6 +32,8 @@ const (
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeEmailTaken:
+		return true
 	case ErrorCodeInternal:
 		return true
 	case ErrorCodeNotFound:
@@ -35,6 +41,10 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodePermissionDenied:
 		return true
 	case ErrorCodeRateLimited:
+		return true
+	case ErrorCodeSlugInvalid:
+		return true
+	case ErrorCodeSlugTaken:
 		return true
 	case ErrorCodeUnauthenticated:
 		return true
@@ -45,18 +55,111 @@ func (e ErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for InviteUserRequestRole.
+const (
+	InviteUserRequestRoleOperator InviteUserRequestRole = "operator"
+	InviteUserRequestRoleOwner    InviteUserRequestRole = "owner"
+)
+
+// Valid indicates whether the value is a known member of the InviteUserRequestRole enum.
+func (e InviteUserRequestRole) Valid() bool {
+	switch e {
+	case InviteUserRequestRoleOperator:
+		return true
+	case InviteUserRequestRoleOwner:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionUserRole.
 const (
-	Operator SessionUserRole = "operator"
-	Owner    SessionUserRole = "owner"
+	SessionUserRoleOperator SessionUserRole = "operator"
+	SessionUserRoleOwner    SessionUserRole = "owner"
 )
 
 // Valid indicates whether the value is a known member of the SessionUserRole enum.
 func (e SessionUserRole) Valid() bool {
 	switch e {
-	case Operator:
+	case SessionUserRoleOperator:
 		return true
-	case Owner:
+	case SessionUserRoleOwner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateUserRequestRole.
+const (
+	UpdateUserRequestRoleOperator UpdateUserRequestRole = "operator"
+	UpdateUserRequestRoleOwner    UpdateUserRequestRole = "owner"
+)
+
+// Valid indicates whether the value is a known member of the UpdateUserRequestRole enum.
+func (e UpdateUserRequestRole) Valid() bool {
+	switch e {
+	case UpdateUserRequestRoleOperator:
+		return true
+	case UpdateUserRequestRoleOwner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateUserRequestStatus.
+const (
+	UpdateUserRequestStatusActive   UpdateUserRequestStatus = "active"
+	UpdateUserRequestStatusDisabled UpdateUserRequestStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the UpdateUserRequestStatus enum.
+func (e UpdateUserRequestStatus) Valid() bool {
+	switch e {
+	case UpdateUserRequestStatusActive:
+		return true
+	case UpdateUserRequestStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserRole.
+const (
+	UserRoleOperator UserRole = "operator"
+	UserRoleOwner    UserRole = "owner"
+)
+
+// Valid indicates whether the value is a known member of the UserRole enum.
+func (e UserRole) Valid() bool {
+	switch e {
+	case UserRoleOperator:
+		return true
+	case UserRoleOwner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserStatus.
+const (
+	UserStatusActive   UserStatus = "active"
+	UserStatusDisabled UserStatus = "disabled"
+	UserStatusInvited  UserStatus = "invited"
+)
+
+// Valid indicates whether the value is a known member of the UserStatus enum.
+func (e UserStatus) Valid() bool {
+	switch e {
+	case UserStatusActive:
+		return true
+	case UserStatusDisabled:
+		return true
+	case UserStatusInvited:
 		return true
 	default:
 		return false
@@ -70,6 +173,16 @@ func (e SessionUserRole) Valid() bool {
 // Kodenya juga jadi segmen terakhir URI `Problem.type`, dan memakai **hyphen**, bukan
 // underscore.
 type ErrorCode string
+
+// InviteUserRequest defines model for InviteUserRequest.
+type InviteUserRequest struct {
+	Email openapi_types.Email    `json:"email"`
+	Name  string                 `json:"name"`
+	Role  *InviteUserRequestRole `json:"role,omitempty"`
+}
+
+// InviteUserRequestRole defines model for InviteUserRequest.Role.
+type InviteUserRequestRole string
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -198,6 +311,106 @@ type SessionUser struct {
 // SessionUserRole Satu peran per orang, karena satu orang punya satu usaha (BR-003, BR-004).
 type SessionUserRole string
 
+// Settings Knob pemilik, semuanya. Tiap satu ada karena sebuah aturan bisnis melarang
+// meng-hardcode-nya, dan `PATCH /settings` satu-satunya tempat mereka disetel.
+type Settings struct {
+	// BookingCodePrefix Awalan kode booking, `SWN-0001`. Mengubahnya **tidak** menyentuh kode yang sudah
+	// terbit dan **tidak** me-reset pencacahnya (BR-024).
+	//
+	//
+	// Examples: RBD
+	BookingCodePrefix string `json:"booking_code_prefix"`
+
+	// DraftExpiryHours Umur draft dari halaman publik sebelum dibatalkan otomatis (BR-027).
+	DraftExpiryHours int `json:"draft_expiry_hours"`
+
+	// NoShowToleranceHours Tenggang sesudah `start_at` sebelum booking ditandai `no_show`. **`0` diterima**,
+	// dan itu bedanya dengan `payment_due_hours` — pemilik yang mau membebaskan unitnya
+	// di hari yang sama memang menyetelnya nol (BR-057).
+	NoShowToleranceHours int `json:"no_show_tolerance_hours"`
+
+	// NotifyOverdueReminder Pengingat saat kondisi telat terpenuhi (BR-070).
+	NotifyOverdueReminder bool `json:"notify_overdue_reminder"`
+
+	// NotifyPickupReminder Pengingat H-1 ambil (BR-070).
+	NotifyPickupReminder bool `json:"notify_pickup_reminder"`
+
+	// NotifyReturnReminder Pengingat H-1 balik (BR-070).
+	NotifyReturnReminder bool `json:"notify_return_reminder"`
+
+	// PaymentDueHours Tenggat bayar sejak invoice terbit. **`0` ditolak database** — tenggat nol berarti
+	// invoice yang lewat tempo pada detik ia terbit (BR-057).
+	PaymentDueHours int `json:"payment_due_hours"`
+
+	// RequirePaymentBeforePickup Kalau menyala, pengambilan ditolak selama invoicenya belum lunas (BR-038).
+	RequirePaymentBeforePickup bool `json:"require_payment_before_pickup"`
+
+	// Slug Sama dengan `SessionOwner.slug`: `null` adalah keadaan awal, dan di sinilah ia
+	// diisi — bukan saat daftar (BR-005, BR-025).
+	//
+	// **Belum ada yang membacanya sampai M5** (`S1-051`, `S1-060`). Ia tersimpan dan
+	// tervalidasi di sini, tapi halaman publiknya baru hidup 12 minggu kemudian, dan
+	// layar pengaturan wajib jujur soal itu.
+	//
+	//
+	// Examples: rentalbudi
+	Slug *string `json:"slug"`
+}
+
+// SettingsUpdate Semua field opsional. Key yang absen dibiarkan apa adanya; `null` eksplisit adalah
+// `422` — menghilangkan field dan mengirim `null` bukan hal yang sama.
+type SettingsUpdate struct {
+	BookingCodePrefix          *string `json:"booking_code_prefix,omitempty"`
+	DraftExpiryHours           *int    `json:"draft_expiry_hours,omitempty"`
+	NoShowToleranceHours       *int    `json:"no_show_tolerance_hours,omitempty"`
+	NotifyOverdueReminder      *bool   `json:"notify_overdue_reminder,omitempty"`
+	NotifyPickupReminder       *bool   `json:"notify_pickup_reminder,omitempty"`
+	NotifyReturnReminder       *bool   `json:"notify_return_reminder,omitempty"`
+	PaymentDueHours            *int    `json:"payment_due_hours,omitempty"`
+	RequirePaymentBeforePickup *bool   `json:"require_payment_before_pickup,omitempty"`
+
+	// Slug Examples: rentalbudi
+	Slug *string `json:"slug,omitempty"`
+}
+
+// UpdateUserRequest Minimal satu field. `email` dan `owner_id` sengaja tidak ada di sini.
+type UpdateUserRequest struct {
+	Role *UpdateUserRequestRole `json:"role,omitempty"`
+
+	// Status `invited` tidak ada di sini — ia dikelola server dan cuma berlaku sebelum
+	// undangannya diterima.
+	Status *UpdateUserRequestStatus `json:"status,omitempty"`
+}
+
+// UpdateUserRequestRole defines model for UpdateUserRequest.Role.
+type UpdateUserRequestRole string
+
+// UpdateUserRequestStatus `invited` tidak ada di sini — ia dikelola server dan cuma berlaku sebelum
+// undangannya diterima.
+type UpdateUserRequestStatus string
+
+// User Akun di usaha ini. Tidak pernah memuat `password_hash` maupun `owner_id` — yang
+// pertama rahasia, yang kedua sudah tersirat dari usaha pemanggilnya.
+type User struct {
+	// Email Unik di seluruh sistem, bukan per usaha (BR-004).
+	Email       openapi_types.Email `json:"email"`
+	Id          openapi_types.UUID  `json:"id"`
+	LastLoginAt *time.Time          `json:"last_login_at,omitempty"`
+	Name        string              `json:"name"`
+	Role        UserRole            `json:"role"`
+
+	// Status `invited` sampai undangannya diterima, `disabled` sesudah dinonaktifkan. Nol
+	// endpoint di API ini yang menghapus baris `users`.
+	Status UserStatus `json:"status"`
+}
+
+// UserRole defines model for User.Role.
+type UserRole string
+
+// UserStatus `invited` sampai undangannya diterima, `disabled` sesudah dinonaktifkan. Nol
+// endpoint di API ini yang menghapus baris `users`.
+type UserStatus string
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
@@ -258,6 +471,15 @@ type UnprocessableEntity = Problem
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
+type UpdateSettingsJSONRequestBody = SettingsUpdate
+
+// InviteUserJSONRequestBody defines body for InviteUser for application/json ContentType.
+type InviteUserJSONRequestBody = InviteUserRequest
+
+// UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
+type UpdateUserJSONRequestBody = UpdateUserRequest
 
 // Getter for additional properties for ProblemError. Returns the specified
 // element and whether it was found
@@ -354,6 +576,24 @@ type ServerInterface interface {
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// GetSettings Baca knob pemilik
+	// (GET /settings)
+	GetSettings(w http.ResponseWriter, r *http.Request)
+	// UpdateSettings Ubah knob pemilik
+	// (PATCH /settings)
+	UpdateSettings(w http.ResponseWriter, r *http.Request)
+	// ListUsers Akun di usaha ini
+	// (GET /users)
+	ListUsers(w http.ResponseWriter, r *http.Request)
+	// InviteUser Undang akun ke usaha ini
+	// (POST /users)
+	InviteUser(w http.ResponseWriter, r *http.Request)
+	// DisableUser Nonaktifkan akun
+	// (DELETE /users/{id})
+	DisableUser(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UpdateUser Ubah peran atau status akun
+	// (PATCH /users/{id})
+	UpdateUser(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -381,6 +621,42 @@ func (_ Unimplemented) Refresh(w http.ResponseWriter, r *http.Request) {
 // GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 // (GET /me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetSettings Baca knob pemilik
+// (GET /settings)
+func (_ Unimplemented) GetSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateSettings Ubah knob pemilik
+// (PATCH /settings)
+func (_ Unimplemented) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListUsers Akun di usaha ini
+// (GET /users)
+func (_ Unimplemented) ListUsers(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// InviteUser Undang akun ke usaha ini
+// (POST /users)
+func (_ Unimplemented) InviteUser(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DisableUser Nonaktifkan akun
+// (DELETE /users/{id})
+func (_ Unimplemented) DisableUser(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateUser Ubah peran atau status akun
+// (PATCH /users/{id})
+func (_ Unimplemented) UpdateUser(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -440,6 +716,114 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InviteUser operation middleware
+func (siw *ServerInterfaceWrapper) InviteUser(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InviteUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableUser operation middleware
+func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateUser(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -573,6 +957,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me", wrapper.GetMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/settings", wrapper.GetSettings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/settings", wrapper.UpdateSettings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/users", wrapper.ListUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/users", wrapper.InviteUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/users/{id}", wrapper.DisableUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/users/{id}", wrapper.UpdateUser)
 	})
 
 	return r
@@ -813,6 +1215,403 @@ func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	return err
 }
 
+type GetSettingsRequestObject struct {
+}
+
+type GetSettingsResponseObject interface {
+	VisitGetSettingsResponse(w http.ResponseWriter) error
+}
+
+type GetSettings200JSONResponse Settings
+
+func (response GetSettings200JSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetSettings401ApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetSettings403ApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSettingsRequestObject struct {
+	Body *UpdateSettingsJSONRequestBody
+}
+
+type UpdateSettingsResponseObject interface {
+	VisitUpdateSettingsResponse(w http.ResponseWriter) error
+}
+
+type UpdateSettings200JSONResponse Settings
+
+func (response UpdateSettings200JSONResponse) VisitUpdateSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSettings401ApplicationProblemPlusJSONResponse) VisitUpdateSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSettings403ApplicationProblemPlusJSONResponse) VisitUpdateSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSettings422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSettings422ApplicationProblemPlusJSONResponse) VisitUpdateSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsersRequestObject struct {
+}
+
+type ListUsersResponseObject interface {
+	VisitListUsersResponse(w http.ResponseWriter) error
+}
+
+type ListUsers200JSONResponse []User
+
+func (response ListUsers200JSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsers401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListUsers401ApplicationProblemPlusJSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListUsers403ApplicationProblemPlusJSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteUserRequestObject struct {
+	Body *InviteUserJSONRequestBody
+}
+
+type InviteUserResponseObject interface {
+	VisitInviteUserResponse(w http.ResponseWriter) error
+}
+
+type InviteUser201JSONResponse User
+
+func (response InviteUser201JSONResponse) VisitInviteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response InviteUser401ApplicationProblemPlusJSONResponse) VisitInviteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response InviteUser403ApplicationProblemPlusJSONResponse) VisitInviteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteUser422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response InviteUser422ApplicationProblemPlusJSONResponse) VisitInviteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUserRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DisableUserResponseObject interface {
+	VisitDisableUserResponse(w http.ResponseWriter) error
+}
+
+type DisableUser204Response struct {
+}
+
+func (response DisableUser204Response) VisitDisableUserResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DisableUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser401ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser403ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser404ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUserRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateUserJSONRequestBody
+}
+
+type UpdateUserResponseObject interface {
+	VisitUpdateUserResponse(w http.ResponseWriter) error
+}
+
+type UpdateUser200JSONResponse User
+
+func (response UpdateUser200JSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser401ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser403ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser404ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser422ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Login Tukar email dan password dengan access token
@@ -827,6 +1626,24 @@ type StrictServerInterface interface {
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// GetSettings Baca knob pemilik
+	// (GET /settings)
+	GetSettings(ctx context.Context, request GetSettingsRequestObject) (GetSettingsResponseObject, error)
+	// UpdateSettings Ubah knob pemilik
+	// (PATCH /settings)
+	UpdateSettings(ctx context.Context, request UpdateSettingsRequestObject) (UpdateSettingsResponseObject, error)
+	// ListUsers Akun di usaha ini
+	// (GET /users)
+	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
+	// InviteUser Undang akun ke usaha ini
+	// (POST /users)
+	InviteUser(ctx context.Context, request InviteUserRequestObject) (InviteUserResponseObject, error)
+	// DisableUser Nonaktifkan akun
+	// (DELETE /users/{id})
+	DisableUser(ctx context.Context, request DisableUserRequestObject) (DisableUserResponseObject, error)
+	// UpdateUser Ubah peran atau status akun
+	// (PATCH /users/{id})
+	UpdateUser(ctx context.Context, request UpdateUserRequestObject) (UpdateUserResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -964,6 +1781,175 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSettings operation middleware
+func (sh *strictHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	var request GetSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSettings(ctx, request.(GetSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSettingsResponseObject); ok {
+		if err := validResponse.VisitGetSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSettings operation middleware
+func (sh *strictHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	var request UpdateSettingsRequestObject
+
+	var body UpdateSettingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSettings(ctx, request.(UpdateSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSettingsResponseObject); ok {
+		if err := validResponse.VisitUpdateSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUsers operation middleware
+func (sh *strictHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	var request ListUsersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUsers(ctx, request.(ListUsersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUsers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUsersResponseObject); ok {
+		if err := validResponse.VisitListUsersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InviteUser operation middleware
+func (sh *strictHandler) InviteUser(w http.ResponseWriter, r *http.Request) {
+	var request InviteUserRequestObject
+
+	var body InviteUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.InviteUser(ctx, request.(InviteUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InviteUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InviteUserResponseObject); ok {
+		if err := validResponse.VisitInviteUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableUser operation middleware
+func (sh *strictHandler) DisableUser(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DisableUserRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableUser(ctx, request.(DisableUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableUserResponseObject); ok {
+		if err := validResponse.VisitDisableUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateUser operation middleware
+func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateUserRequestObject
+
+	request.Id = id
+
+	var body UpdateUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateUser(ctx, request.(UpdateUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateUserResponseObject); ok {
+		if err := validResponse.VisitUpdateUserResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

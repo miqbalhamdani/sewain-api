@@ -170,6 +170,13 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Session, error
 		if err != nil {
 			return err
 		}
+		// Login checks this; refresh used to reach this row for the role alone
+		// and never look. A disabled account therefore kept minting access
+		// tokens every 15 minutes, forever, and "a revoked session dies within
+		// 15 minutes" was only true of accounts nobody had revoked (BR-004).
+		if row.Status != "active" {
+			return ErrUnauthenticated
+		}
 		role = row.Role
 		return nil
 	}); err != nil {

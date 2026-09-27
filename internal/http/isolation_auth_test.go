@@ -112,7 +112,8 @@ func seedAuthUser(ctx context.Context, t *testing.T, store *db.Store, ownerID uu
 
 	// The owner id is the marker: it is what a Session body carries, so it is
 	// what would appear if a route resolved the wrong owner.
-	return seeded{marker: ownerID.String(), email: email, password: isoPassword}
+	return seeded{marker: ownerID.String(), email: email, password: isoPassword,
+		userID: userID.String()}
 }
 
 // seedSignedInUser is seedAuthUser plus a real login, for routes that need a

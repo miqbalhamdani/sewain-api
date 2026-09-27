@@ -13,14 +13,14 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
 )
 
-// TestHealthzReportsBothServices is P1-000's acceptance criterion: the API
-// connects to host PostgreSQL 18 on :5432 and Redis 8 on :6379, and /healthz
-// reports both.
+// TestHealthzReportsEveryService is S1-001's acceptance criterion: the API
+// connects to PostgreSQL 18, Redis 8 and MinIO -- all three installed on the
+// host, none in a container -- and /healthz reports all three.
 //
 // It fails rather than skips when a service is unreachable. A skipping test
-// would let `make check` go green while proving nothing, and reaching both
-// services is the entire deliverable of this item.
-func TestHealthzReportsBothServices(t *testing.T) {
+// would let `make check` go green while proving nothing, and reaching all
+// three services is the entire deliverable of this item.
+func TestHealthzReportsEveryService(t *testing.T) {
 	ctx := t.Context()
 
 	pool, err := db.New(ctx, config.AppDatabaseURL())
@@ -40,6 +40,7 @@ func TestHealthzReportsBothServices(t *testing.T) {
 	newHealthHandler(
 		checker{name: "postgres", version: pool.ServerVersion},
 		checker{name: "redis", version: redis.ServerVersion},
+		objectStoreChecker(config.ObjectStoreURL()),
 	).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
 	if rec.Code != http.StatusOK {
@@ -83,4 +84,17 @@ func TestHealthzReportsBothServices(t *testing.T) {
 		}
 		t.Logf("%s %s", want.service, svc.Version)
 	}
+
+	// MinIO reports its product rather than its build, so there is no major
+	// version to pin -- what matters is that it answered at all. Production
+	// has no MinIO; this is the local stand-in for R2 (S1-033).
+	store, ok := got.Services["objectstore"]
+	if !ok {
+		t.Fatal("/healthz reported no \"objectstore\" service")
+	}
+	if store.Status != "ok" {
+		t.Errorf("objectstore status = %q (%s), want %q\n\nIs MinIO running?\n"+
+			"  minio server --address=:9000 ~/minio-data", store.Status, store.Error, "ok")
+	}
+	t.Logf("objectstore %s", store.Version)
 }
