@@ -86,13 +86,19 @@ func seedAuthUser(ctx context.Context, t *testing.T, store *db.Store, ownerID uu
 	ownerCtx := owner.NewContext(ctx, ownerID)
 	if err := store.InOwnerTx(ownerCtx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO owners (id, name, slug) VALUES ($1, $2, $3)`,
+			`INSERT INTO owners (id, name, slug, business_type)
+			 VALUES ($1, $2, $3, 'vehicle_rental')`,
 			ownerID, "Isolation "+ownerID.String(), "iso-"+ownerID.String()); err != nil {
 			return err
 		}
+		// email_verified_at is set: these fixtures stand in for established
+		// accounts, and every route outside the BR-006 whitelist answers 403
+		// without it. The unverified case has its own fixture, in
+		// verification_test.go, where it is the thing under test rather than
+		// an obstacle in front of it.
 		_, err := tx.Exec(ctx,
-			`INSERT INTO users (id, owner_id, email, password_hash, name, role, status)
-			 VALUES ($1, $2, $3, $4, 'Isolation user', 'operator', 'active')`,
+			`INSERT INTO users (id, owner_id, email, password_hash, name, role, status, email_verified_at)
+			 VALUES ($1, $2, $3, $4, 'Isolation user', 'operator', 'active', now())`,
 			userID, ownerID, email, hash)
 		return err
 	}); err != nil {

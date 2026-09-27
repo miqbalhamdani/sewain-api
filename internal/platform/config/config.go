@@ -30,7 +30,17 @@ const (
 	// production this is R2 instead; the adapter is the same either way,
 	// because both speak S3 (S1-033).
 	DefaultObjectStoreURL = "http://localhost:9000"
-	DefaultPort           = "8080"
+
+	// Mailpit as a single binary on the host, same philosophy as PostgreSQL,
+	// Redis and MinIO in S1-001. Production picks a real relay in M6; the
+	// Mailer interface is what makes that a swap rather than a rewrite.
+	DefaultSMTPAddr = "localhost:1025"
+	DefaultMailFrom = "no-reply@sewain.local"
+
+	// Where the links in outgoing mail point. The backoffice origin, because
+	// that is where /verify-email and /accept-invitation are rendered.
+	DefaultAppBaseURL = "http://localhost:3000"
+	DefaultPort       = "8080"
 
 	// Local development only. There is no safe default for a signing secret,
 	// so this one is obviously not a secret -- JWTSecret refuses it whenever
@@ -57,6 +67,10 @@ func AppDatabaseURL() string { return Getenv("APP_DATABASE_URL", DefaultAppDatab
 func RedisURL() string { return Getenv("REDIS_URL", DefaultRedisURL) }
 
 func ObjectStoreURL() string { return Getenv("OBJECT_STORE_URL", DefaultObjectStoreURL) }
+
+func SMTPAddr() string   { return Getenv("SMTP_ADDR", DefaultSMTPAddr) }
+func MailFrom() string   { return Getenv("MAIL_FROM", DefaultMailFrom) }
+func AppBaseURL() string { return Getenv("APP_BASE_URL", DefaultAppBaseURL) }
 
 // OTLPEndpoint is where traces are sent. Empty means nowhere: ids are still
 // real and still land in the logs, which is all there is to do before P1-001

@@ -36,6 +36,9 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
+	"github.com/miqbalhamdani/sewain-api/internal/platform/mail"
+	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
+	"github.com/miqbalhamdani/sewain-api/internal/queue"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
 )
 
@@ -319,8 +322,19 @@ var newServer = func(t *testing.T) http.Handler {
 		t.Fatalf("new signer: %v", err)
 	}
 	// secureCookies false: httptest speaks plain HTTP.
+	redis, err := queue.New(t.Context(), config.RedisURL())
+	if err != nil {
+		t.Fatalf("connect redis: %v\n\nIs it running?\n  brew services start redis", err)
+	}
+	t.Cleanup(func() { _ = redis.Close() })
+
+	// Discard rather than a real sender: these tests exercise routes, not
+	// mail, and a suite that needs a mailbox running is a suite people skip.
+	authSvc := auth.NewService(store, signer).
+		WithMail(redis, mail.Discard{}, "http://localhost:3000")
+
 	return httpapi.NewRouter(
-		httpapi.NewServer(auth.NewService(store, signer), settings.New(store), false), signer)
+		httpapi.NewServer(authSvc, settings.New(store), ratelimit.New(redis), false), signer)
 }
 
 // --- fixtures --------------------------------------------------------------

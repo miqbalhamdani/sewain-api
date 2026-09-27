@@ -31,6 +31,9 @@ const (
 	CodeEmailTaken  = "email-taken"  // BR-004, S1-010
 	CodeSlugTaken   = "slug-taken"   // BR-025, S1-009
 	CodeSlugInvalid = "slug-invalid" // BR-025, S1-009
+
+	CodeEmailNotVerified         = "email-not-verified"         // BR-006, S1-084
+	CodeVerificationTokenInvalid = "verification-token-invalid" // BR-006, S1-084
 )
 
 // Field is one entry in a Problem's errors array: which field, and what about
@@ -133,6 +136,26 @@ func SlugInvalid(detail string) *Error {
 	return (&Error{Code: CodeSlugInvalid, Status: http.StatusUnprocessableEntity,
 		Title: "Subdomain not allowed", Detail: detail}).
 		WithFields(Field{Name: "slug"})
+}
+
+// EmailNotVerified is the gate on the whole backoffice (BR-006).
+//
+// 403 rather than 401: the caller is authenticated, the session is real, and
+// re-logging-in would change nothing. What is missing is a proof about the
+// address, and the client redirects to the verification wall on this code
+// rather than to the login screen.
+func EmailNotVerified() *Error {
+	return &Error{Code: CodeEmailNotVerified, Status: http.StatusForbidden,
+		Title: "Email not verified",
+		Detail: "Verify your email address before using this. " +
+			"Check your inbox, or request a new link."}
+}
+
+// RateLimited is the 429. The detail says when to come back, because a limit
+// with no stated window reads as a permanent refusal.
+func RateLimited(detail string) *Error {
+	return &Error{Code: CodeRateLimited, Status: http.StatusTooManyRequests,
+		Title: "Too many requests", Detail: detail}
 }
 
 // Internal wraps anything the client has no business seeing.

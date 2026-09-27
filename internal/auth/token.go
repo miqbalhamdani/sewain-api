@@ -36,6 +36,19 @@ var ErrInvalidToken = errors.New("invalid access token")
 type Claims struct {
 	OwnerID uuid.UUID `json:"tid"`
 	Role    string    `json:"role"`
+
+	// EmailVerified gates the whole backoffice (BR-006). It rides in the token
+	// for the same reason OwnerID and Role do: reading it from the database on
+	// every request would double the query count of the cheapest endpoints,
+	// and BR-004 already establishes the token as the carrier for facts that
+	// come from the users row.
+	//
+	// The cost is that verifying takes effect on the next token, not the next
+	// request -- so POST /auth/verify-email is followed by /auth/refresh. That
+	// is one extra call on a once-per-account path, against one saved query on
+	// every request forever.
+	EmailVerified bool `json:"ev"`
+
 	jwt.RegisteredClaims
 }
 
@@ -55,10 +68,11 @@ func NewSigner(secret string) (*Signer, error) {
 }
 
 // Issue returns a signed access token for a user.
-func (s *Signer) Issue(userID, ownerID uuid.UUID, role string, now time.Time) (string, error) {
+func (s *Signer) Issue(userID, ownerID uuid.UUID, role string, emailVerified bool, now time.Time) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
-		OwnerID: ownerID,
-		Role:    role,
+		OwnerID:       ownerID,
+		Role:          role,
+		EmailVerified: emailVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),

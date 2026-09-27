@@ -16,22 +16,56 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for BusinessType.
+const (
+	Apartment       BusinessType = "apartment"
+	BoardingHouse   BusinessType = "boarding_house"
+	Clinic          BusinessType = "clinic"
+	EquipmentRental BusinessType = "equipment_rental"
+	VehicleRental   BusinessType = "vehicle_rental"
+	Venue           BusinessType = "venue"
+)
+
+// Valid indicates whether the value is a known member of the BusinessType enum.
+func (e BusinessType) Valid() bool {
+	switch e {
+	case Apartment:
+		return true
+	case BoardingHouse:
+		return true
+	case Clinic:
+		return true
+	case EquipmentRental:
+		return true
+	case VehicleRental:
+		return true
+	case Venue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorCode.
 const (
-	ErrorCodeEmailTaken       ErrorCode = "email-taken"
-	ErrorCodeInternal         ErrorCode = "internal"
-	ErrorCodeNotFound         ErrorCode = "not-found"
-	ErrorCodePermissionDenied ErrorCode = "permission-denied"
-	ErrorCodeRateLimited      ErrorCode = "rate-limited"
-	ErrorCodeSlugInvalid      ErrorCode = "slug-invalid"
-	ErrorCodeSlugTaken        ErrorCode = "slug-taken"
-	ErrorCodeUnauthenticated  ErrorCode = "unauthenticated"
-	ErrorCodeValidationFailed ErrorCode = "validation-failed"
+	ErrorCodeEmailNotVerified         ErrorCode = "email-not-verified"
+	ErrorCodeEmailTaken               ErrorCode = "email-taken"
+	ErrorCodeInternal                 ErrorCode = "internal"
+	ErrorCodeNotFound                 ErrorCode = "not-found"
+	ErrorCodePermissionDenied         ErrorCode = "permission-denied"
+	ErrorCodeRateLimited              ErrorCode = "rate-limited"
+	ErrorCodeSlugInvalid              ErrorCode = "slug-invalid"
+	ErrorCodeSlugTaken                ErrorCode = "slug-taken"
+	ErrorCodeUnauthenticated          ErrorCode = "unauthenticated"
+	ErrorCodeValidationFailed         ErrorCode = "validation-failed"
+	ErrorCodeVerificationTokenInvalid ErrorCode = "verification-token-invalid"
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeEmailNotVerified:
+		return true
 	case ErrorCodeEmailTaken:
 		return true
 	case ErrorCodeInternal:
@@ -49,6 +83,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeUnauthenticated:
 		return true
 	case ErrorCodeValidationFailed:
+		return true
+	case ErrorCodeVerificationTokenInvalid:
 		return true
 	default:
 		return false
@@ -166,6 +202,21 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// BusinessType Preset pasar, dipilih sekali saat mendaftar. **Ia yang menentukan `pricing_unit`
+// seluruh resource pemilik itu** — juragan tidak pernah mengisi satuan harga di tiap
+// barang (BR-012, BR-017).
+//
+// Enamnya ada di enum karena skema mengenal keenamnya, tapi **cuma dua yang dibuka di
+// fase 1**: `vehicle_rental` dan `equipment_rental`, dua-duanya bersatuan `day`.
+// `boarding_house` dan `apartment` fase 2, `venue` fase 3, `clinic` fase 4 — satuan
+// `clinic` sengaja belum diputuskan, bukan ditebak.
+//
+// Layar daftar fase 1 karena itu merender **dua pilihan**, dengan bahasa juragan
+// ("rental mobil & motor", "rental alat"), bukan nama enum ini.
+//
+// Examples: vehicle_rental
+type BusinessType string
+
 // ErrorCode Kode error generik yang dipakai setiap endpoint sebelum sampai ke aturan bisnisnya.
 // Kode spesifik per aturan bisnis ada di `04-api-spec.md` §2 dan ditambahkan oleh item
 // backlog yang memilikinya.
@@ -238,6 +289,35 @@ type ProblemError struct {
 	// Field Examples: email
 	Field                string                 `json:"field"`
 	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// RegisterRequest Empat field, dan tidak lebih. Tiap satu yang ditambahkan adalah tempat orang
+// berhenti mengisi (BR-005).
+type RegisterRequest struct {
+	// BusinessName Examples: Rental Budi
+	BusinessName string `json:"business_name"`
+
+	// BusinessType Preset pasar, dipilih sekali saat mendaftar. **Ia yang menentukan `pricing_unit`
+	// seluruh resource pemilik itu** — juragan tidak pernah mengisi satuan harga di tiap
+	// barang (BR-012, BR-017).
+	//
+	// Enamnya ada di enum karena skema mengenal keenamnya, tapi **cuma dua yang dibuka di
+	// fase 1**: `vehicle_rental` dan `equipment_rental`, dua-duanya bersatuan `day`.
+	// `boarding_house` dan `apartment` fase 2, `venue` fase 3, `clinic` fase 4 — satuan
+	// `clinic` sengaja belum diputuskan, bukan ditebak.
+	//
+	// Layar daftar fase 1 karena itu merender **dua pilihan**, dengan bahasa juragan
+	// ("rental mobil & motor", "rental alat"), bukan nama enum ini.
+	//
+	//
+	// Examples: vehicle_rental
+	BusinessType BusinessType `json:"business_type"`
+
+	// Email Unik di seluruh sistem, bukan per usaha (BR-004).
+	//
+	// Examples: budi@contoh.id
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
 }
 
 // Session Dikembalikan login dan refresh. Membawa semua yang dibutuhkan klien untuk merender
@@ -469,8 +549,28 @@ type Unauthorized = Problem
 // `type` (BR-092).
 type UnprocessableEntity = Problem
 
+// AcceptInvitationJSONBody defines parameters for AcceptInvitation.
+type AcceptInvitationJSONBody struct {
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
+// VerifyEmailJSONBody defines parameters for VerifyEmail.
+type VerifyEmailJSONBody struct {
+	Token string `json:"token"`
+}
+
+// AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
+type AcceptInvitationJSONRequestBody AcceptInvitationJSONBody
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// RegisterJSONRequestBody defines body for Register for application/json ContentType.
+type RegisterJSONRequestBody = RegisterRequest
+
+// VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
+type VerifyEmailJSONRequestBody VerifyEmailJSONBody
 
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody = SettingsUpdate
@@ -564,6 +664,9 @@ func (a ProblemError) MarshalJSON() ([]byte, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// AcceptInvitation Terima undangan dan pasang password
+	// (POST /auth/accept-invitation)
+	AcceptInvitation(w http.ResponseWriter, r *http.Request)
 	// Login Tukar email dan password dengan access token
 	// (POST /auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -573,6 +676,15 @@ type ServerInterface interface {
 	// Refresh Rotasi refresh token dan terbitkan access token baru
 	// (POST /auth/refresh)
 	Refresh(w http.ResponseWriter, r *http.Request)
+	// Register Daftarkan usaha baru beserta pemiliknya
+	// (POST /auth/register)
+	Register(w http.ResponseWriter, r *http.Request)
+	// VerifyEmail Tukar token verifikasi dengan email yang terverifikasi
+	// (POST /auth/verify-email)
+	VerifyEmail(w http.ResponseWriter, r *http.Request)
+	// ResendVerification Kirim ulang surel verifikasi
+	// (POST /auth/verify-email/resend)
+	ResendVerification(w http.ResponseWriter, r *http.Request)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -600,6 +712,12 @@ type ServerInterface interface {
 
 type Unimplemented struct{}
 
+// AcceptInvitation Terima undangan dan pasang password
+// (POST /auth/accept-invitation)
+func (_ Unimplemented) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Login Tukar email dan password dengan access token
 // (POST /auth/login)
 func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
@@ -615,6 +733,24 @@ func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
 // Refresh Rotasi refresh token dan terbitkan access token baru
 // (POST /auth/refresh)
 func (_ Unimplemented) Refresh(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Register Daftarkan usaha baru beserta pemiliknya
+// (POST /auth/register)
+func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// VerifyEmail Tukar token verifikasi dengan email yang terverifikasi
+// (POST /auth/verify-email)
+func (_ Unimplemented) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ResendVerification Kirim ulang surel verifikasi
+// (POST /auth/verify-email/resend)
+func (_ Unimplemented) ResendVerification(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -669,6 +805,20 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// AcceptInvitation operation middleware
+func (siw *ServerInterfaceWrapper) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcceptInvitation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
 
@@ -702,6 +852,48 @@ func (siw *ServerInterfaceWrapper) Refresh(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Refresh(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Register operation middleware
+func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Register(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyEmail operation middleware
+func (siw *ServerInterfaceWrapper) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyEmail(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResendVerification operation middleware
+func (siw *ServerInterfaceWrapper) ResendVerification(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResendVerification(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -947,6 +1139,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/register", wrapper.Register)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/verify-email", wrapper.VerifyEmail)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/verify-email/resend", wrapper.ResendVerification)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/accept-invitation", wrapper.AcceptInvitation)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/login", wrapper.Login)
 	})
 	r.Group(func(r chi.Router) {
@@ -1002,6 +1206,54 @@ type TooManyRequestsApplicationProblemPlusJSONResponse struct {
 type UnauthorizedApplicationProblemPlusJSONResponse Problem
 
 type UnprocessableEntityApplicationProblemPlusJSONResponse Problem
+
+type AcceptInvitationRequestObject struct {
+	Body *AcceptInvitationJSONRequestBody
+}
+
+type AcceptInvitationResponseObject interface {
+	VisitAcceptInvitationResponse(w http.ResponseWriter) error
+}
+
+type AcceptInvitation200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type AcceptInvitation200JSONResponse struct {
+	Body    Session
+	Headers AcceptInvitation200ResponseHeaders
+}
+
+func (response AcceptInvitation200JSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation422ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type LoginRequestObject struct {
 	Body *LoginJSONRequestBody
@@ -1174,6 +1426,167 @@ func (response Refresh401ApplicationProblemPlusJSONResponse) VisitRefreshRespons
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterRequestObject struct {
+	Body *RegisterJSONRequestBody
+}
+
+type RegisterResponseObject interface {
+	VisitRegisterResponse(w http.ResponseWriter) error
+}
+
+type Register201ResponseHeaders struct {
+	SetCookie *string
+}
+
+type Register201JSONResponse struct {
+	Body    Session
+	Headers Register201ResponseHeaders
+}
+
+func (response Register201JSONResponse) VisitRegisterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Register422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response Register422ApplicationProblemPlusJSONResponse) VisitRegisterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Register429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response Register429ApplicationProblemPlusJSONResponse) VisitRegisterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyEmailRequestObject struct {
+	Body *VerifyEmailJSONRequestBody
+}
+
+type VerifyEmailResponseObject interface {
+	VisitVerifyEmailResponse(w http.ResponseWriter) error
+}
+
+type VerifyEmail204Response struct {
+}
+
+func (response VerifyEmail204Response) VisitVerifyEmailResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type VerifyEmail422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response VerifyEmail422ApplicationProblemPlusJSONResponse) VisitVerifyEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResendVerificationRequestObject struct {
+}
+
+type ResendVerificationResponseObject interface {
+	VisitResendVerificationResponse(w http.ResponseWriter) error
+}
+
+type ResendVerification204Response struct {
+}
+
+func (response ResendVerification204Response) VisitResendVerificationResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ResendVerification401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ResendVerification401ApplicationProblemPlusJSONResponse) VisitResendVerificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResendVerification429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ResendVerification429ApplicationProblemPlusJSONResponse) VisitResendVerificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1614,6 +2027,9 @@ func (response UpdateUser422ApplicationProblemPlusJSONResponse) VisitUpdateUserR
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// AcceptInvitation Terima undangan dan pasang password
+	// (POST /auth/accept-invitation)
+	AcceptInvitation(ctx context.Context, request AcceptInvitationRequestObject) (AcceptInvitationResponseObject, error)
 	// Login Tukar email dan password dengan access token
 	// (POST /auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
@@ -1623,6 +2039,15 @@ type StrictServerInterface interface {
 	// Refresh Rotasi refresh token dan terbitkan access token baru
 	// (POST /auth/refresh)
 	Refresh(ctx context.Context, request RefreshRequestObject) (RefreshResponseObject, error)
+	// Register Daftarkan usaha baru beserta pemiliknya
+	// (POST /auth/register)
+	Register(ctx context.Context, request RegisterRequestObject) (RegisterResponseObject, error)
+	// VerifyEmail Tukar token verifikasi dengan email yang terverifikasi
+	// (POST /auth/verify-email)
+	VerifyEmail(ctx context.Context, request VerifyEmailRequestObject) (VerifyEmailResponseObject, error)
+	// ResendVerification Kirim ulang surel verifikasi
+	// (POST /auth/verify-email/resend)
+	ResendVerification(ctx context.Context, request ResendVerificationRequestObject) (ResendVerificationResponseObject, error)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -1683,6 +2108,37 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// AcceptInvitation operation middleware
+func (sh *strictHandler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+	var request AcceptInvitationRequestObject
+
+	var body AcceptInvitationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcceptInvitation(ctx, request.(AcceptInvitationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcceptInvitation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcceptInvitationResponseObject); ok {
+		if err := validResponse.VisitAcceptInvitationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Login operation middleware
@@ -1757,6 +2213,92 @@ func (sh *strictHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RefreshResponseObject); ok {
 		if err := validResponse.VisitRefreshResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Register operation middleware
+func (sh *strictHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var request RegisterRequestObject
+
+	var body RegisterJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Register(ctx, request.(RegisterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Register")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterResponseObject); ok {
+		if err := validResponse.VisitRegisterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyEmail operation middleware
+func (sh *strictHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var request VerifyEmailRequestObject
+
+	var body VerifyEmailJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyEmail(ctx, request.(VerifyEmailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyEmail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyEmailResponseObject); ok {
+		if err := validResponse.VisitVerifyEmailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResendVerification operation middleware
+func (sh *strictHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	var request ResendVerificationRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResendVerification(ctx, request.(ResendVerificationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResendVerification")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResendVerificationResponseObject); ok {
+		if err := validResponse.VisitResendVerificationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

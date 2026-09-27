@@ -25,6 +25,7 @@ type Owner struct {
 	BookingCodePrefix          string
 	PaymentDueHours            int32
 	NoShowToleranceHours       int32
+	BusinessType               string
 }
 
 type RefreshToken struct {
@@ -39,15 +40,16 @@ type RefreshToken struct {
 }
 
 type User struct {
-	ID           uuid.UUID
-	OwnerID      uuid.UUID
-	Email        string
-	PasswordHash *string
-	Name         string
-	Phone        *string
-	Role         string
-	Status       string
-	LastLoginAt  *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              uuid.UUID
+	OwnerID         uuid.UUID
+	Email           string
+	PasswordHash    *string
+	Name            string
+	Phone           *string
+	Role            string
+	Status          string
+	LastLoginAt     *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	EmailVerifiedAt *time.Time
 }

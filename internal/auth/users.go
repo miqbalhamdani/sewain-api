@@ -81,9 +81,18 @@ func (s *Service) InviteUser(ctx context.Context, ownerID uuid.UUID, email, name
 	}
 
 	var row sqlcgen.InviteUserRow
+	// The business name goes into the invitation mail so the invitee knows
+	// which rental is asking. Read in the same transaction rather than passed
+	// in by the handler: a client-supplied name would let anyone send a
+	// convincing invitation wearing somebody else's business.
+	var businessName string
 	err = s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
+		q := sqlcgen.New(tx)
 		var err error
-		row, err = sqlcgen.New(tx).InviteUser(ctx, sqlcgen.InviteUserParams{
+		if businessName, err = q.GetOwnerName(ctx, ownerID); err != nil {
+			return err
+		}
+		row, err = q.InviteUser(ctx, sqlcgen.InviteUserParams{
 			ID: id, OwnerID: ownerID, Email: email, Name: name, Role: role,
 		})
 		return err
@@ -97,7 +106,19 @@ func (s *Service) InviteUser(ctx context.Context, ownerID uuid.UUID, email, name
 		}
 		return Account{}, fmt.Errorf("invite user: %w", err)
 	}
-	return accountOf(row.ID, row.Email, row.Name, row.Role, row.Status, row.LastLoginAt), nil
+	account := accountOf(row.ID, row.Email, row.Name, row.Role, row.Status, row.LastLoginAt)
+
+	// The invitation link is the only way into this account, and it is also
+	// what will mark the address verified when it is accepted -- so failing to
+	// send it leaves a row nobody can ever use (BR-004, BR-006).
+	//
+	// Sent after the transaction commits, not inside it: a mail that goes out
+	// for a row that then rolls back is a link to nothing, and unsending is
+	// not a thing.
+	if err := s.SendInvitation(ctx, ownerID, row.ID, row.Email, row.Name, businessName); err != nil {
+		return account, fmt.Errorf("invitation sent nowhere: %w", err)
+	}
+	return account, nil
 }
 
 // UpdateUser changes a role or a status, and nothing else.

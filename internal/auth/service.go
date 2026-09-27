@@ -34,9 +34,16 @@ type Session struct {
 }
 
 type SessionUser struct {
-	ID          uuid.UUID
-	Name        string
-	Role        string
+	ID   uuid.UUID
+	Name string
+	Role string
+
+	// EmailVerifiedAt is nil until the address is proved. The frontend renders
+	// its verification wall from this rather than guessing from a 403, because
+	// the 403 can arrive from any endpoint and guessing means guessing on
+	// every screen (BR-006).
+	EmailVerifiedAt *time.Time
+
 	Permissions []string
 }
 
@@ -60,6 +67,13 @@ type Service struct {
 	store  *db.Store
 	signer *Signer
 	now    func() time.Time
+
+	// Set by WithMail. Login, Refresh and Logout need none of them, so a
+	// constructor that demanded all three would make every auth test stand up
+	// Redis and a mailbox to exercise a password check.
+	tokens  TokenStore
+	mailer  Mailer
+	baseURL string
 }
 
 func NewService(store *db.Store, signer *Signer) *Service {
@@ -95,7 +109,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (Session, e
 		return Session{}, ErrUnauthenticated
 	}
 
-	return s.issue(ctx, user.OwnerID, user.ID, user.Role, nil)
+	return s.issue(ctx, user.OwnerID, user.ID, nil)
 }
 
 // Refresh rotates a refresh token and issues a new access token.
@@ -153,7 +167,6 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Session, error
 		return Session{}, ErrUnauthenticated
 	}
 
-	var role string
 	if err := s.store.InOwnerTx(ownerCtx, func(tx pgx.Tx) error {
 		q := sqlcgen.New(tx)
 		// Revoke first. If this affects no rows, another request rotated the
@@ -177,7 +190,6 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Session, error
 		if row.Status != "active" {
 			return ErrUnauthenticated
 		}
-		role = row.Role
 		return nil
 	}); err != nil {
 		if errors.Is(err, ErrUnauthenticated) {
@@ -186,7 +198,7 @@ func (s *Service) Refresh(ctx context.Context, presented string) (Session, error
 		return Session{}, err
 	}
 
-	return s.issue(ctx, stored.OwnerID, stored.UserID, role, &stored.ID)
+	return s.issue(ctx, stored.OwnerID, stored.UserID, &stored.ID)
 }
 
 // Me returns the current session context: the rental, the role, and what that
@@ -244,13 +256,13 @@ func (s *Service) Logout(ctx context.Context, presented string) error {
 
 // issue mints an access token and a fresh refresh token, and records the new
 // refresh token as a rotation of rotatedFrom when there is one.
-func (s *Service) issue(ctx context.Context, ownerID, userID uuid.UUID, role string, rotatedFrom *uuid.UUID) (Session, error) {
+// The row is read before the token is minted, so role and email_verified come
+// from one place rather than from whatever the caller happened to pass. That
+// is also why there is no role parameter: it used to arrive from two different
+// lookups depending on the caller, which is two chances to disagree.
+func (s *Service) issue(ctx context.Context, ownerID, userID uuid.UUID, rotatedFrom *uuid.UUID) (Session, error) {
 	now := s.now()
 
-	access, err := s.signer.Issue(userID, ownerID, role, now)
-	if err != nil {
-		return Session{}, err
-	}
 	refresh, refreshHash, err := NewRefreshToken()
 	if err != nil {
 		return Session{}, err
@@ -286,14 +298,21 @@ func (s *Service) issue(ctx context.Context, ownerID, userID uuid.UUID, role str
 		if err != nil {
 			return err
 		}
+
+		access, err := s.signer.Issue(userID, ownerID, row.Role, row.EmailVerifiedAt != nil, now)
+		if err != nil {
+			return err
+		}
+
 		out = Session{
 			AccessToken:  access,
 			ExpiresIn:    int(AccessTokenTTL.Seconds()),
 			RefreshToken: refresh,
 			User: SessionUser{
-				ID:   row.UserID,
-				Name: row.UserName,
-				Role: row.Role,
+				ID:              row.UserID,
+				Name:            row.UserName,
+				Role:            row.Role,
+				EmailVerifiedAt: row.EmailVerifiedAt,
 				// The client hides actions it does not find here rather than
 				// disabling them, so this list is part of the UI contract and
 				// not merely informational.

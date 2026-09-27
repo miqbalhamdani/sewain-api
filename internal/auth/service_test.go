@@ -325,13 +325,13 @@ func seedUser(ctx context.Context, t *testing.T, store *db.Store) (ownerID, user
 			// No slug: that is the initial state of every business, not an edge
 			// case -- it is not asked for at registration and is filled in later
 			// from PATCH /settings (BR-005, BR-025).
-			`INSERT INTO owners (id, name) VALUES ($1, $2)`,
+			`INSERT INTO owners (id, name, business_type) VALUES ($1, $2, 'vehicle_rental')`,
 			ownerID, "Test owner"); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx,
-			`INSERT INTO users (id, owner_id, email, password_hash, name, role, status)
-			 VALUES ($1, $2, $3, $4, 'Test user', 'operator', 'active')`,
+			`INSERT INTO users (id, owner_id, email, password_hash, name, role, status, email_verified_at)
+			 VALUES ($1, $2, $3, $4, 'Test user', 'operator', 'active', now())`,
 			userID, ownerID, email, hash)
 		return err
 	}); err != nil {

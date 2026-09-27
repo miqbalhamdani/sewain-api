@@ -8,6 +8,7 @@ import (
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
+	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
 )
 
@@ -22,14 +23,15 @@ const refreshCookieName = "refresh_token"
 type Server struct {
 	auth     *auth.Service
 	settings *settings.Service
+	limiter  *ratelimit.Limiter
 
 	// secureCookies is false only for local development over plain HTTP, where
 	// a Secure cookie would be dropped by the browser and nothing would work.
 	secureCookies bool
 }
 
-func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, secureCookies bool) *Server {
-	return &Server{auth: authSvc, settings: settingsSvc, secureCookies: secureCookies}
+func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, limiter *ratelimit.Limiter, secureCookies bool) *Server {
+	return &Server{auth: authSvc, settings: settingsSvc, limiter: limiter, secureCookies: secureCookies}
 }
 
 // Login handles POST /auth/login.
@@ -92,30 +94,30 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, session auth.Session) {
+	s.writeSessionStatus(w, r, session, http.StatusOK)
+}
+
+// writeSessionStatus exists because register answers 201 and everything else
+// answers 200. The body and the cookie are identical either way.
+func (s *Server) writeSessionStatus(w http.ResponseWriter, r *http.Request, session auth.Session, status int) {
 	http.SetCookie(w, s.refreshCookie(session.RefreshToken, auth.RefreshTokenTTL))
 
-	body := Session{
+	writeJSON(w, r, status, Session{
 		AccessToken: session.AccessToken,
 		ExpiresIn:   session.ExpiresIn,
 		User: SessionUser{
-			Id:          session.User.ID,
-			Name:        session.User.Name,
-			Role:        SessionUserRole(session.User.Role),
-			Permissions: session.User.Permissions,
+			Id:              session.User.ID,
+			Name:            session.User.Name,
+			Role:            SessionUserRole(session.User.Role),
+			EmailVerifiedAt: session.User.EmailVerifiedAt,
+			Permissions:     session.User.Permissions,
 		},
 		Owner: SessionOwner{
 			Id:   session.Owner.ID,
 			Name: session.Owner.Name,
 			Slug: session.Owner.Slug,
 		},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(body); err != nil {
-		// The status is already written; there is nothing left to tell the
-		// client. Logged by the middleware.
-		_ = err
-	}
+	})
 }
 
 // writeAuthError collapses every authentication failure into one answer.
@@ -178,18 +180,14 @@ func (s *Server) GetMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := Me{
+	writeJSON(w, r, http.StatusOK, Me{
 		User: SessionUser{
-			Id:          user.ID,
-			Name:        user.Name,
-			Role:        SessionUserRole(user.Role),
-			Permissions: user.Permissions,
+			Id:              user.ID,
+			Name:            user.Name,
+			Role:            SessionUserRole(user.Role),
+			EmailVerifiedAt: user.EmailVerifiedAt,
+			Permissions:     user.Permissions,
 		},
 		Owner: SessionOwner{Id: ownerRow.ID, Name: ownerRow.Name, Slug: ownerRow.Slug},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(body); err != nil {
-		_ = err
-	}
+	})
 }

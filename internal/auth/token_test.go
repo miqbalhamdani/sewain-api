@@ -21,7 +21,7 @@ func TestSigner(t *testing.T) {
 	now := time.Now()
 
 	t.Run("round trips the owner and user", func(t *testing.T) {
-		raw, err := signer.Issue(userID, ownerID, "ops", now)
+		raw, err := signer.Issue(userID, ownerID, RoleOwner, true, now)
 		if err != nil {
 			t.Fatalf("issue: %v", err)
 		}
@@ -35,8 +35,8 @@ func TestSigner(t *testing.T) {
 		if claims.UserID() != userID {
 			t.Errorf("user = %s, want %s", claims.UserID(), userID)
 		}
-		if claims.Role != "ops" {
-			t.Errorf("role = %q, want %q", claims.Role, "ops")
+		if claims.Role != RoleOwner {
+			t.Errorf("role = %q, want %q", claims.Role, RoleOwner)
 		}
 	})
 
@@ -45,7 +45,7 @@ func TestSigner(t *testing.T) {
 		if err != nil {
 			t.Fatalf("new signer: %v", err)
 		}
-		raw, err := other.Issue(userID, ownerID, "ops", now)
+		raw, err := other.Issue(userID, ownerID, RoleOwner, true, now)
 		if err != nil {
 			t.Fatalf("issue: %v", err)
 		}
@@ -55,7 +55,7 @@ func TestSigner(t *testing.T) {
 	})
 
 	t.Run("rejects an expired token", func(t *testing.T) {
-		raw, err := signer.Issue(userID, ownerID, "ops", now.Add(-2*AccessTokenTTL))
+		raw, err := signer.Issue(userID, ownerID, RoleOwner, true, now.Add(-2*AccessTokenTTL))
 		if err != nil {
 			t.Fatalf("issue: %v", err)
 		}

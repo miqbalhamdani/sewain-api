@@ -20,13 +20,13 @@ import (
 // from the request would make cross-owner access a matter of editing one.
 //
 // Routes that opt out of authentication in openapi.yaml (`security: []`) are
-// listed in unauthenticated below. Everything else needs a token, and a route
+// marked noAuth in routeAccessTable below. Everything else needs a token, and a route
 // that forgets to say so fails closed: with no owner in the context,
 // InOwnerTx returns ErrNoOwnerContext rather than reading anything.
 func Authenticate(signer *auth.Signer) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if unauthenticated(r) {
+			if accessFor(r).noAuth {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -63,20 +63,87 @@ func Authenticate(signer *auth.Signer) func(http.Handler) http.Handler {
 	}
 }
 
-// unauthenticated mirrors `security: []` in openapi.yaml.
+// routeAccess is the one table that says how a route is gated.
 //
-// A hand-kept list is a real risk: adding an endpoint here by mistake would
-// expose it. It is kept short and explicit for that reason, and the isolation
-// suite covers every route regardless of which side of this it falls on.
-func unauthenticated(r *http.Request) bool {
-	if r.Method != http.MethodPost {
-		return false
-	}
-	switch r.URL.Path {
-	case "/api/v1/auth/login", "/api/v1/auth/refresh":
-		return true
-	default:
-		return false
+// There used to be one hand-kept path list here for `security: []`. S1-084
+// needs a second, different one for the verification gate -- and two lists
+// that must be remembered together are two lists that will drift apart. One
+// table with two columns cannot: a route appears once, and both properties are
+// read from the same line.
+//
+// Absence is the safe answer for both columns. A route nobody added needs a
+// token and needs a verified address, which is the failure mode you want from
+// a list somebody forgot to update.
+type routeAccess struct {
+	// noAuth mirrors `security: []` in openapi.yaml.
+	noAuth bool
+
+	// preVerification is the BR-006 whitelist: reachable while
+	// users.email_verified_at is still null. Exactly six, and each one is
+	// either the way in, the way out, or the way to see which you are in.
+	preVerification bool
+}
+
+var routeAccessTable = map[string]routeAccess{
+	// The four that must work before a session exists at all.
+	"POST /api/v1/auth/login":             {noAuth: true, preVerification: true},
+	"POST /api/v1/auth/refresh":           {noAuth: true, preVerification: true},
+	"POST /api/v1/auth/register":          {noAuth: true, preVerification: true},
+	"POST /api/v1/auth/verify-email":      {noAuth: true, preVerification: true},
+	"POST /api/v1/auth/accept-invitation": {noAuth: true, preVerification: true},
+
+	// Authenticated, but reachable before verifying. Logout is always allowed;
+	// resend is the only way out of the wall; /me is how the frontend knows it
+	// should be rendering the wall in the first place (BR-006).
+	"POST /api/v1/auth/logout":              {preVerification: true},
+	"POST /api/v1/auth/verify-email/resend": {preVerification: true},
+	"GET /api/v1/me":                        {preVerification: true},
+}
+
+func accessFor(r *http.Request) routeAccess {
+	return routeAccessTable[r.Method+" "+r.URL.Path]
+}
+
+// RequireVerifiedEmail is the gate on the whole backoffice (BR-006).
+//
+// One middleware, not a check per handler: a gate that has to be remembered at
+// every endpoint is a gate that will be missed at the thirty-first. Everything
+// outside routeAccessTable's preVerification column answers
+// 403 email-not-verified while the address is unproved -- catalogue, bookings,
+// handovers, invoices, all of it.
+//
+// It reads the claim rather than the database. The flag rides in the access
+// token for the same reason owner_id and role do (BR-004), so verifying takes
+// effect on the next token: POST /auth/verify-email is followed by
+// /auth/refresh. One extra call on a once-per-account path, against one saved
+// query on every request forever.
+func RequireVerifiedEmail(signer *auth.Signer) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if accessFor(r).preVerification {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Unauthenticated requests are already refused by Authenticate,
+			// which runs first. Reaching here without a token means the route
+			// is in neither column, and failing closed is correct.
+			raw, ok := bearerToken(r)
+			if !ok {
+				writeError(w, r, apperrors.Unauthenticated("A bearer token is required."))
+				return
+			}
+			claims, err := signer.Parse(raw)
+			if err != nil {
+				writeError(w, r, apperrors.Unauthenticated("The access token is invalid or has expired."))
+				return
+			}
+			if !claims.EmailVerified {
+				writeError(w, r, apperrors.EmailNotVerified())
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 

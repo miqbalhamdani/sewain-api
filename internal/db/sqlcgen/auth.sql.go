@@ -40,7 +40,7 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 
 const getSession = `-- name: GetSession :one
 
-SELECT u.id AS user_id, u.name AS user_name, u.role, u.status,
+SELECT u.id AS user_id, u.name AS user_name, u.role, u.status, u.email_verified_at,
        o.id AS owner_id, o.name AS owner_name, o.slug
   FROM users u
   JOIN owners o ON o.id = u.owner_id
@@ -48,13 +48,14 @@ SELECT u.id AS user_id, u.name AS user_name, u.role, u.status,
 `
 
 type GetSessionRow struct {
-	UserID    uuid.UUID
-	UserName  string
-	Role      string
-	Status    string
-	OwnerID   uuid.UUID
-	OwnerName string
-	Slug      *string
+	UserID          uuid.UUID
+	UserName        string
+	Role            string
+	Status          string
+	EmailVerifiedAt *time.Time
+	OwnerID         uuid.UUID
+	OwnerName       string
+	Slug            *string
 }
 
 // Queries over the identity tables. Every one of these runs INSIDE InOwnerTx.
@@ -79,6 +80,7 @@ func (q *Queries) GetSession(ctx context.Context, id uuid.UUID) (GetSessionRow, 
 		&i.UserName,
 		&i.Role,
 		&i.Status,
+		&i.EmailVerifiedAt,
 		&i.OwnerID,
 		&i.OwnerName,
 		&i.Slug,

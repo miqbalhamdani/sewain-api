@@ -19,6 +19,8 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	httpapi "github.com/miqbalhamdani/sewain-api/internal/http"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
+	"github.com/miqbalhamdani/sewain-api/internal/platform/mail"
+	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/telemetry"
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
@@ -68,6 +70,21 @@ func run() error {
 		return err
 	}
 
+	// A non-loopback SMTP host is refused rather than accepted: this sender
+	// has no auth and no TLS, and pointing it at a real relay would send
+	// verification links in the clear. Falling back to Discard keeps a
+	// developer who has not started Mailpit from hitting a wall at register --
+	// the link lands in the log instead.
+	var mailer mail.Mailer
+	if smtp, err := mail.NewSMTP(config.SMTPAddr(), config.MailFrom()); err == nil {
+		mailer = smtp
+	} else {
+		slog.Warn("no mail sender; verification links will go to the log", "error", err)
+		mailer = mail.Discard{}
+	}
+
+	authSvc := auth.NewService(pool, signer).WithMail(redis, mailer, config.AppBaseURL())
+
 	mux := http.NewServeMux()
 	// Not a contract endpoint, so not generated and not under BasePath.
 	mux.Handle("GET /healthz", newHealthHandler(
@@ -76,7 +93,7 @@ func run() error {
 		objectStoreChecker(config.ObjectStoreURL()),
 	))
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
-		httpapi.NewServer(auth.NewService(pool, signer), settings.New(pool), !config.IsDevelopment()),
+		httpapi.NewServer(authSvc, settings.New(pool), ratelimit.New(redis), !config.IsDevelopment()),
 		signer,
 	))
 

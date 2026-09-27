@@ -28,7 +28,10 @@ func NewRouter(srv ServerInterface, signer *auth.Signer) http.Handler {
 	r := chi.NewRouter()
 	// Outermost, so a span exists before anything can fail. An error raised by
 	// the authentication middleware still carries a trace id that resolves.
-	r.Use(tracing, Authenticate(signer))
+	// Order matters: a span before anything can fail, then who you are, then
+	// whether you have proved your address. The gate runs after Authenticate
+	// because an anonymous request should hear "no token", not "not verified".
+	r.Use(tracing, Authenticate(signer), RequireVerifiedEmail(signer))
 	return HandlerWithOptions(srv, ChiServerOptions{
 		BaseURL:    BasePath,
 		BaseRouter: r,
