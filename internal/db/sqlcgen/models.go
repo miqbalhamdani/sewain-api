@@ -12,7 +12,7 @@ import (
 
 type Owner struct {
 	ID                         uuid.UUID
-	Slug                       string
+	Slug                       *string
 	Name                       string
 	Status                     string
 	RequirePaymentBeforePickup bool

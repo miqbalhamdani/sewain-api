@@ -48,7 +48,7 @@ make check        # generate + lint + lint-imports + lint-rls + test + test-race
 ```
 cmd/api/          HTTP API. Stateless.
 cmd/worker/       Konsumer antrean: scan bukti transfer, derivatif foto, pengingat WA
-cmd/scheduler/    Job berjadwal: draft kedaluwarsa, pengingat H-1, retensi identitas
+cmd/scheduler/    Job berjadwal: draft kedaluwarsa, pengingat H-1
 cmd/migrate/      Jalankan migrasi sampai selesai, lalu keluar
 internal/
   platform/       config, logging, tracing, errors — diimpor semua paket
@@ -62,7 +62,7 @@ internal/
   payment/        bukti transfer + pelunasan manual. Gateway & webhook-nya NONAKTIF di fase 1
   notify/         WhatsApp Cloud API
   report/         laporan
-  storage/        S3-compatible: R2 di produksi, MinIO di lokal. Presign + prefix per owner
+  storage/        S3-compatible: R2 di produksi, MinIO di lokal. Presign PUT+GET, HEAD, copy; prefix per owner
   http/           router chi, middleware, handler, DTO
 db/migrations/    golang-migrate, SQL polos, up + down
 ```
@@ -89,7 +89,7 @@ SECURITY`. `FORCE` yang menentukan: tanpanya, pemilik tabel melewati policy-nya 
 peran itulah yang dipakai migrasi. Aplikasi konek sebagai `app_user`, yang tidak memiliki apa pun.
 
 > Dibuktikan, bukan diasumsikan: `../docs/03-verify-constraints.sql` bagian RLS menjalankan
-> lima kasus dari **peran non-superuser** — superuser melewati RLS sepenuhnya, `FORCE` sekalipun.
+> enam kasus dari **peran non-superuser** — superuser melewati RLS sepenuhnya, `FORCE` sekalipun.
 >
 > **Ini naik satu tingkat dari `boarding-house-api`,** yang menegakkan BR-001 lewat filter di
 > setiap query. Filter di query benar sampai ada satu query yang lupa, dan yang lupa itu tidak
@@ -146,7 +146,7 @@ database scratch, `ROLLBACK`, tidak meninggalkan apa pun:
 | Skrip | Isi |
 |---|---|
 | `../docs/03-verify-overlap-constraint.sql` | 6 kasus anti-bentrok + trigger buffer (BR-015, BR-022, BR-023) |
-| `../docs/03-verify-constraints.sql` | 22 constraint sisa di `03-erd.md` §3, plus 5 kasus RLS |
+| `../docs/03-verify-constraints.sql` | 43 kasus constraint di `03-erd.md` §3, plus 6 kasus RLS |
 | `../docs/03-verify-with-check.sql` | Bukti diferensial `WITH CHECK`: `USING` saja bocor saat **menulis** |
 
 Jalankan **sebelum** menulis migrasinya. Ini bukan formalitas: versi `end_at_with_buffer` sebagai
@@ -218,8 +218,13 @@ Kalau terasa perlu, yang sebenarnya terjadi adalah constraint-nya dilewati di su
 | Cache ketersediaan halaman publik | Dihitung dari `bookings` tiap kali diminta | BR-025 |
 
 Empat baris ini alasan tidak ada satu pun cron yang mengubah data di sistem ini. Scheduler yang
-ada cuma tiga, dan ketiganya mengubah hal yang memang berubah: draft kedaluwarsa (BR-027),
-pengingat (BR-070), retensi identitas (BR-086).
+ada cuma dua, dan keduanya mengubah hal yang memang berubah: **kedaluwarsa** (draft BR-027,
+tenggat bayar BR-057, `no_show`) dan **pengingat** (BR-070). Retensi identitas (BR-086) ditunda —
+tidak ada job penghapus di fase 1.
+
+Perhatikan yang **tidak** dilakukan job kedaluwarsa: ia tidak pernah menyentuh booking yang sudah
+`picked_up`, dan tidak membatalkan apa pun kalau `require_payment_before_pickup` mati — pemilik itu
+memang menerima pembayaran saat pengambilan (BR-038, BR-057).
 
 ---
 
@@ -272,9 +277,9 @@ Satu middleware, tiga kewajiban, jangan sampai ada yang lolos satu pun:
 Peta host-nya, supaya tidak ada yang menaruh endpoint di tempat yang salah:
 
 ```
-app.sewain.id          backoffice + portal API-nya      JWT
-api.sewain.id          webhook (fase 1), API eksternal (fase 2)
-<slug>.sewain.id       publik + portal penyewa /b/<token>   Host
+app.sewain.id          backoffice + API-nya                        JWT
+api.sewain.id          webhook + API eksternal (BR-031, BR-032)    tanda tangan / X-API-Key
+<slug>.sewain.id       publik + portal penyewa /booking/<token>    Host
 ```
 
 Respons publik tidak pernah memuat `resource_units.code`, id unit, nama penyewa, atau `owner_id`
@@ -337,10 +342,15 @@ identik; yang beda cuma endpoint dan kredensial.
 - **TTL presigned GET berbeda per jenis** (`S1-033`): foto serah-terima 1 jam, berkas ekspor
   15 menit (BR-077), foto identitas **5 menit** (BR-085) — yang terakhir dibuka sekali lalu ditutup,
   dan setiap pembukaannya menulis baris audit.
-- **Byte unggahan tetap lewat API**, tidak presigned PUT dari browser. Ini **berbeda dari
-  `new-commerce`** yang sengaja menghindari API untuk foto produk. Alasannya BR-036/BR-037: objek
-  dan barisnya harus tercatat dalam satu transaksi. Presign memberi jendela di mana objek ada tanpa
-  barisnya — untuk barang bukti sengketa, jendela itu tidak boleh ada.
+- **Byte unggahan tidak pernah lewat API** — presigned PUT dari browser langsung ke R2 (BR-093),
+  sama seperti `new-commerce`. Yang menjaga BR-036/BR-037 bukan lewatnya byte, tapi dua hal lain:
+  **server yang menentukan kunci**, dan **`HEAD` sebelum menulis baris**. Objek yang ada tanpa
+  barisnya cuma sampah — tidak ada yang menunjuknya, tidak ada yang bisa membacanya, dan lifecycle
+  `pending/` 24 jam yang mengurusnya. Yang berbahaya justru baris yang menunjuk objek karangan,
+  dan `HEAD` itu yang menutupnya.
+- **Unggahan mendarat di `pending/<owner_id>/…`, lalu disalin ke prefiks final saat commit.**
+  Salinannya R2→R2, nol egress lewat aplikasi. Prefiks bukti hanya berisi bukti yang sudah punya
+  baris.
 
 ---
 
@@ -349,7 +359,7 @@ identik; yang beda cuma endpoint dan kredensial.
 `cmd/worker` mengonsumsi Redis Streams; `cmd/scheduler` menaruh pekerjaan berjadwal ke stream
 yang sama. Keduanya berdiri di `S1-040`, dan **lima item sesudahnya memakainya apa adanya** —
 scan bukti transfer (`S1-046`), draft kedaluwarsa (`S1-052`), pengingat WA (`S1-054`), ekspor
-laporan (`S1-057`), retensi identitas (`S1-059`).
+laporan (`S1-057`).
 
 - **Pengiriman at-least-once, jadi handler wajib idempoten.** Ini idempotensi sebagai sifat
   desain, bukan lewat header — beda mekanisme dari BR-090. Satu pekerjaan bisa jalan dua kali
@@ -359,10 +369,10 @@ laporan (`S1-057`), retensi identitas (`S1-059`).
   retry selamanya. Isi dead-letter tampil di dashboard, bukan cuma di log (BR-072).
 - **Scheduler tidak boleh jalan dobel.** Dua replika berarti dua kali kirim; pakai kunci lease di
   Redis, bukan asumsi bahwa cuma ada satu proses.
-- **Jangan gabungkan keduanya jadi satu biner.** Bukan soal kerapian: ekspor XLSX dan scan AI
-  rakus memori dan bergantung layanan luar; draft kedaluwarsa, pengingat, dan retensi identitas
-  nyaris nol sumber daya. Satu ekspor yang kehabisan memori tidak boleh menjatuhkan job yang
-  menghapus foto KTP di hari ke-90 — itu kewajiban hukum (BR-086). Uraiannya di BR-091.
+- **Jangan gabungkan keduanya jadi satu biner.** Ekspor XLSX dan scan AI rakus memori dan
+  bergantung layanan luar; draft kedaluwarsa dan pengingat nyaris nol sumber daya. Batas sumber
+  daya per layanan tidak bisa dipasang ke satu biner yang memuat dua profil itu, dan satu ekspor
+  yang kehabisan memori tidak boleh ikut menjatuhkan pengingat (BR-091).
 - **Jangan pernah `time.Ticker` di dalam `cmd/api`.** Ia jalan sekali per replika, mati saat
   deploy, dan tidak punya jejak kalau gagal. Kalau sebuah task butuh pekerjaan berjadwal,
   tempatnya `cmd/scheduler`.
@@ -397,7 +407,8 @@ seseorang "mengoptimasi" constraint-nya jadi cek aplikasi.
 ## Jangan pernah
 
 - `pool.Query` di luar `internal/db`.
-- Menerima `owner_id`, `unit_price`, `deposit_amount`, atau `late_fee_per_unit` dari request body.
+- Menerima `owner_id`, `unit_price`, `pricing_unit`, `deposit_amount`, atau `late_fee_per_unit`
+  dari request body. `pricing_unit` diisi dari `owners.business_type` saat resource dibuat (BR-017).
 - Membaca ulang harga dari `resources` untuk booking yang sudah ada (BR-014).
 - Menambah lock aplikasi di jalur booking (BR-022).
 - Mendaftarkan endpoint jalur gateway di fase 1. Ketiganya nonaktif (`../docs/04-api-spec.md` §3.8.1).
@@ -420,6 +431,18 @@ seseorang "mengoptimasi" constraint-nya jadi cek aplikasi.
   publik bergantung padanya. Kalau aplikasi bisa dijangkau tanpa lewat proxy,
   `curl -H "Host: rentalbudi.sewain.id"` memilih pemilik mana pun yang diinginkan penyerang, dan
   isolasinya runtuh total, bukan bocor sedikit (BR-030).
+- **Membaca `Host` sebagai sumber `owner_id` di `api.sewain.id`, atau menerima `X-API-Key` di
+  `<slug>.sewain.id`.** Dua jalur, nol penyeberangan. Kunci sah + `Host` palsu = menunjuk pemilik
+  lain, dan asumsi topologi yang menopang BR-030 tidak berlaku untuk host yang memang menerima
+  panggilan dari luar browser (BR-032).
+- **Memakai API key untuk apa pun di luar empat endpoint `04-api-spec.md` §4.** Ia bukan token
+  backoffice dan bukan jalan ke data penyewa (BR-031).
+- **Menerbitkan baris tagihan tanpa konfirmasi operator** — denda telat, kerusakan, dan potongan
+  deposit semuanya diusulkan, bukan ditagih sendiri (BR-051).
+- **Memperlakukan `0` dan `NULL` sebagai hal yang sama** pada `deposit_amount`, `late_fee_per_unit`,
+  `min_duration`, `max_duration`. `NULL` = aturannya tidak berlaku; `0` ditolak database (BR-016).
+- **Menyusun keadaan kalender di klien.** `state` dihitung server, satu definisi untuk semua layar
+  (BR-033).
 
 ---
 
@@ -429,10 +452,15 @@ Tidak ada: tagihan bulanan berulang (itu fase 2 — kos), multi-cabang, kalender
 berulang mingguan, GPS, integrasi asuransi, dynamic pricing, sinkronisasi offline, penghitungan
 kapasitas unit fungible.
 
+**API eksternal + CORS sekarang ADA di fase 1** (`S1-079`–`S1-081`, M5) — larangan lama soal
+"jangan tulis satu baris pun kode CORS" sudah dicabut. Yang tetap dilarang adalah memakai kuncinya
+di luar empat endpoint §4.
+
 Kalau sebuah task menyiratkan salah satunya, itu milik fase berikutnya — berhenti dan katakan,
 jangan bangun versi separuh yang nanti harus dibongkar. `../docs/05-backlog.md` §Di luar ruang lingkup punya
 tabelnya.
 
-Satu hal yang **terlihat** seperti fitur kos tapi masuk ruang lingkup: `subscriptions` +
-`invoices.kind = 'subscription'`. Itu langganan SaaS-nya sendiri, lewat jalur pembayaran yang sama,
-tanpa integrasi kedua (BR-082).
+**Langganan SaaS ditunda dari fase 1** (BR-080–BR-082). `subscriptions` tetap dibuat dan tetap
+kosong, dan `invoices.kind`/`subscription_id` tetap jalan — jadi menyalakannya nanti nol migrasi.
+Yang **tidak** dibangun: paket, penegakan kuota, tagihan langganan, `GET /subscription`. Fase 1
+tanpa batas unit maupun pengguna, dan `unit-quota-exceeded` tidak pernah terbit.

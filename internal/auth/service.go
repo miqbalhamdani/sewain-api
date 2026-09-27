@@ -50,7 +50,7 @@ type SessionUser struct {
 type SessionOwner struct {
 	ID   uuid.UUID
 	Name string
-	Slug string
+	Slug *string // nil = belum punya halaman publik (BR-025)
 }
 
 // Service is the auth use cases. Everything it does that touches an owner's

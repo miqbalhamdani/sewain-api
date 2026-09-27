@@ -103,13 +103,42 @@ func TestLogin(t *testing.T) {
 		if s.AccessToken == "" || s.RefreshToken == "" {
 			t.Error("session is missing a token")
 		}
-		if s.Owner.Slug == "" || s.Owner.Name == "" {
+		if s.Owner.Name == "" {
 			t.Errorf("owner not carried through: %+v", s.Owner)
+		}
+		// A business with no slug is the ordinary case and must log in, so this
+		// fails the moment somebody puts NOT NULL back on the column (BR-005).
+		if s.Owner.Slug != nil {
+			t.Errorf("owner was seeded without a slug, got %q", *s.Owner.Slug)
 		}
 		// It is an empty list rather than absent because the contract marks
 		// the field required.
 		if s.User.Permissions == nil {
 			t.Error("permissions is nil; the contract requires the field")
+		}
+	})
+
+	// The other direction. Without this, wiring that always returned nil would
+	// still pass the case above, and nothing else reads the slug until S1-051.
+	t.Run("carries a slug through once the owner has one", func(t *testing.T) {
+		ownerID, _, slugEmail := seedUser(ctx, t, store)
+		if err := store.InOwnerTx(owner.NewContext(ctx, ownerID), func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `UPDATE owners SET slug = $2 WHERE id = $1`,
+				ownerID, "rentalbudi-"+ownerID.String()[:8])
+			return err
+		}); err != nil {
+			t.Fatalf("set slug: %v", err)
+		}
+
+		s, err := svc.Login(ctx, slugEmail, testPassword)
+		if err != nil {
+			t.Fatalf("login: %v", err)
+		}
+		if s.Owner.Slug == nil {
+			t.Fatal("slug was set on the owner but arrived nil")
+		}
+		if want := "rentalbudi-" + ownerID.String()[:8]; *s.Owner.Slug != want {
+			t.Errorf("slug = %q, want %q", *s.Owner.Slug, want)
 		}
 	})
 
@@ -252,13 +281,16 @@ func seedUser(ctx context.Context, t *testing.T, store *db.Store) (ownerID, user
 	// owners has no RLS by design, so this needs no owner context.
 	if err := store.InOwnerTx(owner.NewContext(ctx, ownerID), func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO owners (id, name, slug) VALUES ($1, $2, $3)`,
-			ownerID, "Test owner", "t-"+ownerID.String()); err != nil {
+			// No slug: that is the initial state of every business, not an edge
+			// case -- it is not asked for at registration and is filled in later
+			// from PATCH /settings (BR-005, BR-025).
+			`INSERT INTO owners (id, name) VALUES ($1, $2)`,
+			ownerID, "Test owner"); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx,
 			`INSERT INTO users (id, owner_id, email, password_hash, name, role, status)
-			 VALUES ($1, $2, $3, $4, 'Test user', 'ops', 'active')`,
+			 VALUES ($1, $2, $3, $4, 'Test user', 'operator', 'active')`,
 			userID, ownerID, email, hash)
 		return err
 	}); err != nil {

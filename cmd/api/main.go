@@ -68,12 +68,12 @@ func run() error {
 	}
 
 	mux := http.NewServeMux()
-	// Not a contract endpoint, so not generated and not under /v1.
+	// Not a contract endpoint, so not generated and not under BasePath.
 	mux.Handle("GET /healthz", newHealthHandler(
 		checker{name: "postgres", version: pool.ServerVersion},
 		checker{name: "redis", version: redis.ServerVersion},
 	))
-	mux.Handle("/v1/", httpapi.NewRouter(
+	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
 		httpapi.NewServer(auth.NewService(pool, signer), !config.IsDevelopment()),
 		signer,
 	))

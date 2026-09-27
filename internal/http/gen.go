@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -164,15 +165,26 @@ type SessionOwner struct {
 
 	// Slug Label subdomain usaha ini — `rentalbudi` berarti `rentalbudi.sewain.id` (BR-025).
 	//
+	// **`null` adalah keadaan awal setiap usaha**, bukan kasus pinggir: slug tidak
+	// ditanyakan saat daftar (BR-005) dan diisi belakangan dari `PATCH /settings`.
+	// Pemilik tanpa slug tidak punya host sama sekali — katalog publik maupun portal
+	// penyewa ikut tidak ada. Karena itu ia tidak `required`: usaha yang baru saja
+	// terbit lewat `POST /auth/register` tidak bisa memenuhinya.
+	//
 	//
 	// Examples: rentalbudi
-	Slug string `json:"slug"`
+	Slug *string `json:"slug,omitempty"`
 }
 
 // SessionUser defines model for SessionUser.
 type SessionUser struct {
-	Id   openapi_types.UUID `json:"id"`
-	Name string             `json:"name"`
+	// EmailVerifiedAt `null` selama email belum terverifikasi. Frontend merender dinding verifikasi
+	// dari field ini, bukan dari menebak lewat `403 email-not-verified` — gerbang itu
+	// bisa muncul di endpoint mana pun, jadi menebaknya berarti menebak di tiap layar
+	// (BR-006).
+	EmailVerifiedAt *time.Time         `json:"email_verified_at"`
+	Id              openapi_types.UUID `json:"id"`
+	Name            string             `json:"name"`
 
 	// Permissions String `resource:action` yang diberikan peran itu. Klien **menyembunyikan** aksi
 	// yang tidak ada di sini, bukan menonaktifkannya — tombol yang `403` mengiklankan

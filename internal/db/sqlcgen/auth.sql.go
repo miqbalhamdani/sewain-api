@@ -53,7 +53,7 @@ type GetSessionRow struct {
 	Role      string
 	OwnerID   uuid.UUID
 	OwnerName string
-	Slug      string
+	Slug      *string
 }
 
 // Queries over the identity tables. Every one of these runs INSIDE InOwnerTx.

@@ -14,7 +14,13 @@
 
 CREATE TABLE owners (
     id     uuid PRIMARY KEY,
-    slug   text NOT NULL,
+    -- NULLABLE, dan itu keadaan awal setiap pemilik: slug tidak ditanyakan saat
+    -- daftar (BR-005) dan diisi belakangan dari PATCH /settings (BR-025, S1-009).
+    -- Pemilik tanpa slug tidak punya host sama sekali. Unique index di bawah tetap
+    -- benar karena PostgreSQL menganggap setiap NULL berbeda -- dua pemilik tanpa
+    -- slug tidak saling tabrakan. Ketiga CHECK di bawah juga aman: predikat atas
+    -- NULL bernilai NULL, dan CHECK hanya menolak yang FALSE.
+    slug   text,
     name   text NOT NULL,
     status text NOT NULL DEFAULT 'active'
            CHECK (status IN ('active','suspended')),
