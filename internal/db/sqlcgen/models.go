@@ -39,6 +39,42 @@ type RefreshToken struct {
 	CreatedAt   time.Time
 }
 
+type Resource struct {
+	ID                     uuid.UUID
+	OwnerID                uuid.UUID
+	Name                   string
+	Category               *string
+	Images                 []string
+	PricingUnit            string
+	BasePrice              int64
+	DepositAmount          *int64
+	LateFeePerUnit         *int64
+	MinDuration            *int32
+	MaxDuration            *int32
+	BufferMinutes          int32
+	RequiresIDVerification bool
+	Status                 string
+	CreatedBy              *uuid.UUID
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	DeletedAt              *time.Time
+}
+
+type ResourceUnit struct {
+	ID             uuid.UUID
+	OwnerID        uuid.UUID
+	ResourceID     uuid.UUID
+	Code           string
+	Label          *string
+	Status         string
+	MeterValue     *int64
+	ConditionNotes *string
+	CreatedBy      *uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+}
+
 type User struct {
 	ID              uuid.UUID
 	OwnerID         uuid.UUID
