@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
+	"github.com/miqbalhamdani/sewain-api/internal/catalog"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
@@ -23,6 +24,7 @@ const refreshCookieName = "refresh_token"
 type Server struct {
 	auth     *auth.Service
 	settings *settings.Service
+	catalog  *catalog.Service
 	limiter  *ratelimit.Limiter
 
 	// secureCookies is false only for local development over plain HTTP, where
@@ -30,8 +32,14 @@ type Server struct {
 	secureCookies bool
 }
 
-func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, limiter *ratelimit.Limiter, secureCookies bool) *Server {
-	return &Server{auth: authSvc, settings: settingsSvc, limiter: limiter, secureCookies: secureCookies}
+func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, catalogSvc *catalog.Service, limiter *ratelimit.Limiter, secureCookies bool) *Server {
+	return &Server{
+		auth:          authSvc,
+		settings:      settingsSvc,
+		catalog:       catalogSvc,
+		limiter:       limiter,
+		secureCookies: secureCookies,
+	}
 }
 
 // Login handles POST /auth/login.

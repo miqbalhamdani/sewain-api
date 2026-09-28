@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
+	"github.com/miqbalhamdani/sewain-api/internal/catalog"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	httpapi "github.com/miqbalhamdani/sewain-api/internal/http"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
@@ -93,7 +94,8 @@ func run() error {
 		objectStoreChecker(config.ObjectStoreURL()),
 	))
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
-		httpapi.NewServer(authSvc, settings.New(pool), ratelimit.New(redis), !config.IsDevelopment()),
+		httpapi.NewServer(authSvc, settings.New(pool), catalog.New(pool),
+			ratelimit.New(redis), !config.IsDevelopment()),
 		signer,
 		redis,
 	))

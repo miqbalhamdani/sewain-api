@@ -33,6 +33,7 @@ import (
 	httpapi "github.com/miqbalhamdani/sewain-api/internal/http"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
+	"github.com/miqbalhamdani/sewain-api/internal/catalog"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
@@ -70,6 +71,11 @@ type seeded struct {
 	// userID is the seeded user's own id, so a case can aim an id-taking route
 	// at owner B's row and watch it answer 404 rather than 403.
 	userID string
+
+	// resourceID and unitID serve the same purpose for the catalogue routes.
+	// Set by seedCatalogOwner; empty for the fixtures that do not need them.
+	resourceID string
+	unitID     string
 }
 
 // isolationCase says how to exercise one route as owner A after owner B owns
@@ -334,7 +340,8 @@ var newServer = func(t *testing.T) http.Handler {
 		WithMail(redis, mail.Discard{}, "http://localhost:3000")
 
 	return httpapi.NewRouter(
-		httpapi.NewServer(authSvc, settings.New(store), ratelimit.New(redis), false), signer, redis)
+		httpapi.NewServer(authSvc, settings.New(store), catalog.New(store),
+			ratelimit.New(redis), false), signer, redis)
 }
 
 // --- fixtures --------------------------------------------------------------

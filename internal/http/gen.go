@@ -112,6 +112,48 @@ func (e InviteUserRequestRole) Valid() bool {
 	}
 }
 
+// Defines values for PricingUnit.
+const (
+	Day   PricingUnit = "day"
+	Hour  PricingUnit = "hour"
+	Month PricingUnit = "month"
+	Week  PricingUnit = "week"
+)
+
+// Valid indicates whether the value is a known member of the PricingUnit enum.
+func (e PricingUnit) Valid() bool {
+	switch e {
+	case Day:
+		return true
+	case Hour:
+		return true
+	case Month:
+		return true
+	case Week:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceStatus.
+const (
+	ResourceStatusActive   ResourceStatus = "active"
+	ResourceStatusInactive ResourceStatus = "inactive"
+)
+
+// Valid indicates whether the value is a known member of the ResourceStatus enum.
+func (e ResourceStatus) Valid() bool {
+	switch e {
+	case ResourceStatusActive:
+		return true
+	case ResourceStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionUserRole.
 const (
 	SessionUserRoleOperator SessionUserRole = "operator"
@@ -124,6 +166,27 @@ func (e SessionUserRole) Valid() bool {
 	case SessionUserRoleOperator:
 		return true
 	case SessionUserRoleOwner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnitStatus.
+const (
+	UnitStatusActive      UnitStatus = "active"
+	UnitStatusMaintenance UnitStatus = "maintenance"
+	UnitStatusRetired     UnitStatus = "retired"
+)
+
+// Valid indicates whether the value is a known member of the UnitStatus enum.
+func (e UnitStatus) Valid() bool {
+	switch e {
+	case UnitStatusActive:
+		return true
+	case UnitStatusMaintenance:
+		return true
+	case UnitStatusRetired:
 		return true
 	default:
 		return false
@@ -205,6 +268,15 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// AffectedBooking defines model for AffectedBooking.
+type AffectedBooking struct {
+	// Code Examples: SWN-0043
+	Code    string    `json:"code"`
+	EndAt   time.Time `json:"end_at"`
+	StartAt time.Time `json:"start_at"`
+	Status  string    `json:"status"`
+}
+
 // BusinessType Preset pasar, dipilih sekali saat mendaftar. **Ia yang menentukan `pricing_unit`
 // seluruh resource pemilik itu** — juragan tidak pernah mengisi satuan harga di tiap
 // barang (BR-012, BR-017).
@@ -257,6 +329,19 @@ type Me struct {
 	Owner SessionOwner `json:"owner"`
 	User  SessionUser  `json:"user"`
 }
+
+// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+// `ResourceCreate` maupun `ResourceUpdate`.
+//
+// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+//
+// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+// melihat field satuan harga di layar mana pun.
+type PricingUnit string
 
 // Problem RFC 9457 `application/problem+json`. Setiap respons error di API ini memakainya.
 //
@@ -321,6 +406,240 @@ type RegisterRequest struct {
 	// Examples: budi@contoh.id
 	Email    openapi_types.Email `json:"email"`
 	Password string              `json:"password"`
+}
+
+// Resource Jenis barang. Unit fisiknya ada di `ResourceUnit`, dan booking selalu menunjuk
+// unit — tidak pernah hanya jenisnya (BR-010).
+//
+// **Keempat nominal dan `category` wajib ada di respons walau bernilai `null`.**
+// Di sebuah *request* "tidak dikirim" dan "`null`" adalah dua perintah berbeda;
+// di respons tidak ada bedanya — barangnya berdeposit atau tidak. Menghilangkan
+// key-nya memaksa klien menebak mana dari dua arti itu yang dimaksud, jadi
+// field-nya selalu terbit dan `null` mengatakannya sendiri.
+type Resource struct {
+	// BasePrice Rupiah penuh, bukan minor unit: `350000` berarti Rp 350.000.
+	//
+	//
+	// Examples: 350000
+	BasePrice int64 `json:"base_price"`
+
+	// BufferMinutes Jeda wajib sesudah `end_at` sebelum unit yang sama bisa disewa lagi
+	// (BR-015). **Satu-satunya field opsional di sini yang tidak boleh kosong:**
+	// `end_at + NULL` menghasilkan NULL, dan rentang tak berbatas ke atas akan
+	// bentrok dengan seluruh booking masa depan unit itu. "Tanpa jeda" sudah
+	// persis sama dengan `0`.
+	//
+	//
+	// Examples: 120
+	BufferMinutes int `json:"buffer_minutes"`
+
+	// Category Examples: Mobil
+	Category *string `json:"category"`
+
+	// DepositAmount `null` berarti barang ini tidak berdeposit — BR-045 tidak menerbitkan
+	// barisnya, dan BR-048/BR-049 tidak berlaku. **`0` ditolak database**: tidak
+	// ada kasus rental yang butuh deposit nol rupiah, dan kalau `0` dan `null`
+	// sama-sama berarti "tanpa deposit", tidak ada laporan yang bisa
+	// membedakannya lagi (BR-016).
+	//
+	//
+	// Examples: 500000
+	DepositAmount *int64             `json:"deposit_amount"`
+	Id            openapi_types.UUID `json:"id"`
+
+	// LateFeePerUnit `null` berarti tanpa denda telat. Yang hilang cuma tagihannya —
+	// peringatan terlambat dan pengingatnya tetap jalan (BR-016, BR-041).
+	LateFeePerUnit *int64 `json:"late_fee_per_unit"`
+
+	// MaxDuration `null` berarti tanpa batas atas. `max < min` ditolak database.
+	MaxDuration *int `json:"max_duration"`
+
+	// MinDuration `null` berarti tanpa batas bawah, bukan nol (BR-016, BR-021).
+	MinDuration *int `json:"min_duration"`
+
+	// Name Examples: Avanza 2021
+	Name string `json:"name"`
+
+	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+	// `ResourceCreate` maupun `ResourceUpdate`.
+	//
+	// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+	// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+	// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+	//
+	// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+	// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+	// melihat field satuan harga di layar mana pun.
+	PricingUnit PricingUnit `json:"pricing_unit"`
+
+	// RequiresIdVerification Tidak ikut yang boleh `null`, walau BR-016 mendaftarnya di tabel yang sama:
+	// boolean bernilai `NULL` cuma menambah keadaan ketiga yang tidak berarti apa
+	// pun. "Tidak wajib" sudah persis sama dengan `false` (BR-085).
+	RequiresIdVerification bool `json:"requires_id_verification"`
+
+	// Status `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
+	Status ResourceStatus `json:"status"`
+
+	// UnitCount Unit `active` yang dimiliki jenis barang ini. Dihitung server. Nol berarti
+	// barang ini tidak akan pernah muncul di pencarian ketersediaan, berapa pun
+	// statusnya sendiri (BR-010) — dan layar katalog wajib mengatakannya.
+	UnitCount int `json:"unit_count"`
+}
+
+// ResourceCreate `pricing_unit` **sengaja tidak ada di sini** dan tidak akan pernah ada:
+// server mengisinya dari preset pemiliknya (BR-017). Begitu juga `id`, `owner_id`,
+// dan `unit_count`.
+type ResourceCreate struct {
+	BasePrice              int64   `json:"base_price"`
+	BufferMinutes          *int    `json:"buffer_minutes,omitempty"`
+	Category               *string `json:"category,omitempty"`
+	DepositAmount          *int64  `json:"deposit_amount,omitempty"`
+	LateFeePerUnit         *int64  `json:"late_fee_per_unit,omitempty"`
+	MaxDuration            *int    `json:"max_duration,omitempty"`
+	MinDuration            *int    `json:"min_duration,omitempty"`
+	Name                   string  `json:"name"`
+	RequiresIdVerification *bool   `json:"requires_id_verification,omitempty"`
+}
+
+// ResourceStatus `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
+type ResourceStatus string
+
+// ResourceUnit Barang fisiknya. Tiga Avanza adalah satu `Resource` dan tiga baris di sini,
+// dan kalender menampilkan tiga lajur terpisah.
+type ResourceUnit struct {
+	// Code Plat nomor atau nomor seri — yang dipakai operator mengenali barangnya
+	// secara fisik. Unik per usaha, bukan global: dua rental boleh sama-sama
+	// punya `B 1234 XY` (BR-011).
+	//
+	// **Tidak pernah muncul di permukaan publik** (BR-025).
+	//
+	//
+	// Examples: B 1234 XY
+	Code           string             `json:"code"`
+	ConditionNotes *string            `json:"condition_notes"`
+	Id             openapi_types.UUID `json:"id"`
+
+	// Label Nama panggilan, buat dibacakan lewat telepon.
+	//
+	// Examples: Avanza Putih
+	Label *string `json:"label"`
+
+	// MeterValue Odometer atau jam pakai terakhir. Biasanya diisi serah-terima (`S1-035`);
+	// di sini supaya unit baru bisa mulai dari angka yang benar.
+	MeterValue *int64             `json:"meter_value"`
+	ResourceId openapi_types.UUID `json:"resource_id"`
+
+	// Status Hanya `active` yang muncul di pencarian ketersediaan (BR-013). `maintenance`
+	// tetap punya lajur di kalender; `retired` tidak punya lajur sama sekali.
+	//
+	// Tidak ada `rented` di sini, dan itu disengaja: "sedang disewa" adalah turunan
+	// dari booking ber-status `picked_up`, bukan keadaan yang disimpan (BR-023).
+	// Dua sumber untuk satu fakta berarti satu di antaranya akan salah.
+	Status UnitStatus `json:"status"`
+}
+
+// ResourceUpdate Semua field opsional, dan key yang absen membiarkan nilainya apa adanya.
+//
+// **Untuk keempat nominal, `null` eksplisit mencabut nilainya** — itu satu-satunya
+// caranya, dan itu pengecualian yang disengaja terhadap aturan umum "`null`
+// eksplisit adalah `422`" yang berlaku untuk field yang dikelola server
+// (`04-api-spec.md` §3.2). `buffer_minutes` tidak ikut: ia `NOT NULL`.
+type ResourceUpdate struct {
+	BasePrice              *int64  `json:"base_price,omitempty"`
+	BufferMinutes          *int    `json:"buffer_minutes,omitempty"`
+	Category               *string `json:"category,omitempty"`
+	DepositAmount          *int64  `json:"deposit_amount,omitempty"`
+	LateFeePerUnit         *int64  `json:"late_fee_per_unit,omitempty"`
+	MaxDuration            *int    `json:"max_duration,omitempty"`
+	MinDuration            *int    `json:"min_duration,omitempty"`
+	Name                   *string `json:"name,omitempty"`
+	RequiresIdVerification *bool   `json:"requires_id_verification,omitempty"`
+
+	// Status `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
+	Status *ResourceStatus `json:"status,omitempty"`
+}
+
+// ResourceUpdated defines model for ResourceUpdated.
+type ResourceUpdated struct {
+	// ActiveBookings Booking berjalan yang **tetap memakai harga lama**, karena harga
+	// di-snapshot saat booking dibuat dan tidak pernah dibaca ulang (BR-014).
+	// Ia ada supaya pemilik yang menaikkan harga tahu persis berapa banyak
+	// yang tidak ikut naik, tanpa menebak.
+	//
+	// **Selalu `0` sampai `S1-022` membuat tabel `bookings`.** Bentuk
+	// responsnya mendarat sekarang supaya layarnya ditulis sekali; yang
+	// menyusul cuma isi query-nya.
+	ActiveBookings int `json:"active_bookings"`
+
+	// BasePrice Rupiah penuh, bukan minor unit: `350000` berarti Rp 350.000.
+	//
+	//
+	// Examples: 350000
+	BasePrice int64 `json:"base_price"`
+
+	// BufferMinutes Jeda wajib sesudah `end_at` sebelum unit yang sama bisa disewa lagi
+	// (BR-015). **Satu-satunya field opsional di sini yang tidak boleh kosong:**
+	// `end_at + NULL` menghasilkan NULL, dan rentang tak berbatas ke atas akan
+	// bentrok dengan seluruh booking masa depan unit itu. "Tanpa jeda" sudah
+	// persis sama dengan `0`.
+	//
+	//
+	// Examples: 120
+	BufferMinutes int `json:"buffer_minutes"`
+
+	// Category Examples: Mobil
+	Category *string `json:"category"`
+
+	// DepositAmount `null` berarti barang ini tidak berdeposit — BR-045 tidak menerbitkan
+	// barisnya, dan BR-048/BR-049 tidak berlaku. **`0` ditolak database**: tidak
+	// ada kasus rental yang butuh deposit nol rupiah, dan kalau `0` dan `null`
+	// sama-sama berarti "tanpa deposit", tidak ada laporan yang bisa
+	// membedakannya lagi (BR-016).
+	//
+	//
+	// Examples: 500000
+	DepositAmount *int64             `json:"deposit_amount"`
+	Id            openapi_types.UUID `json:"id"`
+
+	// LateFeePerUnit `null` berarti tanpa denda telat. Yang hilang cuma tagihannya —
+	// peringatan terlambat dan pengingatnya tetap jalan (BR-016, BR-041).
+	LateFeePerUnit *int64 `json:"late_fee_per_unit"`
+
+	// MaxDuration `null` berarti tanpa batas atas. `max < min` ditolak database.
+	MaxDuration *int `json:"max_duration"`
+
+	// MinDuration `null` berarti tanpa batas bawah, bukan nol (BR-016, BR-021).
+	MinDuration *int `json:"min_duration"`
+
+	// Name Examples: Avanza 2021
+	Name string `json:"name"`
+
+	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+	// `ResourceCreate` maupun `ResourceUpdate`.
+	//
+	// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+	// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+	// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+	//
+	// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+	// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+	// melihat field satuan harga di layar mana pun.
+	PricingUnit PricingUnit `json:"pricing_unit"`
+
+	// RequiresIdVerification Tidak ikut yang boleh `null`, walau BR-016 mendaftarnya di tabel yang sama:
+	// boolean bernilai `NULL` cuma menambah keadaan ketiga yang tidak berarti apa
+	// pun. "Tidak wajib" sudah persis sama dengan `false` (BR-085).
+	RequiresIdVerification bool `json:"requires_id_verification"`
+
+	// Status `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
+	Status ResourceStatus `json:"status"`
+
+	// UnitCount Unit `active` yang dimiliki jenis barang ini. Dihitung server. Nol berarti
+	// barang ini tidak akan pernah muncul di pencarian ketersediaan, berapa pun
+	// statusnya sendiri (BR-010) — dan layar katalog wajib mengatakannya.
+	UnitCount int `json:"unit_count"`
 }
 
 // Session Dikembalikan login dan refresh. Membawa semua yang dibutuhkan klien untuk merender
@@ -456,6 +775,87 @@ type SettingsUpdate struct {
 	Slug *string `json:"slug,omitempty"`
 }
 
+// UnitCreate defines model for UnitCreate.
+type UnitCreate struct {
+	Code           string  `json:"code"`
+	ConditionNotes *string `json:"condition_notes,omitempty"`
+	Label          *string `json:"label,omitempty"`
+	MeterValue     *int64  `json:"meter_value,omitempty"`
+}
+
+// UnitStatus Hanya `active` yang muncul di pencarian ketersediaan (BR-013). `maintenance`
+// tetap punya lajur di kalender; `retired` tidak punya lajur sama sekali.
+//
+// Tidak ada `rented` di sini, dan itu disengaja: "sedang disewa" adalah turunan
+// dari booking ber-status `picked_up`, bukan keadaan yang disimpan (BR-023).
+// Dua sumber untuk satu fakta berarti satu di antaranya akan salah.
+type UnitStatus string
+
+// UnitUpdate Semua field opsional. `resource_id` tidak ada di sini — memindahkan unit ke
+// jenis barang lain akan membuat snapshot booking lama menunjuk jenis yang tidak
+// pernah disewa (BR-014), dan itu perubahan kontrak, bukan satu field.
+type UnitUpdate struct {
+	Code           *string `json:"code,omitempty"`
+	ConditionNotes *string `json:"condition_notes,omitempty"`
+	Label          *string `json:"label,omitempty"`
+	MeterValue     *int64  `json:"meter_value,omitempty"`
+
+	// Status Hanya `active` yang muncul di pencarian ketersediaan (BR-013). `maintenance`
+	// tetap punya lajur di kalender; `retired` tidak punya lajur sama sekali.
+	//
+	// Tidak ada `rented` di sini, dan itu disengaja: "sedang disewa" adalah turunan
+	// dari booking ber-status `picked_up`, bukan keadaan yang disimpan (BR-023).
+	// Dua sumber untuk satu fakta berarti satu di antaranya akan salah.
+	Status *UnitStatus `json:"status,omitempty"`
+}
+
+// UnitUpdated defines model for UnitUpdated.
+type UnitUpdated struct {
+	// Code Plat nomor atau nomor seri — yang dipakai operator mengenali barangnya
+	// secara fisik. Unik per usaha, bukan global: dua rental boleh sama-sama
+	// punya `B 1234 XY` (BR-011).
+	//
+	// **Tidak pernah muncul di permukaan publik** (BR-025).
+	//
+	//
+	// Examples: B 1234 XY
+	Code           string             `json:"code"`
+	ConditionNotes *string            `json:"condition_notes"`
+	Id             openapi_types.UUID `json:"id"`
+
+	// Label Nama panggilan, buat dibacakan lewat telepon.
+	//
+	// Examples: Avanza Putih
+	Label *string `json:"label"`
+
+	// MeterValue Odometer atau jam pakai terakhir. Biasanya diisi serah-terima (`S1-035`);
+	// di sini supaya unit baru bisa mulai dari angka yang benar.
+	MeterValue *int64             `json:"meter_value"`
+	ResourceId openapi_types.UUID `json:"resource_id"`
+
+	// Status Hanya `active` yang muncul di pencarian ketersediaan (BR-013). `maintenance`
+	// tetap punya lajur di kalender; `retired` tidak punya lajur sama sekali.
+	//
+	// Tidak ada `rented` di sini, dan itu disengaja: "sedang disewa" adalah turunan
+	// dari booking ber-status `picked_up`, bukan keadaan yang disimpan (BR-023).
+	// Dua sumber untuk satu fakta berarti satu di antaranya akan salah.
+	Status UnitStatus `json:"status"`
+
+	// Warning Apa yang terdampak oleh perubahan ini. Ia **peringatan, bukan penolakan**:
+	// barisnya sudah berubah waktu badan ini dibaca (BR-013).
+	Warning UnitWarning `json:"warning"`
+}
+
+// UnitWarning Apa yang terdampak oleh perubahan ini. Ia **peringatan, bukan penolakan**:
+// barisnya sudah berubah waktu badan ini dibaca (BR-013).
+type UnitWarning struct {
+	// AffectedBookings Booking yang sudah ada untuk unit ini dan **tidak** dibatalkan maupun
+	// dihapus. Pemilik yang memutuskan apa yang terjadi pada masing-masing.
+	//
+	// **Selalu kosong sampai `S1-022` membuat tabel `bookings`.**
+	AffectedBookings []AffectedBooking `json:"affected_bookings"`
+}
+
 // UpdateUserRequest Minimal satu field. `email` dan `owner_id` sengaja tidak ada di sini.
 type UpdateUserRequest struct {
 	Role *UpdateUserRequestRole `json:"role,omitempty"`
@@ -575,8 +975,20 @@ type RegisterJSONRequestBody = RegisterRequest
 // VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
 type VerifyEmailJSONRequestBody VerifyEmailJSONBody
 
+// CreateResourceJSONRequestBody defines body for CreateResource for application/json ContentType.
+type CreateResourceJSONRequestBody = ResourceCreate
+
+// UpdateResourceJSONRequestBody defines body for UpdateResource for application/json ContentType.
+type UpdateResourceJSONRequestBody = ResourceUpdate
+
+// CreateUnitJSONRequestBody defines body for CreateUnit for application/json ContentType.
+type CreateUnitJSONRequestBody = UnitCreate
+
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody = SettingsUpdate
+
+// UpdateUnitJSONRequestBody defines body for UpdateUnit for application/json ContentType.
+type UpdateUnitJSONRequestBody = UnitUpdate
 
 // InviteUserJSONRequestBody defines body for InviteUser for application/json ContentType.
 type InviteUserJSONRequestBody = InviteUserRequest
@@ -691,12 +1103,39 @@ type ServerInterface interface {
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// ListResources Jenis barang di usaha ini
+	// (GET /resources)
+	ListResources(w http.ResponseWriter, r *http.Request)
+	// CreateResource Daftarkan jenis barang baru
+	// (POST /resources)
+	CreateResource(w http.ResponseWriter, r *http.Request)
+	// DeleteResource Hapus jenis barang
+	// (DELETE /resources/{id})
+	DeleteResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// GetResource Satu jenis barang
+	// (GET /resources/{id})
+	GetResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UpdateResource Ubah jenis barang
+	// (PATCH /resources/{id})
+	UpdateResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// ListUnits Unit fisik dari satu jenis barang
+	// (GET /resources/{id}/units)
+	ListUnits(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// CreateUnit Tambah unit fisik
+	// (POST /resources/{id}/units)
+	CreateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// GetSettings Baca knob pemilik
 	// (GET /settings)
 	GetSettings(w http.ResponseWriter, r *http.Request)
 	// UpdateSettings Ubah knob pemilik
 	// (PATCH /settings)
 	UpdateSettings(w http.ResponseWriter, r *http.Request)
+	// DeleteUnit Hapus unit
+	// (DELETE /units/{id})
+	DeleteUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UpdateUnit Ubah unit, termasuk statusnya
+	// (PATCH /units/{id})
+	UpdateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// ListUsers Akun di usaha ini
 	// (GET /users)
 	ListUsers(w http.ResponseWriter, r *http.Request)
@@ -763,6 +1202,48 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListResources Jenis barang di usaha ini
+// (GET /resources)
+func (_ Unimplemented) ListResources(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateResource Daftarkan jenis barang baru
+// (POST /resources)
+func (_ Unimplemented) CreateResource(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteResource Hapus jenis barang
+// (DELETE /resources/{id})
+func (_ Unimplemented) DeleteResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetResource Satu jenis barang
+// (GET /resources/{id})
+func (_ Unimplemented) GetResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateResource Ubah jenis barang
+// (PATCH /resources/{id})
+func (_ Unimplemented) UpdateResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListUnits Unit fisik dari satu jenis barang
+// (GET /resources/{id}/units)
+func (_ Unimplemented) ListUnits(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateUnit Tambah unit fisik
+// (POST /resources/{id}/units)
+func (_ Unimplemented) CreateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetSettings Baca knob pemilik
 // (GET /settings)
 func (_ Unimplemented) GetSettings(w http.ResponseWriter, r *http.Request) {
@@ -772,6 +1253,18 @@ func (_ Unimplemented) GetSettings(w http.ResponseWriter, r *http.Request) {
 // UpdateSettings Ubah knob pemilik
 // (PATCH /settings)
 func (_ Unimplemented) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteUnit Hapus unit
+// (DELETE /units/{id})
+func (_ Unimplemented) DeleteUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateUnit Ubah unit, termasuk statusnya
+// (PATCH /units/{id})
+func (_ Unimplemented) UpdateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -920,6 +1413,164 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
+// ListResources operation middleware
+func (siw *ServerInterfaceWrapper) ListResources(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListResources(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateResource operation middleware
+func (siw *ServerInterfaceWrapper) CreateResource(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateResource(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteResource operation middleware
+func (siw *ServerInterfaceWrapper) DeleteResource(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteResource(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetResource operation middleware
+func (siw *ServerInterfaceWrapper) GetResource(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetResource(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateResource operation middleware
+func (siw *ServerInterfaceWrapper) UpdateResource(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateResource(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUnits operation middleware
+func (siw *ServerInterfaceWrapper) ListUnits(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUnits(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateUnit operation middleware
+func (siw *ServerInterfaceWrapper) CreateUnit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateUnit(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSettings operation middleware
 func (siw *ServerInterfaceWrapper) GetSettings(w http.ResponseWriter, r *http.Request) {
 
@@ -939,6 +1590,58 @@ func (siw *ServerInterfaceWrapper) UpdateSettings(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteUnit operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUnit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUnit(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateUnit operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUnit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateUnit(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1182,6 +1885,33 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/users/{id}", wrapper.UpdateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/resources", wrapper.ListResources)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/resources", wrapper.CreateResource)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/resources/{id}", wrapper.DeleteResource)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/resources/{id}", wrapper.GetResource)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/resources/{id}", wrapper.UpdateResource)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/resources/{id}/units", wrapper.ListUnits)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/resources/{id}/units", wrapper.CreateUnit)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/units/{id}", wrapper.DeleteUnit)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/units/{id}", wrapper.UpdateUnit)
 	})
 
 	return r
@@ -1631,6 +2361,507 @@ func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	return err
 }
 
+type ListResourcesRequestObject struct {
+}
+
+type ListResourcesResponseObject interface {
+	VisitListResourcesResponse(w http.ResponseWriter) error
+}
+
+type ListResources200JSONResponse []Resource
+
+func (response ListResources200JSONResponse) VisitListResourcesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListResources401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListResources401ApplicationProblemPlusJSONResponse) VisitListResourcesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListResources403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListResources403ApplicationProblemPlusJSONResponse) VisitListResourcesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateResourceRequestObject struct {
+	Body *CreateResourceJSONRequestBody
+}
+
+type CreateResourceResponseObject interface {
+	VisitCreateResourceResponse(w http.ResponseWriter) error
+}
+
+type CreateResource201JSONResponse Resource
+
+func (response CreateResource201JSONResponse) VisitCreateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateResource401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateResource401ApplicationProblemPlusJSONResponse) VisitCreateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateResource403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateResource403ApplicationProblemPlusJSONResponse) VisitCreateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateResource422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateResource422ApplicationProblemPlusJSONResponse) VisitCreateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteResourceRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteResourceResponseObject interface {
+	VisitDeleteResourceResponse(w http.ResponseWriter) error
+}
+
+type DeleteResource204Response struct {
+}
+
+func (response DeleteResource204Response) VisitDeleteResourceResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteResource401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteResource401ApplicationProblemPlusJSONResponse) VisitDeleteResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteResource403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteResource403ApplicationProblemPlusJSONResponse) VisitDeleteResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteResource404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteResource404ApplicationProblemPlusJSONResponse) VisitDeleteResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetResourceRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetResourceResponseObject interface {
+	VisitGetResourceResponse(w http.ResponseWriter) error
+}
+
+type GetResource200JSONResponse Resource
+
+func (response GetResource200JSONResponse) VisitGetResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetResource401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetResource401ApplicationProblemPlusJSONResponse) VisitGetResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetResource403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetResource403ApplicationProblemPlusJSONResponse) VisitGetResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetResource404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetResource404ApplicationProblemPlusJSONResponse) VisitGetResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateResourceRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateResourceJSONRequestBody
+}
+
+type UpdateResourceResponseObject interface {
+	VisitUpdateResourceResponse(w http.ResponseWriter) error
+}
+
+type UpdateResource200JSONResponse ResourceUpdated
+
+func (response UpdateResource200JSONResponse) VisitUpdateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateResource401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateResource401ApplicationProblemPlusJSONResponse) VisitUpdateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateResource403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateResource403ApplicationProblemPlusJSONResponse) VisitUpdateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateResource404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateResource404ApplicationProblemPlusJSONResponse) VisitUpdateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateResource422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateResource422ApplicationProblemPlusJSONResponse) VisitUpdateResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUnitsRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListUnitsResponseObject interface {
+	VisitListUnitsResponse(w http.ResponseWriter) error
+}
+
+type ListUnits200JSONResponse []ResourceUnit
+
+func (response ListUnits200JSONResponse) VisitListUnitsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUnits401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListUnits401ApplicationProblemPlusJSONResponse) VisitListUnitsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUnits403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListUnits403ApplicationProblemPlusJSONResponse) VisitListUnitsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUnits404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListUnits404ApplicationProblemPlusJSONResponse) VisitListUnitsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUnitRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *CreateUnitJSONRequestBody
+}
+
+type CreateUnitResponseObject interface {
+	VisitCreateUnitResponse(w http.ResponseWriter) error
+}
+
+type CreateUnit201JSONResponse ResourceUnit
+
+func (response CreateUnit201JSONResponse) VisitCreateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUnit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUnit401ApplicationProblemPlusJSONResponse) VisitCreateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUnit403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUnit403ApplicationProblemPlusJSONResponse) VisitCreateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUnit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUnit404ApplicationProblemPlusJSONResponse) VisitCreateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUnit422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUnit422ApplicationProblemPlusJSONResponse) VisitCreateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSettingsRequestObject struct {
 }
 
@@ -1743,6 +2974,157 @@ type UpdateSettings422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response UpdateSettings422ApplicationProblemPlusJSONResponse) VisitUpdateSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnitRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteUnitResponseObject interface {
+	VisitDeleteUnitResponse(w http.ResponseWriter) error
+}
+
+type DeleteUnit204Response struct {
+}
+
+func (response DeleteUnit204Response) VisitDeleteUnitResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteUnit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnit401ApplicationProblemPlusJSONResponse) VisitDeleteUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnit403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnit403ApplicationProblemPlusJSONResponse) VisitDeleteUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnit404ApplicationProblemPlusJSONResponse) VisitDeleteUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUnitRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateUnitJSONRequestBody
+}
+
+type UpdateUnitResponseObject interface {
+	VisitUpdateUnitResponse(w http.ResponseWriter) error
+}
+
+type UpdateUnit200JSONResponse UnitUpdated
+
+func (response UpdateUnit200JSONResponse) VisitUpdateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUnit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUnit401ApplicationProblemPlusJSONResponse) VisitUpdateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUnit403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUnit403ApplicationProblemPlusJSONResponse) VisitUpdateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUnit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUnit404ApplicationProblemPlusJSONResponse) VisitUpdateUnitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUnit422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUnit422ApplicationProblemPlusJSONResponse) VisitUpdateUnitResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2054,12 +3436,39 @@ type StrictServerInterface interface {
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ListResources Jenis barang di usaha ini
+	// (GET /resources)
+	ListResources(ctx context.Context, request ListResourcesRequestObject) (ListResourcesResponseObject, error)
+	// CreateResource Daftarkan jenis barang baru
+	// (POST /resources)
+	CreateResource(ctx context.Context, request CreateResourceRequestObject) (CreateResourceResponseObject, error)
+	// DeleteResource Hapus jenis barang
+	// (DELETE /resources/{id})
+	DeleteResource(ctx context.Context, request DeleteResourceRequestObject) (DeleteResourceResponseObject, error)
+	// GetResource Satu jenis barang
+	// (GET /resources/{id})
+	GetResource(ctx context.Context, request GetResourceRequestObject) (GetResourceResponseObject, error)
+	// UpdateResource Ubah jenis barang
+	// (PATCH /resources/{id})
+	UpdateResource(ctx context.Context, request UpdateResourceRequestObject) (UpdateResourceResponseObject, error)
+	// ListUnits Unit fisik dari satu jenis barang
+	// (GET /resources/{id}/units)
+	ListUnits(ctx context.Context, request ListUnitsRequestObject) (ListUnitsResponseObject, error)
+	// CreateUnit Tambah unit fisik
+	// (POST /resources/{id}/units)
+	CreateUnit(ctx context.Context, request CreateUnitRequestObject) (CreateUnitResponseObject, error)
 	// GetSettings Baca knob pemilik
 	// (GET /settings)
 	GetSettings(ctx context.Context, request GetSettingsRequestObject) (GetSettingsResponseObject, error)
 	// UpdateSettings Ubah knob pemilik
 	// (PATCH /settings)
 	UpdateSettings(ctx context.Context, request UpdateSettingsRequestObject) (UpdateSettingsResponseObject, error)
+	// DeleteUnit Hapus unit
+	// (DELETE /units/{id})
+	DeleteUnit(ctx context.Context, request DeleteUnitRequestObject) (DeleteUnitResponseObject, error)
+	// UpdateUnit Ubah unit, termasuk statusnya
+	// (PATCH /units/{id})
+	UpdateUnit(ctx context.Context, request UpdateUnitRequestObject) (UpdateUnitResponseObject, error)
 	// ListUsers Akun di usaha ini
 	// (GET /users)
 	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
@@ -2333,6 +3742,205 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListResources operation middleware
+func (sh *strictHandler) ListResources(w http.ResponseWriter, r *http.Request) {
+	var request ListResourcesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListResources(ctx, request.(ListResourcesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListResources")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListResourcesResponseObject); ok {
+		if err := validResponse.VisitListResourcesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateResource operation middleware
+func (sh *strictHandler) CreateResource(w http.ResponseWriter, r *http.Request) {
+	var request CreateResourceRequestObject
+
+	var body CreateResourceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateResource(ctx, request.(CreateResourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateResource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateResourceResponseObject); ok {
+		if err := validResponse.VisitCreateResourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteResource operation middleware
+func (sh *strictHandler) DeleteResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DeleteResourceRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteResource(ctx, request.(DeleteResourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteResource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteResourceResponseObject); ok {
+		if err := validResponse.VisitDeleteResourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetResource operation middleware
+func (sh *strictHandler) GetResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetResourceRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetResource(ctx, request.(GetResourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetResource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetResourceResponseObject); ok {
+		if err := validResponse.VisitGetResourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateResource operation middleware
+func (sh *strictHandler) UpdateResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateResourceRequestObject
+
+	request.Id = id
+
+	var body UpdateResourceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateResource(ctx, request.(UpdateResourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateResource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateResourceResponseObject); ok {
+		if err := validResponse.VisitUpdateResourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUnits operation middleware
+func (sh *strictHandler) ListUnits(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListUnitsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUnits(ctx, request.(ListUnitsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUnits")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUnitsResponseObject); ok {
+		if err := validResponse.VisitListUnitsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateUnit operation middleware
+func (sh *strictHandler) CreateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreateUnitRequestObject
+
+	request.Id = id
+
+	var body CreateUnitJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateUnit(ctx, request.(CreateUnitRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateUnit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateUnitResponseObject); ok {
+		if err := validResponse.VisitCreateUnitResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetSettings operation middleware
 func (sh *strictHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	var request GetSettingsRequestObject
@@ -2381,6 +3989,65 @@ func (sh *strictHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateSettingsResponseObject); ok {
 		if err := validResponse.VisitUpdateSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteUnit operation middleware
+func (sh *strictHandler) DeleteUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DeleteUnitRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteUnit(ctx, request.(DeleteUnitRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteUnit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteUnitResponseObject); ok {
+		if err := validResponse.VisitDeleteUnitResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateUnit operation middleware
+func (sh *strictHandler) UpdateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateUnitRequestObject
+
+	request.Id = id
+
+	var body UpdateUnitJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateUnit(ctx, request.(UpdateUnitRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateUnit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateUnitResponseObject); ok {
+		if err := validResponse.VisitUpdateUnitResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
