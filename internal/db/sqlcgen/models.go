@@ -26,6 +26,9 @@ type Owner struct {
 	PaymentDueHours            int32
 	NoShowToleranceHours       int32
 	BusinessType               string
+	Whatsapp                   *string
+	Address                    *string
+	OperatingHours             *string
 }
 
 type RefreshToken struct {
@@ -58,6 +61,10 @@ type Resource struct {
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	DeletedAt              *time.Time
+	Description            *string
+	TermsExcludes          *string
+	TermsRequirements      *string
+	TermsCancellation      *string
 }
 
 type ResourceUnit struct {
@@ -88,4 +95,26 @@ type User struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	EmailVerifiedAt *time.Time
+}
+
+type VehicleSpec struct {
+	ResourceID   uuid.UUID
+	OwnerID      uuid.UUID
+	VehicleType  string
+	Transmission string
+	Seats        *int32
+	Fuel         string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type VehicleUnitDetail struct {
+	ResourceUnitID         uuid.UUID
+	OwnerID                uuid.UUID
+	Year                   int32
+	Color                  *string
+	TaxDueOn               *time.Time
+	RegistrationValidUntil *time.Time
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }

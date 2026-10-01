@@ -41,3 +41,15 @@ sql:
             go_type:
               type: "time.Time"
               pointer: true
+
+          # `date` for the same reason as timestamptz: without it sqlc emits
+          # pgtype.Date, a wrapper with its own Valid flag that every caller
+          # would have to unpack. The two date columns are tax_due_on and
+          # registration_valid_until (BR-094), both nullable.
+          - db_type: "date"
+            go_type: "time.Time"
+          - db_type: "date"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true

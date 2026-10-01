@@ -4,7 +4,8 @@
 -- owner context, never from the request.
 SELECT slug, booking_code_prefix, require_payment_before_pickup,
        draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
-       notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder
+       notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
+       whatsapp, address, operating_hours
   FROM owners
  WHERE id = $1;
 
@@ -22,8 +23,12 @@ UPDATE owners SET
     notify_pickup_reminder        = COALESCE(sqlc.narg(notify_pickup_reminder),        notify_pickup_reminder),
     notify_return_reminder        = COALESCE(sqlc.narg(notify_return_reminder),        notify_return_reminder),
     notify_overdue_reminder       = COALESCE(sqlc.narg(notify_overdue_reminder),       notify_overdue_reminder),
+    whatsapp                      = COALESCE(sqlc.narg(whatsapp),                      whatsapp),
+    address                       = COALESCE(sqlc.narg(address),                       address),
+    operating_hours               = COALESCE(sqlc.narg(operating_hours),               operating_hours),
     updated_at                    = now()
  WHERE id = sqlc.arg(id)
 RETURNING slug, booking_code_prefix, require_payment_before_pickup,
           draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
-          notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder;
+          notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
+          whatsapp, address, operating_hours;

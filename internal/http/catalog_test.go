@@ -8,6 +8,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/miqbalhamdani/sewain-api/internal/owner"
 )
 
 // The acceptance for S1-014 .. S1-017 that the isolation suite cannot reach.
@@ -23,6 +26,28 @@ type catalogClient struct {
 	t     *testing.T
 	srv   http.Handler
 	token string
+}
+
+// newEquipmentClient is newCatalogClient on the other phase-1 preset.
+//
+// The preset is changed after seeding rather than threaded through the fixture:
+// business_type is read from the row inside the transaction, never from the
+// token, so an UPDATE is enough and the seeded session stays valid (BR-017).
+func newEquipmentClient(t *testing.T) catalogClient {
+	t.Helper()
+	ctx := t.Context()
+	store := openAppStore(ctx, t)
+	ownerID := uuid.Must(uuid.NewV7())
+	s := seedSignedInOwner(ctx, t, store, ownerID)
+
+	if err := store.InOwnerTx(owner.NewContext(ctx, ownerID), func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx,
+			`UPDATE owners SET business_type = 'equipment_rental' WHERE id = $1`, ownerID)
+		return err
+	}); err != nil {
+		t.Fatalf("switch preset: %v", err)
+	}
+	return catalogClient{t: t, srv: newServer(t), token: s.accessToken}
 }
 
 func newCatalogClient(t *testing.T) catalogClient {
@@ -52,24 +77,67 @@ func (c catalogClient) do(method, path, body string) *httptest.ResponseRecorder 
 
 // resourceBodyShape is what the tests read back. Pointers throughout, because
 // the whole of BR-016 is about telling null from a number.
+type vehicleShape struct {
+	VehicleType  string `json:"vehicle_type"`
+	Transmission string `json:"transmission"`
+	Seats        *int   `json:"seats"`
+	Fuel         string `json:"fuel"`
+}
+
 type resourceBodyShape struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	PricingUnit    string `json:"pricing_unit"`
-	BasePrice      int64  `json:"base_price"`
-	DepositAmount  *int64 `json:"deposit_amount"`
-	LateFeePerUnit *int64 `json:"late_fee_per_unit"`
-	MinDuration    *int   `json:"min_duration"`
-	MaxDuration    *int   `json:"max_duration"`
-	BufferMinutes  int    `json:"buffer_minutes"`
-	Status         string `json:"status"`
-	UnitCount      int    `json:"unit_count"`
-	ActiveBookings int    `json:"active_bookings"`
+	ID             string        `json:"id"`
+	Category       *string       `json:"category"`
+	Description    *string       `json:"description"`
+	Vehicle        *vehicleShape `json:"vehicle"`
+	Name           string        `json:"name"`
+	PricingUnit    string        `json:"pricing_unit"`
+	BasePrice      int64         `json:"base_price"`
+	DepositAmount  *int64        `json:"deposit_amount"`
+	LateFeePerUnit *int64        `json:"late_fee_per_unit"`
+	MinDuration    *int          `json:"min_duration"`
+	MaxDuration    *int          `json:"max_duration"`
+	BufferMinutes  int           `json:"buffer_minutes"`
+	Status         string        `json:"status"`
+	UnitCount      int           `json:"unit_count"`
+	ActiveBookings int           `json:"active_bookings"`
+}
+
+// withCar splices a minimal car spec into a resource body that does not name
+// one.
+//
+// The fixture rental is vehicle_rental, and since S1-085 that preset must send
+// `vehicle` or be refused (BR-094). Every test below that is about something
+// else -- BR-016 nominals, unit codes, permissions -- would otherwise carry four
+// lines of vehicle noise obscuring the one line it is actually asserting.
+//
+// Tests that ARE about the vehicle rules pass their own, and the ones that check
+// the refusal deliberately do not call this.
+func withCar(body string) string {
+	if strings.Contains(body, `"vehicle"`) {
+		return body
+	}
+	const spec = `,"vehicle":{"vehicle_type":"car","transmission":"manual","seats":7,"fuel":"gasoline"}}`
+	return strings.TrimSuffix(body, "}") + spec
+}
+
+// createResourceRaw sends the body exactly as given, for the presets that must
+// not carry a vehicle at all.
+func (c catalogClient) createResourceRaw(body string) resourceBodyShape {
+	c.t.Helper()
+	w := c.do(http.MethodPost, "/api/v1/resources", body)
+	if w.Code != http.StatusCreated {
+		c.t.Fatalf("create resource: status = %d, want 201\nbody: %s", w.Code, w.Body.String())
+	}
+	var out resourceBodyShape
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		c.t.Fatalf("decode resource: %v", err)
+	}
+	return out
 }
 
 func (c catalogClient) createResource(body string) resourceBodyShape {
 	c.t.Helper()
-	w := c.do(http.MethodPost, "/api/v1/resources", body)
+	w := c.do(http.MethodPost, "/api/v1/resources", withCar(body))
 	if w.Code != http.StatusCreated {
 		c.t.Fatalf("create resource: status = %d, want 201\nbody: %s", w.Code, w.Body.String())
 	}
@@ -155,7 +223,7 @@ func TestZeroNominalIsRefused(t *testing.T) {
 	} {
 		t.Run(field, func(t *testing.T) {
 			w := c.do(http.MethodPost, "/api/v1/resources",
-				`{"name":"Nol","base_price":1000,"`+field+`":0}`)
+				withCar(`{"name":"Nol","base_price":1000,"`+field+`":0}`))
 			if w.Code != http.StatusUnprocessableEntity {
 				t.Fatalf("status = %d, want 422\nbody: %s", w.Code, w.Body.String())
 			}
@@ -178,7 +246,7 @@ func TestZeroNominalIsRefused(t *testing.T) {
 func TestDurationOrderIsRefused(t *testing.T) {
 	c := newCatalogClient(t)
 	w := c.do(http.MethodPost, "/api/v1/resources",
-		`{"name":"Terbalik","base_price":1000,"min_duration":7,"max_duration":3}`)
+		withCar(`{"name":"Terbalik","base_price":1000,"min_duration":7,"max_duration":3}`))
 	if w.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422\nbody: %s", w.Code, w.Body.String())
 	}
@@ -211,9 +279,11 @@ func TestPricingUnitComesFromThePreset(t *testing.T) {
 	for _, tc := range []struct{ name, body, field string }{
 		{"pricing_unit", `{"name":"Lapangan","base_price":100000,"pricing_unit":"hour"}`, "pricing_unit"},
 		{"unit_count", `{"name":"Lapangan","base_price":100000,"unit_count":9}`, "unit_count"},
+		// BR-094: category is derived from vehicle_type, never sent.
+		{"category", `{"name":"Lapangan","base_price":100000,"category":"Mobil"}`, "category"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			w := c.do(http.MethodPost, "/api/v1/resources", tc.body)
+			w := c.do(http.MethodPost, "/api/v1/resources", withCar(tc.body))
 			if w.Code != http.StatusUnprocessableEntity {
 				t.Fatalf("status = %d, want 422\nbody: %s", w.Code, w.Body.String())
 			}
@@ -555,5 +625,256 @@ func TestOperatorReadsTheCatalogueButCannotWriteIt(t *testing.T) {
 				t.Errorf("detail %q does not name %q", detail, tc.permission)
 			}
 		})
+	}
+}
+
+// The acceptance for S1-085 and S1-086: vehicle attributes, terms, profil usaha.
+//
+// Almost every case below is a CHECK the database owns. They are exercised
+// through HTTP anyway, because what is being proven is not that PostgreSQL can
+// refuse a row -- it is that the refusal reaches the caller as the 422 the
+// contract promised, on the field they have to change. That is the exact hop
+// M1 got wrong once already.
+
+const carSpec = `"vehicle":{"vehicle_type":"car","transmission":"manual","seats":7,"fuel":"gasoline"}`
+
+// TestVehicleObligationRunsBothWays is BR-094's one rule that Go owns rather
+// than the database.
+//
+// A database can refuse a child pointing at the wrong parent, and the composite
+// key does. What it cannot cheaply do is insist a child EXISTS, or know which
+// presets are allowed one. Both directions are tested because refusing only the
+// missing half would let an equipment rental send specs that are silently
+// thrown away -- data the caller believes is saved.
+func TestVehicleObligationRunsBothWays(t *testing.T) {
+	c := newCatalogClient(t)
+
+	w := c.do(http.MethodPost, "/api/v1/resources", `{"name":"Tanpa Spek","base_price":1000}`)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("vehicle_rental tanpa vehicle: status = %d, want 422\nbody: %s", w.Code, w.Body.String())
+	}
+	_, _, fields := problemOf(t, w)
+	if len(fields) == 0 || fields[0] != "vehicle" {
+		t.Errorf("errors[].field = %v, want [vehicle]", fields)
+	}
+
+	// The other direction needs a rental on a different preset.
+	e := newEquipmentClient(t)
+	w = e.do(http.MethodPost, "/api/v1/resources",
+		`{"name":"Kamera Sony","base_price":250000,`+carSpec+`}`)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("equipment_rental dengan vehicle: status = %d, want 422\nbody: %s", w.Code, w.Body.String())
+	}
+	// ...and without it the same rental saves fine, with no vehicle on the way back.
+	got := e.createResourceRaw(`{"name":"Kamera Sony","base_price":250000}`)
+	if got.Vehicle != nil {
+		t.Errorf("equipment resource carries a vehicle: %+v", got.Vehicle)
+	}
+	if got.Category != nil {
+		t.Errorf("category = %v, want null for a preset with no companion table", *got.Category)
+	}
+}
+
+// TestCrossColumnRulesAreRefusedByTheDatabase walks all three, both sides.
+//
+// The seats rule is written as an equality on purpose, and the second half is
+// the one that would rot silently: a CHECK reading "a car must have seats"
+// passes the first case here and accepts a four-seat motorcycle forever.
+func TestCrossColumnRulesAreRefusedByTheDatabase(t *testing.T) {
+	c := newCatalogClient(t)
+
+	for _, tc := range []struct{ name, vehicle, field string }{
+		{"mobil tanpa kursi", `{"vehicle_type":"car","transmission":"manual","fuel":"gasoline"}`, "vehicle.seats"},
+		{"motor berkursi", `{"vehicle_type":"motorcycle","transmission":"manual","seats":2,"fuel":"gasoline"}`, "vehicle.seats"},
+		{"kopling di mobil", `{"vehicle_type":"car","transmission":"clutch","seats":5,"fuel":"gasoline"}`, "vehicle.transmission"},
+		{"diesel di motor", `{"vehicle_type":"motorcycle","transmission":"manual","fuel":"diesel"}`, "vehicle.fuel"},
+		{"kursi 21", `{"vehicle_type":"car","transmission":"manual","seats":21,"fuel":"gasoline"}`, "vehicle.seats"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := c.do(http.MethodPost, "/api/v1/resources",
+				`{"name":"X","base_price":1000,"vehicle":`+tc.vehicle+`}`)
+			if w.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want 422\nbody: %s", w.Code, w.Body.String())
+			}
+			code, _, fields := problemOf(t, w)
+			if code != "validation-failed" {
+				t.Errorf("code = %q, want validation-failed", code)
+			}
+			if len(fields) == 0 || fields[0] != tc.field {
+				t.Errorf("errors[].field = %v, want [%s]", fields, tc.field)
+			}
+		})
+	}
+
+	// And the legal shapes stay legal, so a constraint that over-reaches shows up.
+	for _, ok := range []string{
+		`{"vehicle_type":"motorcycle","transmission":"clutch","fuel":"gasoline"}`,
+		`{"vehicle_type":"car","transmission":"automatic","seats":2,"fuel":"diesel"}`,
+		`{"vehicle_type":"car","transmission":"manual","seats":20,"fuel":"electric"}`,
+	} {
+		if w := c.do(http.MethodPost, "/api/v1/resources",
+			`{"name":"Sah","base_price":1000,"vehicle":`+ok+`}`); w.Code != http.StatusCreated {
+			t.Errorf("kombinasi sah ditolak: status = %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+}
+
+// TestCategoryIsDerivedNeverSent is BR-094's second rule, and it is the pattern
+// pricing_unit already established (BR-017 rule 1).
+func TestCategoryIsDerivedNeverSent(t *testing.T) {
+	c := newCatalogClient(t)
+
+	got := c.createResource(`{"name":"Avanza 1.3 G","base_price":350000}`)
+	if got.Category == nil || *got.Category != "car" {
+		t.Errorf("category = %v, want \"car\" derived from vehicle_type", got.Category)
+	}
+
+	moto := c.createResource(`{"name":"Vario 160","base_price":90000,` +
+		`"vehicle":{"vehicle_type":"motorcycle","transmission":"automatic","fuel":"gasoline"}}`)
+	if moto.Category == nil || *moto.Category != "motorcycle" {
+		t.Errorf("category = %v, want \"motorcycle\"", moto.Category)
+	}
+}
+
+// TestVehicleTypeIsLocked: it is not in the update schema at all, so the only
+// way to reach it is a hand-rolled body -- which is silently ignored rather than
+// applied. The point of the test is that the stored value does not move.
+func TestVehicleTypeIsLocked(t *testing.T) {
+	c := newCatalogClient(t)
+	got := c.createResource(`{"name":"Avanza 1.3 G","base_price":350000}`)
+
+	w := c.do(http.MethodPatch, "/api/v1/resources/"+got.ID,
+		`{"vehicle":{"vehicle_type":"motorcycle","transmission":"automatic","fuel":"gasoline"}}`)
+	if w.Code != http.StatusUnprocessableEntity {
+		// Without seats the car-side CHECK fires, which is itself the proof the
+		// type never moved: a real motorcycle would have been accepted.
+		t.Fatalf("status = %d, want 422\nbody: %s", w.Code, w.Body.String())
+	}
+
+	after := c.getResource(got.ID)
+	if after.Vehicle == nil || after.Vehicle.VehicleType != "car" {
+		t.Errorf("vehicle_type moved: %+v", after.Vehicle)
+	}
+}
+
+// TestVehiclePatchReplacesTheWholeObject: `vehicle` is a nested object the form
+// renders whole, so what arrives is what the resource should have.
+func TestVehiclePatchReplacesTheWholeObject(t *testing.T) {
+	c := newCatalogClient(t)
+	got := c.createResource(`{"name":"Avanza 1.3 G","base_price":350000}`)
+
+	w := c.do(http.MethodPatch, "/api/v1/resources/"+got.ID,
+		`{"vehicle":{"transmission":"automatic","seats":5,"fuel":"hybrid"}}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d\nbody: %s", w.Code, w.Body.String())
+	}
+	after := c.getResource(got.ID)
+	if after.Vehicle == nil || after.Vehicle.Transmission != "automatic" ||
+		after.Vehicle.Fuel != "hybrid" || after.Vehicle.Seats == nil || *after.Vehicle.Seats != 5 {
+		t.Errorf("spek tidak terganti: %+v", after.Vehicle)
+	}
+
+	// A PATCH that never mentions vehicle leaves it exactly where it was.
+	if w := c.do(http.MethodPatch, "/api/v1/resources/"+got.ID,
+		`{"name":"Avanza Baru"}`); w.Code != http.StatusOK {
+		t.Fatalf("status = %d\nbody: %s", w.Code, w.Body.String())
+	}
+	if again := c.getResource(got.ID); again.Vehicle == nil || again.Vehicle.Fuel != "hybrid" {
+		t.Errorf("vehicle hilang setelah PATCH yang tidak menyebutnya: %+v", again.Vehicle)
+	}
+}
+
+// TestUnitCarriesItsVehicleDetail covers S1-088's backend half.
+func TestUnitCarriesItsVehicleDetail(t *testing.T) {
+	c := newCatalogClient(t)
+	res := c.createResource(`{"name":"Avanza 1.3 G","base_price":350000}`)
+	units := "/api/v1/resources/" + res.ID + "/units"
+
+	w := c.do(http.MethodPost, units,
+		`{"code":"B 1234 XY","vehicle":{"year":2021,"color":"Putih","tax_due_on":"2027-03-15"}}`)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var unit struct {
+		ID      string `json:"id"`
+		Vehicle *struct {
+			Year     int     `json:"year"`
+			Color    *string `json:"color"`
+			TaxDueOn *string `json:"tax_due_on"`
+		} `json:"vehicle"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &unit); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if unit.Vehicle == nil || unit.Vehicle.Year != 2021 {
+		t.Fatalf("detail kendaraan tidak kembali: %+v", unit.Vehicle)
+	}
+	if unit.Vehicle.TaxDueOn == nil || *unit.Vehicle.TaxDueOn != "2027-03-15" {
+		t.Errorf("tax_due_on = %v, want 2027-03-15", unit.Vehicle.TaxDueOn)
+	}
+
+	// Year 1989 is refused by the database, not by the handler.
+	if w := c.do(http.MethodPost, units,
+		`{"code":"B 9 OLD","vehicle":{"year":1989}}`); w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("tahun 1989: status = %d, want 422\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// A wholesale replace is how a mistyped date gets cleared again.
+	if w := c.do(http.MethodPatch, "/api/v1/units/"+unit.ID,
+		`{"vehicle":{"year":2021,"color":"Hitam"}}`); w.Code != http.StatusOK {
+		t.Fatalf("patch: status = %d\nbody: %s", w.Code, w.Body.String())
+	}
+	w = c.do(http.MethodGet, units, "")
+	if strings.Contains(w.Body.String(), "2027-03-15") {
+		t.Error("tax_due_on masih ada setelah diganti dengan objek tanpa tanggal")
+	}
+}
+
+// TestTermsLengthIsRefusedByTheDatabase is BR-095: the public page renders these
+// verbatim, so 50k characters is not a rental term, it is a broken page.
+func TestTermsLengthIsRefusedByTheDatabase(t *testing.T) {
+	c := newCatalogClient(t)
+	w := c.do(http.MethodPost, "/api/v1/resources",
+		`{"name":"Panjang","base_price":1000,`+carSpec+`,"terms_excludes":"`+strings.Repeat("x", 501)+`"}`)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422\nbody: %s", w.Code, w.Body.String())
+	}
+	_, _, fields := problemOf(t, w)
+	if len(fields) == 0 || fields[0] != "terms_excludes" {
+		t.Errorf("errors[].field = %v, want [terms_excludes]", fields)
+	}
+
+	got := c.createResource(`{"name":"Pas","base_price":1000,"description":"AC dingin, charger HP.",` +
+		`"terms_requirements":"KTP & SIM A asli penyewa."}`)
+	if got.Description == nil || *got.Description != "AC dingin, charger HP." {
+		t.Errorf("description = %v", got.Description)
+	}
+}
+
+// TestWhatsAppFormatIsRefusedByTheDatabase is BR-096. The public page turns it
+// into a wa.me link, and a dead link on the page whose whole purpose is reaching
+// the owner is worse than no button at all.
+func TestWhatsAppFormatIsRefusedByTheDatabase(t *testing.T) {
+	c := newCatalogClient(t)
+
+	w := c.do(http.MethodPatch, "/api/v1/settings", `{"whatsapp":"08123456789"}`)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("nomor lokal: status = %d, want 422\nbody: %s", w.Code, w.Body.String())
+	}
+	_, detail, fields := problemOf(t, w)
+	if len(fields) == 0 || fields[0] != "whatsapp" {
+		t.Errorf("errors[].field = %v, want [whatsapp]", fields)
+	}
+	if !strings.Contains(detail, "+62") {
+		t.Errorf("detail %q does not show the shape it wants", detail)
+	}
+
+	w = c.do(http.MethodPatch, "/api/v1/settings",
+		`{"whatsapp":"+628123456789","address":"Jl. Kaliurang KM 5","operating_hours":"Senin-Sabtu 08.00-20.00"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d\nbody: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "+628123456789") {
+		t.Errorf("profil tidak kembali di respons: %s", w.Body.String())
 	}
 }

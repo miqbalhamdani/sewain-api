@@ -94,6 +94,30 @@ func (e ErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for Fuel.
+const (
+	Diesel   Fuel = "diesel"
+	Electric Fuel = "electric"
+	Gasoline Fuel = "gasoline"
+	Hybrid   Fuel = "hybrid"
+)
+
+// Valid indicates whether the value is a known member of the Fuel enum.
+func (e Fuel) Valid() bool {
+	switch e {
+	case Diesel:
+		return true
+	case Electric:
+		return true
+	case Gasoline:
+		return true
+	case Hybrid:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InviteUserRequestRole.
 const (
 	InviteUserRequestRoleOperator InviteUserRequestRole = "operator"
@@ -166,6 +190,27 @@ func (e SessionUserRole) Valid() bool {
 	case SessionUserRoleOperator:
 		return true
 	case SessionUserRoleOwner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Transmission.
+const (
+	Automatic Transmission = "automatic"
+	Clutch    Transmission = "clutch"
+	Manual    Transmission = "manual"
+)
+
+// Valid indicates whether the value is a known member of the Transmission enum.
+func (e Transmission) Valid() bool {
+	switch e {
+	case Automatic:
+		return true
+	case Clutch:
+		return true
+	case Manual:
 		return true
 	default:
 		return false
@@ -268,6 +313,24 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// Defines values for VehicleType.
+const (
+	Car        VehicleType = "car"
+	Motorcycle VehicleType = "motorcycle"
+)
+
+// Valid indicates whether the value is a known member of the VehicleType enum.
+func (e VehicleType) Valid() bool {
+	switch e {
+	case Car:
+		return true
+	case Motorcycle:
+		return true
+	default:
+		return false
+	}
+}
+
 // AffectedBooking defines model for AffectedBooking.
 type AffectedBooking struct {
 	// Code Examples: SWN-0043
@@ -299,6 +362,9 @@ type BusinessType string
 // Kodenya juga jadi segmen terakhir URI `Problem.type`, dan memakai **hyphen**, bukan
 // underscore.
 type ErrorCode string
+
+// Fuel `diesel` **hanya ada di mobil**, ditegakkan database (BR-094).
+type Fuel string
 
 // InviteUserRequest defines model for InviteUserRequest.
 type InviteUserRequest struct {
@@ -444,8 +510,20 @@ type Resource struct {
 	//
 	//
 	// Examples: 500000
-	DepositAmount *int64             `json:"deposit_amount"`
-	Id            openapi_types.UUID `json:"id"`
+	DepositAmount *int64 `json:"deposit_amount"`
+
+	// Description Fitur dan perlengkapan, ditulis juragan (BR-095). Dirender halaman publik
+	// `S1-060`; sampai itu ia tersimpan dan tervalidasi tapi belum dibaca siapa pun.
+	//
+	// Menerima **markdown minimal** — tebal, miring, daftar berbutir; bukan HTML,
+	// dan tidak lebih dari ketiganya. `maxLength` menghitung penandanya juga, jadi
+	// `**AC dingin**` memakan 15 karakter, bukan 9. Berlaku sama untuk ketiga
+	// `terms_*` di bawah (BR-095).
+	//
+	//
+	// Examples: AC dingin, charger HP, audio Bluetooth, kartu e-Toll.
+	Description *string            `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
 
 	// LateFeePerUnit `null` berarti tanpa denda telat. Yang hilang cuma tagihannya —
 	// peringatan terlambat dan pengingatnya tetap jalan (BR-016, BR-041).
@@ -481,25 +559,48 @@ type Resource struct {
 	// Status `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
 	Status ResourceStatus `json:"status"`
 
+	// TermsCancellation Pembatalan & perubahan. **Hanya untuk yang tidak dijalankan sistem** —
+	// refund dan reschedule dieksekusi manual oleh juragan di fase 1. Tenggat
+	// bayar, denda telat, dan toleransi no-show TIDAK ditulis di sini: server
+	// merakitnya dari kolomnya sendiri, dan mengetiknya ulang membuat halaman
+	// publik berbohong begitu knob-nya berubah. Markdown minimal (BR-095).
+	TermsCancellation *string `json:"terms_cancellation"`
+
+	// TermsExcludes Belum termasuk. Kosong = bagian ini tidak ditampilkan. Markdown minimal (BR-095).
+	TermsExcludes *string `json:"terms_excludes"`
+
+	// TermsRequirements Syarat sewa — dokumen, jaminan, usia, wilayah. Markdown minimal (BR-095).
+	TermsRequirements *string `json:"terms_requirements"`
+
 	// UnitCount Unit `active` yang dimiliki jenis barang ini. Dihitung server. Nol berarti
 	// barang ini tidak akan pernah muncul di pencarian ketersediaan, berapa pun
 	// statusnya sendiri (BR-010) — dan layar katalog wajib mengatakannya.
 	UnitCount int `json:"unit_count"`
+
+	// Vehicle Spek kendaraan, atau `null` untuk preset yang bukan `vehicle_rental`
+	// (BR-094). Bersarang, bukan diratakan: pembelahan generik-vs-kendaraan
+	// adalah inti keputusannya.
+	Vehicle *VehicleSpec `json:"vehicle"`
 }
 
 // ResourceCreate `pricing_unit` **sengaja tidak ada di sini** dan tidak akan pernah ada:
 // server mengisinya dari preset pemiliknya (BR-017). Begitu juga `id`, `owner_id`,
 // dan `unit_count`.
 type ResourceCreate struct {
-	BasePrice              int64   `json:"base_price"`
-	BufferMinutes          *int    `json:"buffer_minutes,omitempty"`
-	Category               *string `json:"category,omitempty"`
-	DepositAmount          *int64  `json:"deposit_amount,omitempty"`
-	LateFeePerUnit         *int64  `json:"late_fee_per_unit,omitempty"`
-	MaxDuration            *int    `json:"max_duration,omitempty"`
-	MinDuration            *int    `json:"min_duration,omitempty"`
-	Name                   string  `json:"name"`
-	RequiresIdVerification *bool   `json:"requires_id_verification,omitempty"`
+	BasePrice              int64             `json:"base_price"`
+	BufferMinutes          *int              `json:"buffer_minutes,omitempty"`
+	Category               *string           `json:"category,omitempty"`
+	DepositAmount          *int64            `json:"deposit_amount,omitempty"`
+	Description            *string           `json:"description,omitempty"`
+	LateFeePerUnit         *int64            `json:"late_fee_per_unit,omitempty"`
+	MaxDuration            *int              `json:"max_duration,omitempty"`
+	MinDuration            *int              `json:"min_duration,omitempty"`
+	Name                   string            `json:"name"`
+	RequiresIdVerification *bool             `json:"requires_id_verification,omitempty"`
+	TermsCancellation      *string           `json:"terms_cancellation,omitempty"`
+	TermsExcludes          *string           `json:"terms_excludes,omitempty"`
+	TermsRequirements      *string           `json:"terms_requirements,omitempty"`
+	Vehicle                *VehicleSpecInput `json:"vehicle,omitempty"`
 }
 
 // ResourceStatus `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
@@ -537,6 +638,11 @@ type ResourceUnit struct {
 	// dari booking ber-status `picked_up`, bukan keadaan yang disimpan (BR-023).
 	// Dua sumber untuk satu fakta berarti satu di antaranya akan salah.
 	Status UnitStatus `json:"status"`
+
+	// Vehicle Detail kendaraan unit ini, atau `null` untuk preset yang bukan
+	// `vehicle_rental` (BR-094). Tidak satu pun field di dalamnya pernah keluar
+	// ke permukaan publik.
+	Vehicle *VehicleUnitDetail `json:"vehicle"`
 }
 
 // ResourceUpdate Semua field opsional, dan key yang absen membiarkan nilainya apa adanya.
@@ -550,6 +656,7 @@ type ResourceUpdate struct {
 	BufferMinutes          *int    `json:"buffer_minutes,omitempty"`
 	Category               *string `json:"category,omitempty"`
 	DepositAmount          *int64  `json:"deposit_amount,omitempty"`
+	Description            *string `json:"description,omitempty"`
 	LateFeePerUnit         *int64  `json:"late_fee_per_unit,omitempty"`
 	MaxDuration            *int    `json:"max_duration,omitempty"`
 	MinDuration            *int    `json:"min_duration,omitempty"`
@@ -557,7 +664,14 @@ type ResourceUpdate struct {
 	RequiresIdVerification *bool   `json:"requires_id_verification,omitempty"`
 
 	// Status `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
-	Status *ResourceStatus `json:"status,omitempty"`
+	Status            *ResourceStatus `json:"status,omitempty"`
+	TermsCancellation *string         `json:"terms_cancellation,omitempty"`
+	TermsExcludes     *string         `json:"terms_excludes,omitempty"`
+	TermsRequirements *string         `json:"terms_requirements,omitempty"`
+
+	// Vehicle `vehicle_type` sengaja tidak ada: ia dikunci sesudah resource dibuat (BR-094).
+	// Juragan yang salah pilih jenis membuat resource baru.
+	Vehicle *VehicleSpecUpdate `json:"vehicle,omitempty"`
 }
 
 // ResourceUpdated defines model for ResourceUpdated.
@@ -599,8 +713,20 @@ type ResourceUpdated struct {
 	//
 	//
 	// Examples: 500000
-	DepositAmount *int64             `json:"deposit_amount"`
-	Id            openapi_types.UUID `json:"id"`
+	DepositAmount *int64 `json:"deposit_amount"`
+
+	// Description Fitur dan perlengkapan, ditulis juragan (BR-095). Dirender halaman publik
+	// `S1-060`; sampai itu ia tersimpan dan tervalidasi tapi belum dibaca siapa pun.
+	//
+	// Menerima **markdown minimal** — tebal, miring, daftar berbutir; bukan HTML,
+	// dan tidak lebih dari ketiganya. `maxLength` menghitung penandanya juga, jadi
+	// `**AC dingin**` memakan 15 karakter, bukan 9. Berlaku sama untuk ketiga
+	// `terms_*` di bawah (BR-095).
+	//
+	//
+	// Examples: AC dingin, charger HP, audio Bluetooth, kartu e-Toll.
+	Description *string            `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
 
 	// LateFeePerUnit `null` berarti tanpa denda telat. Yang hilang cuma tagihannya —
 	// peringatan terlambat dan pengingatnya tetap jalan (BR-016, BR-041).
@@ -636,10 +762,28 @@ type ResourceUpdated struct {
 	// Status `inactive` berarti barang itu tidak ditawarkan lagi tanpa menghapus riwayatnya.
 	Status ResourceStatus `json:"status"`
 
+	// TermsCancellation Pembatalan & perubahan. **Hanya untuk yang tidak dijalankan sistem** —
+	// refund dan reschedule dieksekusi manual oleh juragan di fase 1. Tenggat
+	// bayar, denda telat, dan toleransi no-show TIDAK ditulis di sini: server
+	// merakitnya dari kolomnya sendiri, dan mengetiknya ulang membuat halaman
+	// publik berbohong begitu knob-nya berubah. Markdown minimal (BR-095).
+	TermsCancellation *string `json:"terms_cancellation"`
+
+	// TermsExcludes Belum termasuk. Kosong = bagian ini tidak ditampilkan. Markdown minimal (BR-095).
+	TermsExcludes *string `json:"terms_excludes"`
+
+	// TermsRequirements Syarat sewa — dokumen, jaminan, usia, wilayah. Markdown minimal (BR-095).
+	TermsRequirements *string `json:"terms_requirements"`
+
 	// UnitCount Unit `active` yang dimiliki jenis barang ini. Dihitung server. Nol berarti
 	// barang ini tidak akan pernah muncul di pencarian ketersediaan, berapa pun
 	// statusnya sendiri (BR-010) — dan layar katalog wajib mengatakannya.
 	UnitCount int `json:"unit_count"`
+
+	// Vehicle Spek kendaraan, atau `null` untuk preset yang bukan `vehicle_rental`
+	// (BR-094). Bersarang, bukan diratakan: pembelahan generik-vs-kendaraan
+	// adalah inti keputusannya.
+	Vehicle *VehicleSpec `json:"vehicle"`
 }
 
 // Session Dikembalikan login dan refresh. Membawa semua yang dibutuhkan klien untuk merender
@@ -673,7 +817,22 @@ type Session struct {
 // (`120000` = Rp 120.000). Tidak ada `timezone`: waktu di kawat selalu UTC, dan
 // Asia/Jakarta urusan render di frontend.
 type SessionOwner struct {
-	Id openapi_types.UUID `json:"id"`
+	// BusinessType Preset pasar, dipilih sekali saat mendaftar. **Ia yang menentukan `pricing_unit`
+	// seluruh resource pemilik itu** — juragan tidak pernah mengisi satuan harga di tiap
+	// barang (BR-012, BR-017).
+	//
+	// Enamnya ada di enum karena skema mengenal keenamnya, tapi **cuma dua yang dibuka di
+	// fase 1**: `vehicle_rental` dan `equipment_rental`, dua-duanya bersatuan `day`.
+	// `boarding_house` dan `apartment` fase 2, `venue` fase 3, `clinic` fase 4 — satuan
+	// `clinic` sengaja belum diputuskan, bukan ditebak.
+	//
+	// Layar daftar fase 1 karena itu merender **dua pilihan**, dengan bahasa juragan
+	// ("rental mobil & motor", "rental alat"), bukan nama enum ini.
+	//
+	//
+	// Examples: vehicle_rental
+	BusinessType BusinessType       `json:"business_type"`
+	Id           openapi_types.UUID `json:"id"`
 
 	// Name Examples: Rental Budi
 	Name string `json:"name"`
@@ -716,6 +875,13 @@ type SessionUserRole string
 // Settings Knob pemilik, semuanya. Tiap satu ada karena sebuah aturan bisnis melarang
 // meng-hardcode-nya, dan `PATCH /settings` satu-satunya tempat mereka disetel.
 type Settings struct {
+	// Address Alamat usaha, dan **lokasi ambil default** kecuali juragan menulis lain di
+	// syarat sewa (BR-095, BR-096).
+	//
+	//
+	// Examples: Jl. Kaliurang KM 5 No. 12, Sleman
+	Address *string `json:"address"`
+
 	// BookingCodePrefix Awalan kode booking, `SWN-0001`. Mengubahnya **tidak** menyentuh kode yang sudah
 	// terbit dan **tidak** me-reset pencacahnya (BR-024).
 	//
@@ -740,6 +906,14 @@ type Settings struct {
 	// NotifyReturnReminder Pengingat H-1 balik (BR-070).
 	NotifyReturnReminder bool `json:"notify_return_reminder"`
 
+	// OperatingHours Teks bebas, dan sengaja tidak terstruktur: jam buka rental Indonesia penuh
+	// pengecualian, dan memaksanya jadi tujuh baris buka/tutup membuat juragan
+	// mengisi data yang salah atau tidak mengisi sama sekali (BR-096).
+	//
+	//
+	// Examples: Senin–Sabtu 08.00–20.00, Minggu janjian dulu
+	OperatingHours *string `json:"operating_hours"`
+
 	// PaymentDueHours Tenggat bayar sejak invoice terbit. **`0` ditolak database** — tenggat nol berarti
 	// invoice yang lewat tempo pada detik ia terbit (BR-057).
 	PaymentDueHours int `json:"payment_due_hours"`
@@ -757,30 +931,72 @@ type Settings struct {
 	//
 	// Examples: rentalbudi
 	Slug *string `json:"slug"`
+
+	// Whatsapp Nomor WhatsApp usaha, satu-satunya field profil yang dibaca mesin bukan mata:
+	// halaman publik menjadikannya tautan `wa.me`, jadi formatnya ditegakkan
+	// database. Nomor berformat bebas menghasilkan tautan mati di halaman yang
+	// seluruh gunanya menghubungi pemilik (BR-096).
+	//
+	// **`null` adalah keadaan awal setiap usaha** — pendaftaran cuma menanyakan
+	// empat hal (BR-005).
+	//
+	//
+	// Examples: +628123456789
+	Whatsapp *string `json:"whatsapp"`
 }
 
 // SettingsUpdate Semua field opsional. Key yang absen dibiarkan apa adanya; `null` eksplisit adalah
 // `422` — menghilangkan field dan mengirim `null` bukan hal yang sama.
 type SettingsUpdate struct {
-	BookingCodePrefix          *string `json:"booking_code_prefix,omitempty"`
-	DraftExpiryHours           *int    `json:"draft_expiry_hours,omitempty"`
-	NoShowToleranceHours       *int    `json:"no_show_tolerance_hours,omitempty"`
-	NotifyOverdueReminder      *bool   `json:"notify_overdue_reminder,omitempty"`
-	NotifyPickupReminder       *bool   `json:"notify_pickup_reminder,omitempty"`
-	NotifyReturnReminder       *bool   `json:"notify_return_reminder,omitempty"`
+	// Address Alamat usaha, dan **lokasi ambil default** kecuali juragan menulis lain di
+	// syarat sewa (BR-095, BR-096).
+	//
+	//
+	// Examples: Jl. Kaliurang KM 5 No. 12, Sleman
+	Address               *string `json:"address,omitempty"`
+	BookingCodePrefix     *string `json:"booking_code_prefix,omitempty"`
+	DraftExpiryHours      *int    `json:"draft_expiry_hours,omitempty"`
+	NoShowToleranceHours  *int    `json:"no_show_tolerance_hours,omitempty"`
+	NotifyOverdueReminder *bool   `json:"notify_overdue_reminder,omitempty"`
+	NotifyPickupReminder  *bool   `json:"notify_pickup_reminder,omitempty"`
+	NotifyReturnReminder  *bool   `json:"notify_return_reminder,omitempty"`
+
+	// OperatingHours Teks bebas, dan sengaja tidak terstruktur: jam buka rental Indonesia penuh
+	// pengecualian, dan memaksanya jadi tujuh baris buka/tutup membuat juragan
+	// mengisi data yang salah atau tidak mengisi sama sekali (BR-096).
+	//
+	//
+	// Examples: Senin–Sabtu 08.00–20.00, Minggu janjian dulu
+	OperatingHours             *string `json:"operating_hours,omitempty"`
 	PaymentDueHours            *int    `json:"payment_due_hours,omitempty"`
 	RequirePaymentBeforePickup *bool   `json:"require_payment_before_pickup,omitempty"`
 
 	// Slug Examples: rentalbudi
 	Slug *string `json:"slug,omitempty"`
+
+	// Whatsapp Nomor WhatsApp usaha, satu-satunya field profil yang dibaca mesin bukan mata:
+	// halaman publik menjadikannya tautan `wa.me`, jadi formatnya ditegakkan
+	// database. Nomor berformat bebas menghasilkan tautan mati di halaman yang
+	// seluruh gunanya menghubungi pemilik (BR-096).
+	//
+	// **`null` adalah keadaan awal setiap usaha** — pendaftaran cuma menanyakan
+	// empat hal (BR-005).
+	//
+	//
+	// Examples: +628123456789
+	Whatsapp *string `json:"whatsapp,omitempty"`
 }
+
+// Transmission `clutch` (kopling) **hanya ada di motor**, ditegakkan database (BR-094).
+type Transmission string
 
 // UnitCreate defines model for UnitCreate.
 type UnitCreate struct {
-	Code           string  `json:"code"`
-	ConditionNotes *string `json:"condition_notes,omitempty"`
-	Label          *string `json:"label,omitempty"`
-	MeterValue     *int64  `json:"meter_value,omitempty"`
+	Code           string                  `json:"code"`
+	ConditionNotes *string                 `json:"condition_notes,omitempty"`
+	Label          *string                 `json:"label,omitempty"`
+	MeterValue     *int64                  `json:"meter_value,omitempty"`
+	Vehicle        *VehicleUnitDetailInput `json:"vehicle,omitempty"`
 }
 
 // UnitStatus Hanya `active` yang muncul di pencarian ketersediaan (BR-013). `maintenance`
@@ -806,7 +1022,8 @@ type UnitUpdate struct {
 	// Tidak ada `rented` di sini, dan itu disengaja: "sedang disewa" adalah turunan
 	// dari booking ber-status `picked_up`, bukan keadaan yang disimpan (BR-023).
 	// Dua sumber untuk satu fakta berarti satu di antaranya akan salah.
-	Status *UnitStatus `json:"status,omitempty"`
+	Status  *UnitStatus             `json:"status,omitempty"`
+	Vehicle *VehicleUnitDetailInput `json:"vehicle,omitempty"`
 }
 
 // UnitUpdated defines model for UnitUpdated.
@@ -840,6 +1057,11 @@ type UnitUpdated struct {
 	// dari booking ber-status `picked_up`, bukan keadaan yang disimpan (BR-023).
 	// Dua sumber untuk satu fakta berarti satu di antaranya akan salah.
 	Status UnitStatus `json:"status"`
+
+	// Vehicle Detail kendaraan unit ini, atau `null` untuk preset yang bukan
+	// `vehicle_rental` (BR-094). Tidak satu pun field di dalamnya pernah keluar
+	// ke permukaan publik.
+	Vehicle *VehicleUnitDetail `json:"vehicle"`
 
 	// Warning Apa yang terdampak oleh perubahan ini. Ia **peringatan, bukan penolakan**:
 	// barisnya sudah berubah waktu badan ini dibaca (BR-013).
@@ -893,6 +1115,107 @@ type UserRole string
 // UserStatus `invited` sampai undangannya diterima, `disabled` sesudah dinonaktifkan. Nol
 // endpoint di API ini yang menghapus baris `users`.
 type UserStatus string
+
+// VehicleSpec Spek kendaraan untuk satu jenis barang, satu-ke-satu dengan `Resource`
+// (BR-094). Hanya ada pada pemilik berpreset `vehicle_rental`; preset lain
+// membawa `vehicle: null`.
+type VehicleSpec struct {
+	// Fuel `diesel` **hanya ada di mobil**, ditegakkan database (BR-094).
+	Fuel Fuel `json:"fuel"`
+
+	// Seats **Wajib pada mobil, dilarang pada motor** — satu CHECK berbentuk kesetaraan
+	// menegakkan dua arah sekaligus. Versi "mobil wajib punya kursi" saja akan
+	// menerima motor berkursi empat tanpa satu pun test merah.
+	//
+	//
+	// Examples: 7
+	Seats *int `json:"seats"`
+
+	// Transmission `clutch` (kopling) **hanya ada di motor**, ditegakkan database (BR-094).
+	Transmission Transmission `json:"transmission"`
+
+	// VehicleType Mobil atau motor (BR-094). **Dipilih per resource, bukan per usaha** — rental
+	// yang menyewakan keduanya harus muat di satu akun, jadi preset tetap satu
+	// (`vehicle_rental`) dan jenisnya ditanyakan di sini.
+	//
+	// **Dikunci sesudah resource dibuat**, dan alasannya mekanis: CHECK
+	// `(vehicle_type = 'car') = (seats IS NOT NULL)` membuat motor→mobil melanggar
+	// constraint kecuali kursinya ikut diisi di transaksi yang sama. Karena itu ia
+	// tidak ada di `VehicleSpecUpdate`.
+	VehicleType VehicleType `json:"vehicle_type"`
+}
+
+// VehicleSpecInput defines model for VehicleSpecInput.
+type VehicleSpecInput struct {
+	// Fuel `diesel` **hanya ada di mobil**, ditegakkan database (BR-094).
+	Fuel  Fuel `json:"fuel"`
+	Seats *int `json:"seats,omitempty"`
+
+	// Transmission `clutch` (kopling) **hanya ada di motor**, ditegakkan database (BR-094).
+	Transmission Transmission `json:"transmission"`
+
+	// VehicleType Mobil atau motor (BR-094). **Dipilih per resource, bukan per usaha** — rental
+	// yang menyewakan keduanya harus muat di satu akun, jadi preset tetap satu
+	// (`vehicle_rental`) dan jenisnya ditanyakan di sini.
+	//
+	// **Dikunci sesudah resource dibuat**, dan alasannya mekanis: CHECK
+	// `(vehicle_type = 'car') = (seats IS NOT NULL)` membuat motor→mobil melanggar
+	// constraint kecuali kursinya ikut diisi di transaksi yang sama. Karena itu ia
+	// tidak ada di `VehicleSpecUpdate`.
+	VehicleType VehicleType `json:"vehicle_type"`
+}
+
+// VehicleSpecUpdate `vehicle_type` sengaja tidak ada: ia dikunci sesudah resource dibuat (BR-094).
+// Juragan yang salah pilih jenis membuat resource baru.
+type VehicleSpecUpdate struct {
+	// Fuel `diesel` **hanya ada di mobil**, ditegakkan database (BR-094).
+	Fuel  *Fuel `json:"fuel,omitempty"`
+	Seats *int  `json:"seats,omitempty"`
+
+	// Transmission `clutch` (kopling) **hanya ada di motor**, ditegakkan database (BR-094).
+	Transmission *Transmission `json:"transmission,omitempty"`
+}
+
+// VehicleType Mobil atau motor (BR-094). **Dipilih per resource, bukan per usaha** — rental
+// yang menyewakan keduanya harus muat di satu akun, jadi preset tetap satu
+// (`vehicle_rental`) dan jenisnya ditanyakan di sini.
+//
+// **Dikunci sesudah resource dibuat**, dan alasannya mekanis: CHECK
+// `(vehicle_type = 'car') = (seats IS NOT NULL)` membuat motor→mobil melanggar
+// constraint kecuali kursinya ikut diisi di transaksi yang sama. Karena itu ia
+// tidak ada di `VehicleSpecUpdate`.
+type VehicleType string
+
+// VehicleUnitDetail Detail kendaraan untuk satu unit fisik (BR-094).
+//
+// **Tidak satu pun field di sini keluar ke permukaan publik.** `resource_units.code`
+// adalah plat nomor dan BR-025 sudah melarangnya keluar; pajak dan STNK adalah
+// catatan juragan untuk armadanya sendiri.
+type VehicleUnitDetail struct {
+	// Color Examples: Putih
+	Color *string `json:"color"`
+
+	// RegistrationValidUntil STNK berlaku sampai. Hanya dilihat juragan.
+	RegistrationValidUntil *openapi_types.Date `json:"registration_valid_until"`
+
+	// TaxDueOn Jatuh tempo pajak tahunan. Hanya dilihat juragan.
+	TaxDueOn *openapi_types.Date `json:"tax_due_on"`
+
+	// Year Batas atasnya di database longgar sampai 2100, dan "tahun depan" disempitkan
+	// aplikasi — predikat itu butuh `now()`, sedangkan CHECK wajib IMMUTABLE.
+	//
+	//
+	// Examples: 2021
+	Year int `json:"year"`
+}
+
+// VehicleUnitDetailInput defines model for VehicleUnitDetailInput.
+type VehicleUnitDetailInput struct {
+	Color                  *string             `json:"color,omitempty"`
+	RegistrationValidUntil *openapi_types.Date `json:"registration_valid_until,omitempty"`
+	TaxDueOn               *openapi_types.Date `json:"tax_due_on,omitempty"`
+	Year                   int                 `json:"year"`
+}
 
 // Cursor defines model for Cursor.
 type Cursor = string

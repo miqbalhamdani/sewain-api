@@ -58,6 +58,12 @@ type SessionOwner struct {
 	ID   uuid.UUID
 	Name string
 	Slug *string // nil = belum punya halaman publik (BR-025)
+
+	// BusinessType is the market preset, chosen once at registration (BR-017).
+	// It rides in the session because the catalogue form branches on it: a
+	// vehicle rental is asked for transmission and fuel, an equipment rental
+	// is not, and the screen cannot know which without this (BR-094).
+	BusinessType string
 }
 
 // Service is the auth use cases. Everything it does that touches an owner's
@@ -223,7 +229,8 @@ func (s *Service) Me(ctx context.Context, userID uuid.UUID) (SessionUser, Sessio
 			Role:        row.Role,
 			Permissions: PermissionsFor(row.Role),
 		}
-		owner = SessionOwner{ID: row.OwnerID, Name: row.OwnerName, Slug: row.Slug}
+		owner = SessionOwner{ID: row.OwnerID, Name: row.OwnerName, Slug: row.Slug,
+			BusinessType: row.BusinessType}
 		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -319,9 +326,10 @@ func (s *Service) issue(ctx context.Context, ownerID, userID uuid.UUID, rotatedF
 				Permissions: PermissionsFor(row.Role),
 			},
 			Owner: SessionOwner{
-				ID:   row.OwnerID,
-				Name: row.OwnerName,
-				Slug: row.Slug,
+				ID:           row.OwnerID,
+				Name:         row.OwnerName,
+				Slug:         row.Slug,
+				BusinessType: row.BusinessType,
 			},
 		}
 		return nil

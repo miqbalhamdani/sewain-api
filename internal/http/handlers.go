@@ -121,9 +121,10 @@ func (s *Server) writeSessionStatus(w http.ResponseWriter, r *http.Request, sess
 			Permissions:     session.User.Permissions,
 		},
 		Owner: SessionOwner{
-			Id:   session.Owner.ID,
-			Name: session.Owner.Name,
-			Slug: session.Owner.Slug,
+			Id:           session.Owner.ID,
+			Name:         session.Owner.Name,
+			Slug:         session.Owner.Slug,
+			BusinessType: BusinessType(session.Owner.BusinessType),
 		},
 	})
 }
@@ -196,6 +197,7 @@ func (s *Server) GetMe(w http.ResponseWriter, r *http.Request) {
 			EmailVerifiedAt: user.EmailVerifiedAt,
 			Permissions:     user.Permissions,
 		},
-		Owner: SessionOwner{Id: ownerRow.ID, Name: ownerRow.Name, Slug: ownerRow.Slug},
+		Owner: SessionOwner{Id: ownerRow.ID, Name: ownerRow.Name, Slug: ownerRow.Slug,
+			BusinessType: BusinessType(ownerRow.BusinessType)},
 	})
 }

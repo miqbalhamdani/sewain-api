@@ -45,6 +45,14 @@ type Knobs struct {
 	NotifyPickupReminder       bool
 	NotifyReturnReminder       bool
 	NotifyOverdueReminder      bool
+
+	// Profil usaha (BR-096). Bukan knob melainkan identitas, dan ketiganya
+	// nullable karena itu keadaan awal tiap usaha baru -- pendaftaran cuma
+	// menanyakan empat hal (BR-005). Halaman publik tidak hidup sebelum Slug,
+	// WhatsApp, dan Address ketiganya terisi.
+	WhatsApp       *string
+	Address        *string
+	OperatingHours *string
 }
 
 // Patch is what a caller is changing. A nil field means the key was absent and
@@ -60,6 +68,10 @@ type Patch struct {
 	NotifyPickupReminder       *bool
 	NotifyReturnReminder       *bool
 	NotifyOverdueReminder      *bool
+
+	WhatsApp       *string
+	Address        *string
+	OperatingHours *string
 }
 
 // Get reads this rental's knobs. The id comes from the owner context, never
@@ -109,6 +121,9 @@ func (s *Service) Update(ctx context.Context, p Patch) (Knobs, error) {
 			NotifyPickupReminder:       p.NotifyPickupReminder,
 			NotifyReturnReminder:       p.NotifyReturnReminder,
 			NotifyOverdueReminder:      p.NotifyOverdueReminder,
+			Whatsapp:                   p.WhatsApp,
+			Address:                    p.Address,
+			OperatingHours:             p.OperatingHours,
 		})
 		return err
 	})
@@ -134,6 +149,9 @@ func knobsOf(row sqlcgen.GetSettingsRow) Knobs {
 		NotifyPickupReminder:       row.NotifyPickupReminder,
 		NotifyReturnReminder:       row.NotifyReturnReminder,
 		NotifyOverdueReminder:      row.NotifyOverdueReminder,
+		WhatsApp:                   row.Whatsapp,
+		Address:                    row.Address,
+		OperatingHours:             row.OperatingHours,
 	}
 }
 
@@ -175,6 +193,16 @@ func translate(err error) error {
 		return apperrors.ValidationFailed(
 			"payment_due_hours is at least 1: an invoice due on the instant it is issued " +
 				"is past due on the instant it is issued.").WithCause(err)
+	case "owners_whatsapp_format":
+		// The one profile field a machine reads rather than a person: the
+		// public page turns it into a wa.me link, and a freely formatted
+		// number produces a dead link on the page whose whole purpose is
+		// reaching the owner (BR-096).
+		return apperrors.ValidationFailed(
+			"A WhatsApp number starts with +62 and has 8 to 13 digits after it, " +
+				"for example +628123456789.").
+			WithFields(apperrors.Field{Name: "whatsapp"}).WithCause(err)
+
 	case "owners_no_show_tolerance_non_negative":
 		return apperrors.ValidationFailed(
 			"no_show_tolerance_hours cannot be negative. Zero is allowed and means the " +

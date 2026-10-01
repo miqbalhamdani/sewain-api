@@ -14,10 +14,13 @@
 SELECT r.id, r.name, r.category, r.pricing_unit, r.base_price,
        r.deposit_amount, r.late_fee_per_unit, r.min_duration, r.max_duration,
        r.buffer_minutes, r.requires_id_verification, r.status,
+       r.description, r.terms_excludes, r.terms_requirements, r.terms_cancellation,
+       v.vehicle_type, v.transmission, v.seats, v.fuel,
        (SELECT count(*) FROM resource_units u
          WHERE u.resource_id = r.id
            AND u.status = 'active' AND u.deleted_at IS NULL) AS unit_count
   FROM resources r
+  LEFT JOIN vehicle_specs v ON v.resource_id = r.id
  WHERE r.deleted_at IS NULL
  ORDER BY r.name;
 
@@ -25,10 +28,13 @@ SELECT r.id, r.name, r.category, r.pricing_unit, r.base_price,
 SELECT r.id, r.name, r.category, r.pricing_unit, r.base_price,
        r.deposit_amount, r.late_fee_per_unit, r.min_duration, r.max_duration,
        r.buffer_minutes, r.requires_id_verification, r.status,
+       r.description, r.terms_excludes, r.terms_requirements, r.terms_cancellation,
+       v.vehicle_type, v.transmission, v.seats, v.fuel,
        (SELECT count(*) FROM resource_units u
          WHERE u.resource_id = r.id
            AND u.status = 'active' AND u.deleted_at IS NULL) AS unit_count
   FROM resources r
+  LEFT JOIN vehicle_specs v ON v.resource_id = r.id
  WHERE r.id = $1 AND r.deleted_at IS NULL;
 
 -- name: CreateResource :one
@@ -38,8 +44,9 @@ SELECT r.id, r.name, r.category, r.pricing_unit, r.base_price,
 INSERT INTO resources (id, owner_id, created_by, name, category, pricing_unit,
                        base_price, deposit_amount, late_fee_per_unit,
                        min_duration, max_duration, buffer_minutes,
-                       requires_id_verification)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                       requires_id_verification, description, terms_excludes,
+                       terms_requirements, terms_cancellation)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 RETURNING id;
 
 -- name: UpdateResource :one
@@ -60,6 +67,10 @@ UPDATE resources SET
     buffer_minutes = COALESCE(sqlc.narg(buffer_minutes)::int, buffer_minutes),
     requires_id_verification =
         COALESCE(sqlc.narg(requires_id_verification)::boolean, requires_id_verification),
+    description        = COALESCE(sqlc.narg(description),        description),
+    terms_excludes     = COALESCE(sqlc.narg(terms_excludes),     terms_excludes),
+    terms_requirements = COALESCE(sqlc.narg(terms_requirements), terms_requirements),
+    terms_cancellation = COALESCE(sqlc.narg(terms_cancellation), terms_cancellation),
 
     deposit_amount = CASE WHEN sqlc.arg(set_deposit_amount)::boolean
                           THEN sqlc.narg(deposit_amount)::bigint
@@ -96,10 +107,13 @@ UPDATE resource_units SET deleted_at = now(), updated_at = now()
 SELECT EXISTS (SELECT 1 FROM resources WHERE id = $1);
 
 -- name: ListUnits :many
-SELECT id, resource_id, code, label, status, meter_value, condition_notes
-  FROM resource_units
- WHERE resource_id = $1 AND deleted_at IS NULL
- ORDER BY code;
+SELECT u.id, u.resource_id, u.code, u.label, u.status, u.meter_value,
+       u.condition_notes,
+       d.year, d.color, d.tax_due_on, d.registration_valid_until
+  FROM resource_units u
+  LEFT JOIN vehicle_unit_details d ON d.resource_unit_id = u.id
+ WHERE u.resource_id = $1 AND u.deleted_at IS NULL
+ ORDER BY u.code;
 
 -- name: CreateUnit :one
 -- code is the client's (plate, serial -- BR-011), unlike bookings.code which the
@@ -107,7 +121,7 @@ SELECT id, resource_id, code, label, status, meter_value, condition_notes
 INSERT INTO resource_units (id, owner_id, created_by, resource_id, code, label,
                             meter_value, condition_notes)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, resource_id, code, label, status, meter_value, condition_notes;
+RETURNING id;
 
 -- name: UpdateUnit :one
 -- No CASE pairs here: none of these four is a BR-016 nominal, so absent can
@@ -120,7 +134,15 @@ UPDATE resource_units SET
     condition_notes = COALESCE(sqlc.narg(condition_notes), condition_notes),
     updated_at      = now()
  WHERE id = sqlc.arg(id) AND deleted_at IS NULL
-RETURNING id, resource_id, code, label, status, meter_value, condition_notes;
+RETURNING id;
+
+-- name: GetUnit :one
+SELECT u.id, u.resource_id, u.code, u.label, u.status, u.meter_value,
+       u.condition_notes,
+       d.year, d.color, d.tax_due_on, d.registration_valid_until
+  FROM resource_units u
+  LEFT JOIN vehicle_unit_details d ON d.resource_unit_id = u.id
+ WHERE u.id = $1 AND u.deleted_at IS NULL;
 
 -- name: SoftDeleteUnit :execrows
 UPDATE resource_units SET deleted_at = now(), updated_at = now()
@@ -134,3 +156,51 @@ SELECT EXISTS (SELECT 1 FROM resource_units WHERE id = $1);
 -- BR-017: the preset picks the pricing unit for every resource in the rental,
 -- and the mapping lives as a constant in Go, not as a column here.
 SELECT business_type FROM owners WHERE id = $1;
+
+-- ─────────────── BR-094 · atribut kendaraan, tabel pendamping ───────────────
+--
+-- Nol query di bawah punya `WHERE owner_id`. Kedua tabel ber-RLS seperti yang
+-- lain, dan owner_id cuma muncul sebagai nilai kolom di INSERT -- tempat separuh
+-- WITH CHECK policy memvalidasinya, dan tempat FK komposit memastikan ia cocok
+-- dengan pemilik resource/unit induknya.
+
+-- name: CreateVehicleSpec :exec
+-- Dijalankan di transaksi yang sama dengan CreateResource. Kewajiban 1:1 dijaga
+-- aplikasi karena database tidak bisa menegakkan "anak wajib ada" dengan murah;
+-- yang dijaga database adalah kebalikannya -- anak tidak bisa menunjuk induk
+-- pemilik lain.
+INSERT INTO vehicle_specs (resource_id, owner_id, vehicle_type, transmission, seats, fuel)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: UpdateVehicleSpec :execrows
+-- Mengganti seluruh objeknya, bukan COALESCE per field, dan itu disengaja:
+-- `vehicle` di body adalah objek bersarang yang dirender form secara utuh, jadi
+-- apa yang dikirim adalah apa yang seharusnya ada. `vehicle_type` tidak ikut --
+-- ia dikunci sesudah resource dibuat (BR-094).
+--
+-- Konsekuensinya benar: mobil yang lupa mengirim `seats` melanggar
+-- vehicle_specs_seats_car dan dijawab 422, bukan diam-diam kehilangan kursinya.
+UPDATE vehicle_specs SET
+    transmission = $2,
+    seats        = $3,
+    fuel         = $4,
+    updated_at   = now()
+ WHERE resource_id = $1;
+
+-- name: CreateVehicleUnitDetail :exec
+INSERT INTO vehicle_unit_details
+    (resource_unit_id, owner_id, year, color, tax_due_on, registration_valid_until)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: UpdateVehicleUnitDetail :execrows
+-- Mengganti seluruh objeknya, alasan yang sama dengan UpdateVehicleSpec. Di sini
+-- ia juga yang membuat tanggal pajak salah ketik bisa DIKOSONGKAN lagi: COALESCE
+-- akan membaca null sebagai "jangan sentuh", dan juragan tidak punya jalan
+-- mencabutnya sama sekali.
+UPDATE vehicle_unit_details SET
+    year                     = $2,
+    color                    = $3,
+    tax_due_on               = $4,
+    registration_valid_until = $5,
+    updated_at               = now()
+ WHERE resource_unit_id = $1;

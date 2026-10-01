@@ -14,7 +14,8 @@ import (
 const getSettings = `-- name: GetSettings :one
 SELECT slug, booking_code_prefix, require_payment_before_pickup,
        draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
-       notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder
+       notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
+       whatsapp, address, operating_hours
   FROM owners
  WHERE id = $1
 `
@@ -29,6 +30,9 @@ type GetSettingsRow struct {
 	NotifyPickupReminder       bool
 	NotifyReturnReminder       bool
 	NotifyOverdueReminder      bool
+	Whatsapp                   *string
+	Address                    *string
+	OperatingHours             *string
 }
 
 // Runs inside InOwnerTx like everything else, but owners has no RLS (it IS the
@@ -47,6 +51,9 @@ func (q *Queries) GetSettings(ctx context.Context, id uuid.UUID) (GetSettingsRow
 		&i.NotifyPickupReminder,
 		&i.NotifyReturnReminder,
 		&i.NotifyOverdueReminder,
+		&i.Whatsapp,
+		&i.Address,
+		&i.OperatingHours,
 	)
 	return i, err
 }
@@ -62,11 +69,15 @@ UPDATE owners SET
     notify_pickup_reminder        = COALESCE($7,        notify_pickup_reminder),
     notify_return_reminder        = COALESCE($8,        notify_return_reminder),
     notify_overdue_reminder       = COALESCE($9,       notify_overdue_reminder),
+    whatsapp                      = COALESCE($10,                      whatsapp),
+    address                       = COALESCE($11,                       address),
+    operating_hours               = COALESCE($12,               operating_hours),
     updated_at                    = now()
- WHERE id = $10
+ WHERE id = $13
 RETURNING slug, booking_code_prefix, require_payment_before_pickup,
           draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
-          notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder
+          notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
+          whatsapp, address, operating_hours
 `
 
 type UpdateSettingsParams struct {
@@ -79,6 +90,9 @@ type UpdateSettingsParams struct {
 	NotifyPickupReminder       *bool
 	NotifyReturnReminder       *bool
 	NotifyOverdueReminder      *bool
+	Whatsapp                   *string
+	Address                    *string
+	OperatingHours             *string
 	ID                         uuid.UUID
 }
 
@@ -92,6 +106,9 @@ type UpdateSettingsRow struct {
 	NotifyPickupReminder       bool
 	NotifyReturnReminder       bool
 	NotifyOverdueReminder      bool
+	Whatsapp                   *string
+	Address                    *string
+	OperatingHours             *string
 }
 
 // COALESCE per column: a NULL argument means "the client omitted this key", so
@@ -108,6 +125,9 @@ func (q *Queries) UpdateSettings(ctx context.Context, arg UpdateSettingsParams) 
 		arg.NotifyPickupReminder,
 		arg.NotifyReturnReminder,
 		arg.NotifyOverdueReminder,
+		arg.Whatsapp,
+		arg.Address,
+		arg.OperatingHours,
 		arg.ID,
 	)
 	var i UpdateSettingsRow
@@ -121,6 +141,9 @@ func (q *Queries) UpdateSettings(ctx context.Context, arg UpdateSettingsParams) 
 		&i.NotifyPickupReminder,
 		&i.NotifyReturnReminder,
 		&i.NotifyOverdueReminder,
+		&i.Whatsapp,
+		&i.Address,
+		&i.OperatingHours,
 	)
 	return i, err
 }

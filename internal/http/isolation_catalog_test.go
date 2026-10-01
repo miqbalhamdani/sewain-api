@@ -35,8 +35,15 @@ func init() {
 			route: route{method: "POST", pattern: "/api/v1/resources"},
 			seed:  seedCatalogOwner,
 			request: func(t *testing.T, s seeded) *http.Request {
+				// The vehicle block is load-bearing here, not decoration: the
+				// fixture rental is vehicle_rental, and without it the request
+				// stops at 422 before the handler ever runs (BR-094). A case
+				// that never reaches the code it is meant to isolate is green
+				// and worthless -- the same trap seedSignedInOwner exists for.
 				return bodyRequest(t, http.MethodPost, "/api/v1/resources", s.accessToken,
-					`{"name":"Iso Resource","base_price":350000}`)
+					`{"name":"Iso Resource","base_price":350000,`+
+						`"vehicle":{"vehicle_type":"car","transmission":"manual",`+
+						`"seats":7,"fuel":"gasoline"}}`)
 			},
 		},
 		isolationCase{
@@ -122,15 +129,30 @@ func seedCatalogOwner(ctx context.Context, t *testing.T, store *db.Store, ownerI
 	ownerCtx := owner.NewContext(ctx, ownerID)
 	if err := store.InOwnerTx(ownerCtx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO resources (id, owner_id, name, pricing_unit, base_price)
-			 VALUES ($1, $2, $3, 'day', 350000)`,
+			`INSERT INTO resources (id, owner_id, name, pricing_unit, base_price, category)
+			 VALUES ($1, $2, $3, 'day', 350000, 'car')`,
 			resourceID, ownerID, name); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx,
+		// The companion rows exist so a leak carries them too: a handler that
+		// returned another rental's catalogue wholesale would bring its specs
+		// along, and a fixture without them could not show that.
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO vehicle_specs (resource_id, owner_id, vehicle_type, transmission, seats, fuel)
+			 VALUES ($1, $2, 'car', 'manual', 7, 'gasoline')`,
+			resourceID, ownerID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx,
 			`INSERT INTO resource_units (id, owner_id, resource_id, code)
 			 VALUES ($1, $2, $3, $4)`,
-			unitID, ownerID, resourceID, code)
+			unitID, ownerID, resourceID, code); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`INSERT INTO vehicle_unit_details (resource_unit_id, owner_id, year, color)
+			 VALUES ($1, $2, 2021, 'Putih')`,
+			unitID, ownerID)
 		return err
 	}); err != nil {
 		t.Fatalf("seed catalogue for owner %s: %v", ownerID, err)
@@ -139,6 +161,16 @@ func seedCatalogOwner(ctx context.Context, t *testing.T, store *db.Store, ownerI
 	t.Cleanup(func() {
 		cleanup := context.WithoutCancel(ctx)
 		_ = store.InOwnerTx(owner.NewContext(cleanup, ownerID), func(tx pgx.Tx) error {
+			// Children first. ON DELETE CASCADE would cover it, but relying on
+			// it here would hide a broken key rather than surface one.
+			if _, err := tx.Exec(cleanup,
+				`DELETE FROM vehicle_unit_details WHERE owner_id = $1`, ownerID); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(cleanup,
+				`DELETE FROM vehicle_specs WHERE owner_id = $1`, ownerID); err != nil {
+				return err
+			}
 			if _, err := tx.Exec(cleanup,
 				`DELETE FROM resource_units WHERE owner_id = $1`, ownerID); err != nil {
 				return err

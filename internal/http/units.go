@@ -3,8 +3,10 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
@@ -67,6 +69,7 @@ func (s *Server) createUnit(w http.ResponseWriter, r *http.Request, resourceID u
 		Label:          body.Label,
 		MeterValue:     body.MeterValue,
 		ConditionNotes: body.ConditionNotes,
+		Vehicle:        vehicleDetailOf(body.Vehicle),
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -99,6 +102,7 @@ func (s *Server) updateUnit(w http.ResponseWriter, r *http.Request, id uuid.UUID
 		Status:         stringPtr(body.Status),
 		MeterValue:     body.MeterValue,
 		ConditionNotes: body.ConditionNotes,
+		Vehicle:        vehicleDetailOf(body.Vehicle),
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -130,6 +134,7 @@ func (s *Server) updateUnit(w http.ResponseWriter, r *http.Request, id uuid.UUID
 		Status:         UnitStatus(unit.Status),
 		MeterValue:     unit.MeterValue,
 		ConditionNotes: unit.ConditionNotes,
+		Vehicle:        vehicleDetailBody(unit.Vehicle),
 		Warning:        UnitWarning{AffectedBookings: bookings},
 	})
 }
@@ -159,5 +164,47 @@ func unitBody(unit catalog.Unit) ResourceUnit {
 		Status:         UnitStatus(unit.Status),
 		MeterValue:     unit.MeterValue,
 		ConditionNotes: unit.ConditionNotes,
+		Vehicle:        vehicleDetailBody(unit.Vehicle),
 	}
+}
+
+// vehicleDetailOf / vehicleDetailBody cross between the contract's `vehicle`
+// object and the domain's. openapi_types.Date wraps a time.Time and exists only
+// at the contract edge; the domain speaks time.Time like every other date here.
+func vehicleDetailOf(in *VehicleUnitDetailInput) *catalog.VehicleUnitDetail {
+	if in == nil {
+		return nil
+	}
+	return &catalog.VehicleUnitDetail{
+		Year:                   int32(in.Year), //nolint:gosec // bounded by the column's CHECK
+		Color:                  in.Color,
+		TaxDueOn:               dateTime(in.TaxDueOn),
+		RegistrationValidUntil: dateTime(in.RegistrationValidUntil),
+	}
+}
+
+func vehicleDetailBody(v *catalog.VehicleUnitDetail) *VehicleUnitDetail {
+	if v == nil {
+		return nil
+	}
+	return &VehicleUnitDetail{
+		Year:                   int(v.Year),
+		Color:                  v.Color,
+		TaxDueOn:               openapiDate(v.TaxDueOn),
+		RegistrationValidUntil: openapiDate(v.RegistrationValidUntil),
+	}
+}
+
+func dateTime(d *openapi_types.Date) *time.Time {
+	if d == nil {
+		return nil
+	}
+	return &d.Time
+}
+
+func openapiDate(t *time.Time) *openapi_types.Date {
+	if t == nil {
+		return nil
+	}
+	return &openapi_types.Date{Time: *t}
 }

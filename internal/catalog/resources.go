@@ -37,6 +37,15 @@ type Resource struct {
 	RequiresIDVerification bool
 	Status                 string
 
+	// BR-095. Kosong berarti bagian itu tidak ditampilkan di halaman publik.
+	Description       *string
+	TermsExcludes     *string
+	TermsRequirements *string
+	TermsCancellation *string
+
+	// Vehicle is nil for every preset that is not vehicle_rental (BR-094).
+	Vehicle *VehicleSpec
+
 	// Active units. Zero means this resource can never appear in availability
 	// search, whatever its own status says (BR-010).
 	UnitCount int64
@@ -56,6 +65,16 @@ type NewResource struct {
 	MaxDuration            *int32
 	BufferMinutes          int32
 	RequiresIDVerification bool
+
+	Description       *string
+	TermsExcludes     *string
+	TermsRequirements *string
+	TermsCancellation *string
+
+	// Vehicle must be non-nil exactly when the rental's preset is
+	// vehicle_rental, and nil for every other preset. Create checks both
+	// directions -- see the comment there for why the obligation lives in Go.
+	Vehicle *VehicleSpec
 }
 
 // ResourcePatch is what a caller is changing.
@@ -75,6 +94,15 @@ type ResourcePatch struct {
 	LateFeePerUnit Optional[int64]
 	MinDuration    Optional[int32]
 	MaxDuration    Optional[int32]
+
+	Description       *string
+	TermsExcludes     *string
+	TermsRequirements *string
+	TermsCancellation *string
+
+	// Vehicle replaces the whole nested object when present and leaves the row
+	// untouched when nil. See VehicleSpecPatch for why it is not a COALESCE.
+	Vehicle *VehicleSpecPatch
 }
 
 // pricingUnitForPreset is BR-017's table, and the only copy of it.
@@ -89,6 +117,9 @@ type ResourcePatch struct {
 // which is not in BR-012's enum at all, and that gets decided in phase 4 rather
 // than guessed here. An owner on that preset cannot create a resource yet, and
 // saying so is better than filing their rentals under the wrong unit.
+// presetVehicleRental is the one preset with a companion table today (BR-094).
+const presetVehicleRental = "vehicle_rental"
+
 var pricingUnitForPreset = map[string]string{
 	"vehicle_rental":   "day",
 	"equipment_rental": "day",
@@ -168,12 +199,43 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, n NewResource) (
 					"so resources cannot be created on it.")
 		}
 
+		// The 1:1 obligation, and it runs in BOTH directions. A database can
+		// refuse a child that points at the wrong parent -- the composite key
+		// does that -- but it cannot cheaply insist a child exists at all, and
+		// it certainly cannot know which presets are allowed one. So this is
+		// the one rule in this package that Go really does own (BR-094).
+		//
+		// Refusing the second direction matters as much as the first: an
+		// equipment rental that sends `vehicle` has data it believes is saved,
+		// and accepting it silently would throw that away.
+		wantsVehicle := preset == presetVehicleRental
+		switch {
+		case wantsVehicle && n.Vehicle == nil:
+			return apperrors.ValidationFailed(
+				"vehicle is required for a vehicle rental: every resource needs its " +
+					"type, transmission and fuel.").
+				WithFields(apperrors.Field{Name: "vehicle"})
+		case !wantsVehicle && n.Vehicle != nil:
+			return apperrors.ValidationFailed(
+				"vehicle does not apply to the " + preset + " preset.").
+				WithFields(apperrors.Field{Name: "vehicle"})
+		}
+
+		// BR-094: category is derived, never sent. It IS the vehicle type --
+		// the point is that a generic resource list stays groupable without
+		// joining the companion table, not that it says something new. A preset
+		// with no companion table leaves it null rather than guessing.
+		var category *string
+		if n.Vehicle != nil {
+			category = &n.Vehicle.VehicleType
+		}
+
 		if _, err := q.CreateResource(ctx, sqlcgen.CreateResourceParams{
 			ID:                     id,
 			OwnerID:                ownerID,
 			CreatedBy:              &userID,
 			Name:                   n.Name,
-			Category:               n.Category,
+			Category:               category,
 			PricingUnit:            unit,
 			BasePrice:              n.BasePrice,
 			DepositAmount:          n.DepositAmount,
@@ -182,8 +244,25 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, n NewResource) (
 			MaxDuration:            n.MaxDuration,
 			BufferMinutes:          n.BufferMinutes,
 			RequiresIDVerification: n.RequiresIDVerification,
+			Description:            n.Description,
+			TermsExcludes:          n.TermsExcludes,
+			TermsRequirements:      n.TermsRequirements,
+			TermsCancellation:      n.TermsCancellation,
 		}); err != nil {
 			return err
+		}
+
+		if n.Vehicle != nil {
+			if err := q.CreateVehicleSpec(ctx, sqlcgen.CreateVehicleSpecParams{
+				ResourceID:   id,
+				OwnerID:      ownerID,
+				VehicleType:  n.Vehicle.VehicleType,
+				Transmission: n.Vehicle.Transmission,
+				Seats:        n.Vehicle.Seats,
+				Fuel:         n.Vehicle.Fuel,
+			}); err != nil {
+				return err
+			}
 		}
 
 		// Read it back rather than RETURNING it: unit_count is a subquery and
@@ -226,8 +305,33 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, p ResourcePatch) (Re
 			MinDuration:       minDuration,
 			SetMaxDuration:    setMax,
 			MaxDuration:       maxDuration,
+
+			Description:       p.Description,
+			TermsExcludes:     p.TermsExcludes,
+			TermsRequirements: p.TermsRequirements,
+			TermsCancellation: p.TermsCancellation,
 		}); err != nil {
 			return err
+		}
+
+		if p.Vehicle != nil {
+			touched, err := q.UpdateVehicleSpec(ctx, sqlcgen.UpdateVehicleSpecParams{
+				ResourceID:   id,
+				Transmission: p.Vehicle.Transmission,
+				Seats:        p.Vehicle.Seats,
+				Fuel:         p.Vehicle.Fuel,
+			})
+			if err != nil {
+				return err
+			}
+			// Zero rows means this resource has no spec to update, which means
+			// its rental is not a vehicle rental. Saying so beats writing
+			// nothing and answering 200.
+			if touched == 0 {
+				return apperrors.ValidationFailed(
+					"vehicle does not apply to this resource.").
+					WithFields(apperrors.Field{Name: "vehicle"})
+			}
 		}
 
 		var err error
@@ -294,5 +398,10 @@ func resourceOf(row sqlcgen.GetResourceRow) Resource {
 		RequiresIDVerification: row.RequiresIDVerification,
 		Status:                 row.Status,
 		UnitCount:              row.UnitCount,
+		Description:            row.Description,
+		TermsExcludes:          row.TermsExcludes,
+		TermsRequirements:      row.TermsRequirements,
+		TermsCancellation:      row.TermsCancellation,
+		Vehicle:                vehicleSpecOf(row),
 	}
 }

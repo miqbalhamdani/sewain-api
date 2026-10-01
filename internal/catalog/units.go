@@ -25,6 +25,9 @@ type Unit struct {
 	Status         string
 	MeterValue     *int64
 	ConditionNotes *string
+
+	// Vehicle is nil for every preset that is not vehicle_rental (BR-094).
+	Vehicle *VehicleUnitDetail
 }
 
 // NewUnit is what a caller is adding. Status is absent: a unit is born active,
@@ -34,6 +37,11 @@ type NewUnit struct {
 	Label          *string
 	MeterValue     *int64
 	ConditionNotes *string
+
+	// Vehicle must be non-nil exactly when the rental's preset is
+	// vehicle_rental. The service checks both directions; see Create in
+	// resources.go for why that obligation lives here rather than in a CHECK.
+	Vehicle *VehicleUnitDetail
 }
 
 // UnitPatch is what a caller is changing.
@@ -46,6 +54,10 @@ type UnitPatch struct {
 	Status         *string
 	MeterValue     *int64
 	ConditionNotes *string
+
+	// Vehicle replaces the whole nested object when present, and leaves the row
+	// untouched when nil -- same rule as VehicleSpecPatch.
+	Vehicle *VehicleUnitDetail
 }
 
 // ListUnits returns the units of one resource.
@@ -75,7 +87,7 @@ func (s *Service) ListUnits(ctx context.Context, resourceID uuid.UUID) ([]Unit, 
 
 	out := make([]Unit, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, unitOf(sqlcgen.CreateUnitRow(row)))
+		out = append(out, unitOf(sqlcgen.GetUnitRow(row)))
 	}
 	return out, nil
 }
@@ -92,7 +104,7 @@ func (s *Service) CreateUnit(ctx context.Context, userID, resourceID uuid.UUID, 
 		return Unit{}, fmt.Errorf("new unit id: %w", err)
 	}
 
-	var row sqlcgen.CreateUnitRow
+	var row sqlcgen.GetUnitRow
 	var exists bool
 	err = s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
 		q := sqlcgen.New(tx)
@@ -106,7 +118,7 @@ func (s *Service) CreateUnit(ctx context.Context, userID, resourceID uuid.UUID, 
 			return err
 		}
 
-		row, err = q.CreateUnit(ctx, sqlcgen.CreateUnitParams{
+		if _, err := q.CreateUnit(ctx, sqlcgen.CreateUnitParams{
 			ID:             id,
 			OwnerID:        ownerID,
 			CreatedBy:      &userID,
@@ -115,7 +127,27 @@ func (s *Service) CreateUnit(ctx context.Context, userID, resourceID uuid.UUID, 
 			Label:          n.Label,
 			MeterValue:     n.MeterValue,
 			ConditionNotes: n.ConditionNotes,
-		})
+		}); err != nil {
+			return err
+		}
+
+		if n.Vehicle != nil {
+			if err := q.CreateVehicleUnitDetail(ctx, sqlcgen.CreateVehicleUnitDetailParams{
+				ResourceUnitID:         id,
+				OwnerID:                ownerID,
+				Year:                   n.Vehicle.Year,
+				Color:                  n.Vehicle.Color,
+				TaxDueOn:               n.Vehicle.TaxDueOn,
+				RegistrationValidUntil: n.Vehicle.RegistrationValidUntil,
+			}); err != nil {
+				return err
+			}
+		}
+
+		// Read back rather than RETURNING: the vehicle half arrives by LEFT
+		// JOIN and cannot ride on an INSERT, and one row shape with one
+		// converter beats a second that differs by four columns.
+		row, err = q.GetUnit(ctx, id)
 		return err
 	})
 	if err != nil {
@@ -133,17 +165,35 @@ func (s *Service) CreateUnit(ctx context.Context, userID, resourceID uuid.UUID, 
 // caller pairs this with AffectedBookings and shows the owner what is affected;
 // the owner decides (BR-013).
 func (s *Service) UpdateUnit(ctx context.Context, id uuid.UUID, p UnitPatch) (Unit, error) {
-	var row sqlcgen.UpdateUnitRow
+	var row sqlcgen.GetUnitRow
 	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
-		var err error
-		row, err = sqlcgen.New(tx).UpdateUnit(ctx, sqlcgen.UpdateUnitParams{
+		q := sqlcgen.New(tx)
+
+		if _, err := q.UpdateUnit(ctx, sqlcgen.UpdateUnitParams{
 			ID:             id,
 			Code:           p.Code,
 			Label:          p.Label,
 			Status:         p.Status,
 			MeterValue:     p.MeterValue,
 			ConditionNotes: p.ConditionNotes,
-		})
+		}); err != nil {
+			return err
+		}
+
+		if p.Vehicle != nil {
+			if _, err := q.UpdateVehicleUnitDetail(ctx, sqlcgen.UpdateVehicleUnitDetailParams{
+				ResourceUnitID:         id,
+				Year:                   p.Vehicle.Year,
+				Color:                  p.Vehicle.Color,
+				TaxDueOn:               p.Vehicle.TaxDueOn,
+				RegistrationValidUntil: p.Vehicle.RegistrationValidUntil,
+			}); err != nil {
+				return err
+			}
+		}
+
+		var err error
+		row, err = q.GetUnit(ctx, id)
 		return err
 	})
 	if noRows(err) {
@@ -152,7 +202,7 @@ func (s *Service) UpdateUnit(ctx context.Context, id uuid.UUID, p UnitPatch) (Un
 	if err != nil {
 		return Unit{}, translate(err, "update unit")
 	}
-	return unitOf(sqlcgen.CreateUnitRow(row)), nil
+	return unitOf(row), nil
 }
 
 // DeleteUnit soft-deletes one unit, which releases its code again (BR-011).
@@ -178,7 +228,7 @@ func (s *Service) DeleteUnit(ctx context.Context, id uuid.UUID) (bool, error) {
 }
 
 // unitOf is the one place a database row becomes a Unit.
-func unitOf(row sqlcgen.CreateUnitRow) Unit {
+func unitOf(row sqlcgen.GetUnitRow) Unit {
 	return Unit{
 		ID:             row.ID,
 		ResourceID:     row.ResourceID,
@@ -187,5 +237,6 @@ func unitOf(row sqlcgen.CreateUnitRow) Unit {
 		Status:         row.Status,
 		MeterValue:     row.MeterValue,
 		ConditionNotes: row.ConditionNotes,
+		Vehicle:        vehicleUnitDetailOf(row),
 	}
 }

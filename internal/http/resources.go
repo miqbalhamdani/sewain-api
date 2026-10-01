@@ -94,6 +94,11 @@ func (s *Server) createResource(w http.ResponseWriter, r *http.Request) {
 		MaxDuration:            int32Ptr(body.MaxDuration),
 		BufferMinutes:          int32Or(body.BufferMinutes, 0),
 		RequiresIDVerification: boolOr(body.RequiresIdVerification, false),
+		Description:            body.Description,
+		TermsExcludes:          body.TermsExcludes,
+		TermsRequirements:      body.TermsRequirements,
+		TermsCancellation:      body.TermsCancellation,
+		Vehicle:                vehicleSpecOf(body.Vehicle),
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -150,6 +155,12 @@ func (s *Server) updateResource(w http.ResponseWriter, r *http.Request, id uuid.
 		LateFeePerUnit: optional(present, "late_fee_per_unit", body.LateFeePerUnit),
 		MinDuration:    optional(present, "min_duration", int32Ptr(body.MinDuration)),
 		MaxDuration:    optional(present, "max_duration", int32Ptr(body.MaxDuration)),
+
+		Description:       body.Description,
+		TermsExcludes:     body.TermsExcludes,
+		TermsRequirements: body.TermsRequirements,
+		TermsCancellation: body.TermsCancellation,
+		Vehicle:           vehicleSpecPatchOf(body.Vehicle),
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -177,6 +188,11 @@ func (s *Server) updateResource(w http.ResponseWriter, r *http.Request, id uuid.
 		RequiresIdVerification: res.RequiresIDVerification,
 		Status:                 ResourceStatus(res.Status),
 		UnitCount:              int(res.UnitCount),
+		Description:            res.Description,
+		TermsExcludes:          res.TermsExcludes,
+		TermsRequirements:      res.TermsRequirements,
+		TermsCancellation:      res.TermsCancellation,
+		Vehicle:                vehicleSpecBody(res.Vehicle),
 		ActiveBookings:         active,
 	})
 }
@@ -219,7 +235,59 @@ func resourceBody(res catalog.Resource) Resource {
 		RequiresIdVerification: res.RequiresIDVerification,
 		Status:                 ResourceStatus(res.Status),
 		UnitCount:              int(res.UnitCount),
+		Description:            res.Description,
+		TermsExcludes:          res.TermsExcludes,
+		TermsRequirements:      res.TermsRequirements,
+		TermsCancellation:      res.TermsCancellation,
+		Vehicle:                vehicleSpecBody(res.Vehicle),
 	}
+}
+
+// vehicleSpecOf / vehicleSpecPatchOf / vehicleSpecBody are the three crossings
+// between the contract's nested `vehicle` object and the domain's, and there is
+// one per direction on purpose: create carries a locked vehicle_type, update
+// does not carry it at all, and the response carries whatever the row has.
+func vehicleSpecOf(in *VehicleSpecInput) *catalog.VehicleSpec {
+	if in == nil {
+		return nil
+	}
+	return &catalog.VehicleSpec{
+		VehicleType:  string(in.VehicleType),
+		Transmission: string(in.Transmission),
+		Seats:        int32Ptr(in.Seats),
+		Fuel:         string(in.Fuel),
+	}
+}
+
+func vehicleSpecPatchOf(in *VehicleSpecUpdate) *catalog.VehicleSpecPatch {
+	if in == nil {
+		return nil
+	}
+	return &catalog.VehicleSpecPatch{
+		Transmission: string(derefOr(in.Transmission)),
+		Seats:        int32Ptr(in.Seats),
+		Fuel:         string(derefOr(in.Fuel)),
+	}
+}
+
+func vehicleSpecBody(v *catalog.VehicleSpec) *VehicleSpec {
+	if v == nil {
+		return nil
+	}
+	return &VehicleSpec{
+		VehicleType:  VehicleType(v.VehicleType),
+		Transmission: Transmission(v.Transmission),
+		Seats:        intPtr(v.Seats),
+		Fuel:         Fuel(v.Fuel),
+	}
+}
+
+func derefOr[T ~string](v *T) T {
+	if v == nil {
+		var zero T
+		return zero
+	}
+	return *v
 }
 
 // readBody reads the request body once and returns it alongside its raw keys.
@@ -259,7 +327,11 @@ func readBody(w http.ResponseWriter, r *http.Request) ([]byte, map[string]json.R
 // owner_id and id are in the list for the same reason even though no schema has
 // them: this is the boundary where a body stops being trusted (BR-001).
 func refuseServerManaged(present map[string]json.RawMessage) error {
-	for _, field := range []string{"pricing_unit", "id", "owner_id", "unit_count", "active_bookings"} {
+	// `category` joined this list at S1-085: it is derived from
+	// vehicle.vehicle_type, never sent (BR-094).
+	for _, field := range []string{
+		"pricing_unit", "category", "id", "owner_id", "unit_count", "active_bookings",
+	} {
 		if _, sent := present[field]; sent {
 			return apperrors.ValidationFailed(
 				field + " is set by the server and cannot be sent.").

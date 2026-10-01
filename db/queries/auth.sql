@@ -15,7 +15,7 @@
 -- every 15 minutes, forever. BR-004 caps a revoked session at the access token
 -- TTL, and that promise needs the column (S1-010).
 SELECT u.id AS user_id, u.name AS user_name, u.role, u.status, u.email_verified_at,
-       o.id AS owner_id, o.name AS owner_name, o.slug
+       o.id AS owner_id, o.name AS owner_name, o.slug, o.business_type
   FROM users u
   JOIN owners o ON o.id = u.owner_id
  WHERE u.id = $1;

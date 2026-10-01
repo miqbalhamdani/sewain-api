@@ -59,6 +59,9 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
 		NotifyPickupReminder:       body.NotifyPickupReminder,
 		NotifyReturnReminder:       body.NotifyReturnReminder,
 		NotifyOverdueReminder:      body.NotifyOverdueReminder,
+		WhatsApp:                   body.Whatsapp,
+		Address:                    body.Address,
+		OperatingHours:             body.OperatingHours,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -81,5 +84,8 @@ func settingsBody(k settings.Knobs) Settings {
 		NotifyPickupReminder:       k.NotifyPickupReminder,
 		NotifyReturnReminder:       k.NotifyReturnReminder,
 		NotifyOverdueReminder:      k.NotifyOverdueReminder,
+		Whatsapp:                   k.WhatsApp,
+		Address:                    k.Address,
+		OperatingHours:             k.OperatingHours,
 	}
 }

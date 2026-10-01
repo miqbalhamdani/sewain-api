@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -115,6 +116,51 @@ func translate(err error, verb string) error {
 			"That code is already used by another unit in this business.").
 			WithFields(apperrors.Field{Name: "code"}).WithCause(err)
 
+	// BR-094. Pesannya menjelaskan aturan lintas kolomnya, bukan menyebut nama
+	// constraint -- orang yang membacanya sedang mengisi form, bukan membaca
+	// migrasi.
+	case "vehicle_specs_seats_car":
+		return apperrors.ValidationFailed(
+			"A car needs a seat count and a motorcycle cannot have one.").
+			WithFields(apperrors.Field{Name: "vehicle.seats"}).WithCause(err)
+	case "vehicle_specs_clutch_moto":
+		return apperrors.ValidationFailed(
+			"A clutch transmission only exists on a motorcycle.").
+			WithFields(apperrors.Field{Name: "vehicle.transmission"}).WithCause(err)
+	case "vehicle_specs_diesel_car":
+		return apperrors.ValidationFailed(
+			"Diesel only applies to a car.").
+			WithFields(apperrors.Field{Name: "vehicle.fuel"}).WithCause(err)
+	case "vehicle_specs_seats_range":
+		return apperrors.ValidationFailed(
+			"A seat count is between 2 and 20.").
+			WithFields(apperrors.Field{Name: "vehicle.seats"}).WithCause(err)
+	case "vehicle_specs_type_valid", "vehicle_specs_transmission_valid",
+		"vehicle_specs_fuel_valid":
+		return apperrors.ValidationFailed(
+			"That is not a vehicle type, transmission or fuel this system has.").
+			WithFields(apperrors.Field{Name: "vehicle"}).WithCause(err)
+	case "vehicle_unit_details_year_range":
+		return apperrors.ValidationFailed(
+			"A model year is 1990 or later.").
+			WithFields(apperrors.Field{Name: "vehicle.year"}).WithCause(err)
+
+	// BR-095. Halaman publik merendernya apa adanya, jadi batasnya dijaga
+	// database rather than trusting a maxLength nobody enforces.
+	case "resources_description_length":
+		return tooLong("description", 500).WithCause(err)
+	case "resources_terms_excludes_length":
+		return tooLong("terms_excludes", 500).WithCause(err)
+	case "resources_terms_requirements_length":
+		return tooLong("terms_requirements", 1000).WithCause(err)
+	case "resources_terms_cancellation_length":
+		return tooLong("terms_cancellation", 1000).WithCause(err)
+
+	case "vehicle_specs_resource_matches_owner", "vehicle_unit_details_unit_matches_owner":
+		// The composite key refusing means the parent belongs to another
+		// rental. Same answer as a parent that does not exist (BR-001).
+		return notFoundResource()
+
 	case "resource_units_resource_matches_owner":
 		// The composite key refusing means the resource id belongs to another
 		// rental. Same answer as a resource that does not exist (BR-001).
@@ -133,6 +179,12 @@ func zeroIsNotEmpty(field, noun string) *apperrors.Error {
 		"Leave " + field + " empty to run this resource without a " + noun +
 			". Zero is not the way to say that -- a report cannot tell a " + noun +
 			" of nothing from no " + noun + " at all.").
+		WithFields(apperrors.Field{Name: field})
+}
+
+func tooLong(field string, max int) *apperrors.Error {
+	return apperrors.ValidationFailed(
+		field + " is at most " + strconv.Itoa(max) + " characters.").
 		WithFields(apperrors.Field{Name: field})
 }
 
