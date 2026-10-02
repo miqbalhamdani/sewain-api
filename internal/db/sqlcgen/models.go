@@ -10,6 +10,74 @@ import (
 	"github.com/google/uuid"
 )
 
+type AuditLog struct {
+	ID          uuid.UUID
+	OwnerID     uuid.UUID
+	ActorUserID uuid.UUID
+	Action      string
+	Entity      string
+	EntityID    uuid.UUID
+	Metadata    []byte
+	CreatedAt   time.Time
+}
+
+type Booking struct {
+	ID                  uuid.UUID
+	OwnerID             uuid.UUID
+	Code                string
+	CustomerID          uuid.UUID
+	ResourceID          uuid.UUID
+	ResourceUnitID      uuid.UUID
+	StartAt             time.Time
+	EndAt               time.Time
+	EndAtWithBuffer     time.Time
+	Status              string
+	Source              string
+	UnitPrice           int64
+	PricingUnit         string
+	BufferMinutes       int32
+	DurationQty         int32
+	Subtotal            int64
+	DepositAmount       *int64
+	LateFeePerUnit      *int64
+	DepositWaivedAt     *time.Time
+	DepositWaivedBy     *uuid.UUID
+	DepositWaiverReason *string
+	ActualReturnAt      *time.Time
+	DepositDeducted     int64
+	DepositRefunded     int64
+	DepositNote         *string
+	ExpiresAt           *time.Time
+	CancelledReason     *string
+	CreatedBy           *uuid.UUID
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           *time.Time
+}
+
+type BookingCounter struct {
+	OwnerID    uuid.UUID
+	LastNumber int64
+}
+
+type Customer struct {
+	ID              uuid.UUID
+	OwnerID         uuid.UUID
+	Name            string
+	Phone           string
+	IDType          *string
+	IDNumberEnc     []byte
+	IDNumberLast4   *string
+	IDPhotoKey      *string
+	IsBlacklisted   bool
+	BlacklistReason *string
+	IDPurgeAfter    *time.Time
+	CreatedBy       *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time
+}
+
 type Owner struct {
 	ID                         uuid.UUID
 	Slug                       *string

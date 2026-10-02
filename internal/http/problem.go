@@ -63,6 +63,14 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		}
 		body.Errors = &fields
 	}
+	if len(problem.Conflicts) > 0 {
+		conflicts := make([]AffectedBooking, 0, len(problem.Conflicts))
+		for _, c := range problem.Conflicts {
+			conflicts = append(conflicts, AffectedBooking{
+				Code: c.Code, StartAt: c.StartAt, EndAt: c.EndAt, Status: c.Status})
+		}
+		body.Conflicts = &conflicts
+	}
 
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(problem.Status)

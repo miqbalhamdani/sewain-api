@@ -112,8 +112,6 @@ func (s *Server) updateUnit(w http.ResponseWriter, r *http.Request, id uuid.UUID
 	// The warning rides on every update, not only on a status change. A
 	// caller that has to ask "did I change the status?" to know whether to
 	// read the warning is a caller that will get it wrong once (BR-013).
-	//
-	// Empty until S1-022 -- see catalog.AffectedBookings.
 	affected, err := s.catalog.AffectedBookings(r.Context(), id)
 	if err != nil {
 		writeError(w, r, err)

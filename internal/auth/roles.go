@@ -52,6 +52,11 @@ const (
 	PermSubscriptionRead  = "subscription:read"  // pengaturan langganan
 	PermSubscriptionWrite = "subscription:write" //
 	PermDelete            = "records:delete"     // menghapus data apa pun
+
+	// BR-028: hanya pemilik yang bisa memblokir/membuka penyewa. Not one of
+	// BR-003's lines, which is why it is its own permission rather than riding
+	// on customers:write -- an operator has that, and must keep it.
+	PermCustomersBlacklist = "customers:blacklist"
 )
 
 // operatorPermissions is BR-003's "operator boleh" list, verbatim: membuat &
@@ -77,7 +82,7 @@ var ownerPermissions = concat(operatorPermissions, []string{
 	PermUsersRead, PermUsersWrite,
 	PermSettingsRead, PermSettingsWrite,
 	PermSubscriptionRead, PermSubscriptionWrite,
-	PermDelete,
+	PermDelete, PermCustomersBlacklist,
 })
 
 var rolePermissions = map[string][]string{

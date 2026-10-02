@@ -56,7 +56,7 @@ test:
 test-iso:
 	@$(LOAD_ENV) go test ./internal/http/ -run 'TestOwnerIsolation|TestIsolationHarness' -v
 
-## test-race: concurrency. Gains the BR-022 double-booking case at S1-022.
+## test-race: concurrency, including S1-023 -- the BR-022 double-booking race (internal/booking/race_test.go).
 test-race:
 	@$(LOAD_ENV) go test -race ./...
 

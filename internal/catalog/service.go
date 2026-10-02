@@ -25,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/miqbalhamdani/sewain-api/internal/db"
+	"github.com/miqbalhamdani/sewain-api/internal/db/sqlcgen"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
 )
 
@@ -194,12 +195,19 @@ func noRows(err error) bool { return errors.Is(err, pgx.ErrNoRows) }
 
 // ActiveBookings counts the running bookings still holding this resource's old
 // prices, because a price change never reaches a booking already made (BR-014).
-//
-// Always 0 today: `bookings` arrives with S1-022. The function exists now so the
-// response shape is settled once and S1-018's screen is written once -- what
-// lands with S1-022 is this body, not its callers.
-func (s *Service) ActiveBookings(_ context.Context, _ uuid.UUID) (int, error) {
-	return 0, nil
+// "Running" is anything not yet finished or called off: draft, reserved,
+// picked_up.
+func (s *Service) ActiveBookings(ctx context.Context, resourceID uuid.UUID) (int, error) {
+	var n int64
+	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		n, err = sqlcgen.New(tx).CountActiveBookings(ctx, resourceID)
+		return err
+	})
+	if err != nil {
+		return 0, fmt.Errorf("count active bookings: %w", err)
+	}
+	return int(n), nil
 }
 
 // AffectedBookings lists the bookings a unit's status change does NOT cancel.
@@ -207,10 +215,21 @@ func (s *Service) ActiveBookings(_ context.Context, _ uuid.UUID) (int, error) {
 // The list is the whole point of BR-013: the system warns and the owner
 // decides. Refusing the change instead would make a juragan cancel bookings
 // one by one before being allowed to say the car is in the workshop.
-//
-// Always empty today, for the same reason as ActiveBookings.
-func (s *Service) AffectedBookings(_ context.Context, _ uuid.UUID) ([]AffectedBooking, error) {
-	return []AffectedBooking{}, nil
+func (s *Service) AffectedBookings(ctx context.Context, unitID uuid.UUID) ([]AffectedBooking, error) {
+	var rows []sqlcgen.ListAffectedBookingsRow
+	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		rows, err = sqlcgen.New(tx).ListAffectedBookings(ctx, unitID)
+		return err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list affected bookings: %w", err)
+	}
+	out := make([]AffectedBooking, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, AffectedBooking{Code: r.Code, StartAt: r.StartAt, EndAt: r.EndAt, Status: r.Status})
+	}
+	return out, nil
 }
 
 // AffectedBooking is one booking that survives a unit going out of service.

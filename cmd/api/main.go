@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
+	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
+	"github.com/miqbalhamdani/sewain-api/internal/customer"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	httpapi "github.com/miqbalhamdani/sewain-api/internal/http"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
@@ -86,6 +88,15 @@ func run() error {
 
 	authSvc := auth.NewService(pool, signer).WithMail(redis, mailer, config.AppBaseURL())
 
+	identityKey, err := config.IdentityKey()
+	if err != nil {
+		return err
+	}
+	customerSvc, err := customer.New(pool, identityKey)
+	if err != nil {
+		return err
+	}
+
 	mux := http.NewServeMux()
 	// Not a contract endpoint, so not generated and not under BasePath.
 	mux.Handle("GET /healthz", newHealthHandler(
@@ -95,6 +106,7 @@ func run() error {
 	))
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(pool), catalog.New(pool),
+			customerSvc, booking.New(pool),
 			ratelimit.New(redis), !config.IsDevelopment()),
 		signer,
 		redis,

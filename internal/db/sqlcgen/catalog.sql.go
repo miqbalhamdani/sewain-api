@@ -12,6 +12,21 @@ import (
 	"github.com/google/uuid"
 )
 
+const countActiveBookings = `-- name: CountActiveBookings :one
+SELECT count(*) FROM bookings
+ WHERE resource_id = $1 AND status IN ('draft', 'reserved', 'picked_up')
+   AND deleted_at IS NULL
+`
+
+// Bookings still holding this resource's old prices (BR-014): anything that has
+// not finished or been called off.
+func (q *Queries) CountActiveBookings(ctx context.Context, resourceID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveBookings, resourceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createResource = `-- name: CreateResource :one
 INSERT INTO resources (id, owner_id, created_by, name, category, pricing_unit,
                        base_price, deposit_amount, late_fee_per_unit,
@@ -291,6 +306,46 @@ func (q *Queries) GetUnit(ctx context.Context, id uuid.UUID) (GetUnitRow, error)
 		&i.RegistrationValidUntil,
 	)
 	return i, err
+}
+
+const listAffectedBookings = `-- name: ListAffectedBookings :many
+SELECT code, start_at, end_at, status FROM bookings
+ WHERE resource_unit_id = $1 AND status IN ('draft', 'reserved', 'picked_up')
+   AND end_at > now() AND deleted_at IS NULL
+ ORDER BY start_at
+`
+
+type ListAffectedBookingsRow struct {
+	Code    string
+	StartAt time.Time
+	EndAt   time.Time
+	Status  string
+}
+
+// What a unit going out of service does NOT cancel (BR-013).
+func (q *Queries) ListAffectedBookings(ctx context.Context, resourceUnitID uuid.UUID) ([]ListAffectedBookingsRow, error) {
+	rows, err := q.db.Query(ctx, listAffectedBookings, resourceUnitID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAffectedBookingsRow
+	for rows.Next() {
+		var i ListAffectedBookingsRow
+		if err := rows.Scan(
+			&i.Code,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listResources = `-- name: ListResources :many

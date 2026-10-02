@@ -109,11 +109,16 @@ var routeAccessTable = map[string]routeAccess{
 	"POST /api/v1/auth/verify-email/resend": {preVerification: true},
 	"GET /api/v1/me":                        {preVerification: true},
 
+	// S1-026. The literal path works here because it has no parameter; the
+	// first one that does (S1-035's pickup) has to teach accessFor about
+	// patterns before it can be listed.
+	"POST /api/v1/bookings": {idempotent: true},
+
 	// The eight that will require Idempotency-Key (04-api-spec.md §2.1). Each
 	// arrives with the item that adds it, and adding the route without the
 	// flag is the mistake this list exists to make visible:
 	//
-	//   S1-026  POST /bookings              POST /public/bookings
+	//   S1-051  POST /public/bookings       (POST /bookings is listed above)
 	//   S1-035  POST /bookings/{id}/pickup
 	//   S1-036  POST /bookings/{id}/return
 	//   S1-041  POST /invoices/{id}/lines

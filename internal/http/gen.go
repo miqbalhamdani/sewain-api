@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -15,6 +16,57 @@ import (
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for BookingSource.
+const (
+	PublicPage BookingSource = "public_page"
+	Staff      BookingSource = "staff"
+)
+
+// Valid indicates whether the value is a known member of the BookingSource enum.
+func (e BookingSource) Valid() bool {
+	switch e {
+	case PublicPage:
+		return true
+	case Staff:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookingStatus.
+const (
+	BookingStatusCancelled BookingStatus = "cancelled"
+	BookingStatusCompleted BookingStatus = "completed"
+	BookingStatusDraft     BookingStatus = "draft"
+	BookingStatusNoShow    BookingStatus = "no_show"
+	BookingStatusPickedUp  BookingStatus = "picked_up"
+	BookingStatusReserved  BookingStatus = "reserved"
+	BookingStatusReturned  BookingStatus = "returned"
+)
+
+// Valid indicates whether the value is a known member of the BookingStatus enum.
+func (e BookingStatus) Valid() bool {
+	switch e {
+	case BookingStatusCancelled:
+		return true
+	case BookingStatusCompleted:
+		return true
+	case BookingStatusDraft:
+		return true
+	case BookingStatusNoShow:
+		return true
+	case BookingStatusPickedUp:
+		return true
+	case BookingStatusReserved:
+		return true
+	case BookingStatusReturned:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for BusinessType.
 const (
@@ -46,8 +98,68 @@ func (e BusinessType) Valid() bool {
 	}
 }
 
+// Defines values for CalendarState.
+const (
+	CalendarStateAvailable      CalendarState = "available"
+	CalendarStateBuffer         CalendarState = "buffer"
+	CalendarStateMaintenance    CalendarState = "maintenance"
+	CalendarStateOverdue        CalendarState = "overdue"
+	CalendarStatePickedUp       CalendarState = "picked_up"
+	CalendarStateReservedPaid   CalendarState = "reserved_paid"
+	CalendarStateReservedUnpaid CalendarState = "reserved_unpaid"
+	CalendarStateRetired        CalendarState = "retired"
+)
+
+// Valid indicates whether the value is a known member of the CalendarState enum.
+func (e CalendarState) Valid() bool {
+	switch e {
+	case CalendarStateAvailable:
+		return true
+	case CalendarStateBuffer:
+		return true
+	case CalendarStateMaintenance:
+		return true
+	case CalendarStateOverdue:
+		return true
+	case CalendarStatePickedUp:
+		return true
+	case CalendarStateReservedPaid:
+		return true
+	case CalendarStateReservedUnpaid:
+		return true
+	case CalendarStateRetired:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CancelledReason.
+const (
+	CancelledReasonExpired        CancelledReason = "expired"
+	CancelledReasonManual         CancelledReason = "manual"
+	CancelledReasonPaymentExpired CancelledReason = "payment_expired"
+)
+
+// Valid indicates whether the value is a known member of the CancelledReason enum.
+func (e CancelledReason) Valid() bool {
+	switch e {
+	case CancelledReasonExpired:
+		return true
+	case CancelledReasonManual:
+		return true
+	case CancelledReasonPaymentExpired:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorCode.
 const (
+	ErrorCodeBookingConflict          ErrorCode = "booking-conflict"
+	ErrorCodeCustomerBlacklisted      ErrorCode = "customer-blacklisted"
+	ErrorCodeDurationOutOfRange       ErrorCode = "duration-out-of-range"
 	ErrorCodeEmailNotVerified         ErrorCode = "email-not-verified"
 	ErrorCodeEmailTaken               ErrorCode = "email-taken"
 	ErrorCodeInternal                 ErrorCode = "internal"
@@ -58,6 +170,7 @@ const (
 	ErrorCodeSlugInvalid              ErrorCode = "slug-invalid"
 	ErrorCodeSlugTaken                ErrorCode = "slug-taken"
 	ErrorCodeUnauthenticated          ErrorCode = "unauthenticated"
+	ErrorCodeUnitNotSwappable         ErrorCode = "unit-not-swappable"
 	ErrorCodeValidationFailed         ErrorCode = "validation-failed"
 	ErrorCodeVerificationTokenInvalid ErrorCode = "verification-token-invalid"
 )
@@ -65,6 +178,12 @@ const (
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeBookingConflict:
+		return true
+	case ErrorCodeCustomerBlacklisted:
+		return true
+	case ErrorCodeDurationOutOfRange:
+		return true
 	case ErrorCodeEmailNotVerified:
 		return true
 	case ErrorCodeEmailTaken:
@@ -84,6 +203,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeSlugTaken:
 		return true
 	case ErrorCodeUnauthenticated:
+		return true
+	case ErrorCodeUnitNotSwappable:
 		return true
 	case ErrorCodeValidationFailed:
 		return true
@@ -112,6 +233,27 @@ func (e Fuel) Valid() bool {
 	case Gasoline:
 		return true
 	case Hybrid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IdType.
+const (
+	Ktp      IdType = "ktp"
+	Passport IdType = "passport"
+	Sim      IdType = "sim"
+)
+
+// Valid indicates whether the value is a known member of the IdType enum.
+func (e IdType) Valid() bool {
+	switch e {
+	case Ktp:
+		return true
+	case Passport:
+		return true
+	case Sim:
 		return true
 	default:
 		return false
@@ -198,19 +340,19 @@ func (e SessionUserRole) Valid() bool {
 
 // Defines values for Transmission.
 const (
-	Automatic Transmission = "automatic"
-	Clutch    Transmission = "clutch"
-	Manual    Transmission = "manual"
+	TransmissionAutomatic Transmission = "automatic"
+	TransmissionClutch    Transmission = "clutch"
+	TransmissionManual    Transmission = "manual"
 )
 
 // Valid indicates whether the value is a known member of the Transmission enum.
 func (e Transmission) Valid() bool {
 	switch e {
-	case Automatic:
+	case TransmissionAutomatic:
 		return true
-	case Clutch:
+	case TransmissionClutch:
 		return true
-	case Manual:
+	case TransmissionManual:
 		return true
 	default:
 		return false
@@ -340,6 +482,129 @@ type AffectedBooking struct {
 	Status  string    `json:"status"`
 }
 
+// AvailabilityResult `duration_qty` = `ceil(durasi / satuan)`, dengan `month` = 30 hari tetap —
+// bulan kalender membuat Februari lebih murah per hari dari Maret, dan dua
+// penyewa dengan durasi sama membayar beda. `subtotal` = `duration_qty ×
+// base_price` saat ini; harga yang mengikat baru di-snapshot saat booking dibuat.
+type AvailabilityResult struct {
+	AvailableUnits []UnitRef `json:"available_units"`
+	DurationQty    int       `json:"duration_qty"`
+	Resource       struct {
+		BasePrice     int64              `json:"base_price"`
+		BufferMinutes int                `json:"buffer_minutes"`
+		DepositAmount *int64             `json:"deposit_amount"`
+		Id            openapi_types.UUID `json:"id"`
+		Name          string             `json:"name"`
+
+		// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+		// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+		// `ResourceCreate` maupun `ResourceUpdate`.
+		//
+		// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+		// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+		// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+		//
+		// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+		// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+		// melihat field satuan harga di layar mana pun.
+		PricingUnit PricingUnit `json:"pricing_unit"`
+	} `json:"resource"`
+	Subtotal int64 `json:"subtotal"`
+}
+
+// BlacklistRequest defines model for BlacklistRequest.
+type BlacklistRequest struct {
+	Reason string `json:"reason"`
+}
+
+// Booking Snapshot harga milik booking ini, bukan resource-nya — mengubah harga resource
+// tidak pernah menyentuhnya (BR-014). `overdue` dihitung saat dibaca, tidak
+// tersimpan (BR-041).
+type Booking struct {
+	BufferMinutes   int              `json:"buffer_minutes"`
+	CancelledReason *CancelledReason `json:"cancelled_reason"`
+
+	// Code Examples: SWN-0042
+	Code          string          `json:"code"`
+	CreatedAt     time.Time       `json:"created_at"`
+	Customer      BookingCustomer `json:"customer"`
+	DepositAmount *int64          `json:"deposit_amount"`
+	DurationQty   int             `json:"duration_qty"`
+	EndAt         time.Time       `json:"end_at"`
+
+	// EndAtWithBuffer Diisi trigger database, bukan aplikasi (BR-015, BR-022).
+	EndAtWithBuffer time.Time          `json:"end_at_with_buffer"`
+	ExpiresAt       *time.Time         `json:"expires_at"`
+	Id              openapi_types.UUID `json:"id"`
+	LateFeePerUnit  *int64             `json:"late_fee_per_unit"`
+
+	// Overdue `picked_up` dan `end_at < now()` (BR-041).
+	Overdue bool `json:"overdue"`
+
+	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+	// `ResourceCreate` maupun `ResourceUpdate`.
+	//
+	// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+	// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+	// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+	//
+	// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+	// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+	// melihat field satuan harga di layar mana pun.
+	PricingUnit PricingUnit     `json:"pricing_unit"`
+	Resource    BookingResource `json:"resource"`
+	Source      BookingSource   `json:"source"`
+	StartAt     time.Time       `json:"start_at"`
+
+	// Status Tujuh status tersimpan. `overdue` **bukan** salah satunya — ia kondisi turunan
+	// (BR-041).
+	Status    BookingStatus `json:"status"`
+	Subtotal  int64         `json:"subtotal"`
+	Unit      UnitRef       `json:"unit"`
+	UnitPrice int64         `json:"unit_price"`
+}
+
+// BookingSource defines model for Booking.Source.
+type BookingSource string
+
+// BookingCreate defines model for BookingCreate.
+type BookingCreate struct {
+	CustomerId     openapi_types.UUID `json:"customer_id"`
+	EndAt          time.Time          `json:"end_at"`
+	ResourceUnitId openapi_types.UUID `json:"resource_unit_id"`
+	StartAt        time.Time          `json:"start_at"`
+}
+
+// BookingCustomer defines model for BookingCustomer.
+type BookingCustomer struct {
+	Id            openapi_types.UUID `json:"id"`
+	IsBlacklisted bool               `json:"is_blacklisted"`
+	Name          string             `json:"name"`
+	Phone         string             `json:"phone"`
+}
+
+// BookingPage defines model for BookingPage.
+type BookingPage struct {
+	Data       []Booking `json:"data"`
+	NextCursor *string   `json:"next_cursor"`
+}
+
+// BookingResource defines model for BookingResource.
+type BookingResource struct {
+	Id   openapi_types.UUID `json:"id"`
+	Name string             `json:"name"`
+}
+
+// BookingStatus Tujuh status tersimpan. `overdue` **bukan** salah satunya — ia kondisi turunan
+// (BR-041).
+type BookingStatus string
+
+// BookingUpdate defines model for BookingUpdate.
+type BookingUpdate struct {
+	ResourceUnitId openapi_types.UUID `json:"resource_unit_id"`
+}
+
 // BusinessType Preset pasar, dipilih sekali saat mendaftar. **Ia yang menentukan `pricing_unit`
 // seluruh resource pemilik itu** — juragan tidak pernah mengisi satuan harga di tiap
 // barang (BR-012, BR-017).
@@ -355,6 +620,82 @@ type AffectedBooking struct {
 // Examples: vehicle_rental
 type BusinessType string
 
+// CalendarRow defines model for CalendarRow.
+type CalendarRow struct {
+	ResourceId openapi_types.UUID `json:"resource_id"`
+	Segments   []CalendarSegment  `json:"segments"`
+	Unit       UnitRef            `json:"unit"`
+}
+
+// CalendarSegment defines model for CalendarSegment.
+type CalendarSegment struct {
+	Booking *struct {
+		Code         string             `json:"code"`
+		CustomerName string             `json:"customer_name"`
+		Id           openapi_types.UUID `json:"id"`
+	} `json:"booking,omitempty"`
+	From time.Time `json:"from"`
+
+	// State Delapan keadaan BR-033. `retired` ada di enum demi kelengkapan kosakata tapi
+	// tidak pernah terbit — unit `retired` tidak punya lajur.
+	State CalendarState `json:"state"`
+	To    time.Time     `json:"to"`
+}
+
+// CalendarState Delapan keadaan BR-033. `retired` ada di enum demi kelengkapan kosakata tapi
+// tidak pernah terbit — unit `retired` tidak punya lajur.
+type CalendarState string
+
+// CancelledReason `manual` dari `POST /bookings/{id}/cancel`; `expired` dan `payment_expired`
+// dari job `S1-052`.
+type CancelledReason string
+
+// Customer Penyewa. **Nomor identitas tidak pernah dibalas** — ia tersimpan terenkripsi
+// aplikasi dan hanya empat digit terakhirnya yang keluar, supaya operator bisa
+// mencocokkan KTP di tangan tanpa server pernah mengirim nomornya utuh (BR-085).
+//
+// `blacklist_reason` terbaca semua peran di backoffice — BR-028 justru mewajibkan
+// operator melihatnya. Ia tidak pernah keluar ke permukaan publik.
+type Customer struct {
+	BlacklistReason *string            `json:"blacklist_reason"`
+	CreatedAt       time.Time          `json:"created_at"`
+	Id              openapi_types.UUID `json:"id"`
+
+	// IdNumberLast4 Examples: 7890
+	IdNumberLast4 *string `json:"id_number_last4"`
+	IdType        *IdType `json:"id_type"`
+	IsBlacklisted bool    `json:"is_blacklisted"`
+
+	// Name Examples: Budi Santoso
+	Name string `json:"name"`
+
+	// Phone Examples: +6281234567890
+	Phone string `json:"phone"`
+}
+
+// CustomerCreate `id_number` dan `id_type` berpasangan: nomor tanpa jenisnya → `422`.
+type CustomerCreate struct {
+	IdNumber *string `json:"id_number,omitempty"`
+	IdType   *IdType `json:"id_type,omitempty"`
+	Name     string  `json:"name"`
+	Phone    string  `json:"phone"`
+}
+
+// CustomerPage defines model for CustomerPage.
+type CustomerPage struct {
+	Data       []Customer `json:"data"`
+	NextCursor *string    `json:"next_cursor"`
+}
+
+// CustomerUpdate Semua field opsional. Status blokir tidak ada di sini — lihat
+// `/customers/{id}/blacklist` (BR-028).
+type CustomerUpdate struct {
+	IdNumber *string `json:"id_number,omitempty"`
+	IdType   *IdType `json:"id_type,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	Phone    *string `json:"phone,omitempty"`
+}
+
 // ErrorCode Kode error generik yang dipakai setiap endpoint sebelum sampai ke aturan bisnisnya.
 // Kode spesifik per aturan bisnis ada di `04-api-spec.md` §2 dan ditambahkan oleh item
 // backlog yang memilikinya.
@@ -365,6 +706,9 @@ type ErrorCode string
 
 // Fuel `diesel` **hanya ada di mobil**, ditegakkan database (BR-094).
 type Fuel string
+
+// IdType defines model for IdType.
+type IdType string
 
 // InviteUserRequest defines model for InviteUserRequest.
 type InviteUserRequest struct {
@@ -415,6 +759,10 @@ type PricingUnit string
 // menunjuk ke span-nya. Tidak ada field `code` terpisah: kodenya adalah segmen terakhir
 // `type` (BR-092).
 type Problem struct {
+	// Conflicts Hanya pada `booking-conflict`: booking yang mengunci unit itu pada rentang
+	// yang diminta, supaya layar bisa menunjuknya alih-alih bilang "gagal" (BR-022).
+	Conflicts *[]AffectedBooking `json:"conflicts,omitempty"`
+
 	// Detail Examples: Aksi ini butuh izin bookings:write.
 	Detail *string         `json:"detail,omitempty"`
 	Errors *[]ProblemError `json:"errors,omitempty"`
@@ -681,9 +1029,8 @@ type ResourceUpdated struct {
 	// Ia ada supaya pemilik yang menaikkan harga tahu persis berapa banyak
 	// yang tidak ikut naik, tanpa menebak.
 	//
-	// **Selalu `0` sampai `S1-022` membuat tabel `bookings`.** Bentuk
-	// responsnya mendarat sekarang supaya layarnya ditulis sekali; yang
-	// menyusul cuma isi query-nya.
+	// Dihitung: booking `draft`, `reserved`, atau `picked_up` untuk jenis
+	// barang ini.
 	ActiveBookings int `json:"active_bookings"`
 
 	// BasePrice Rupiah penuh, bukan minor unit: `350000` berarti Rp 350.000.
@@ -999,6 +1346,13 @@ type UnitCreate struct {
 	Vehicle        *VehicleUnitDetailInput `json:"vehicle,omitempty"`
 }
 
+// UnitRef defines model for UnitRef.
+type UnitRef struct {
+	Code  string             `json:"code"`
+	Id    openapi_types.UUID `json:"id"`
+	Label *string            `json:"label"`
+}
+
 // UnitStatus Hanya `active` yang muncul di pencarian ketersediaan (BR-013). `maintenance`
 // tetap punya lajur di kalender; `retired` tidak punya lajur sama sekali.
 //
@@ -1074,7 +1428,7 @@ type UnitWarning struct {
 	// AffectedBookings Booking yang sudah ada untuk unit ini dan **tidak** dibatalkan maupun
 	// dihapus. Pemilik yang memutuskan apa yang terjadi pada masing-masing.
 	//
-	// **Selalu kosong sampai `S1-022` membuat tabel `bookings`.**
+	// Yang dihitung: `draft`, `reserved`, `picked_up` yang belum berakhir.
 	AffectedBookings []AffectedBooking `json:"affected_bookings"`
 }
 
@@ -1286,6 +1640,58 @@ type VerifyEmailJSONBody struct {
 	Token string `json:"token"`
 }
 
+// GetAvailabilityParams defines parameters for GetAvailability.
+type GetAvailabilityParams struct {
+	StartAt    time.Time           `form:"start_at" json:"start_at"`
+	EndAt      time.Time           `form:"end_at" json:"end_at"`
+	ResourceId *openapi_types.UUID `form:"resource_id,omitempty" json:"resource_id,omitempty"`
+}
+
+// ListBookingsParams defines parameters for ListBookings.
+type ListBookingsParams struct {
+	Status     *BookingStatus      `form:"status,omitempty" json:"status,omitempty"`
+	From       *time.Time          `form:"from,omitempty" json:"from,omitempty"`
+	To         *time.Time          `form:"to,omitempty" json:"to,omitempty"`
+	UnitId     *openapi_types.UUID `form:"unit_id,omitempty" json:"unit_id,omitempty"`
+	CustomerId *openapi_types.UUID `form:"customer_id,omitempty" json:"customer_id,omitempty"`
+	Overdue    *bool               `form:"overdue,omitempty" json:"overdue,omitempty"`
+
+	// Limit Ukuran halaman. Berpasangan dengan `cursor`; tidak ada `offset` di API ini.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Cursor buram dari halaman sebelumnya. Hanya paginasi cursor — `offset` yang dalam di
+	// tabel besar adalah sequential scan, jadi parameternya tidak ada.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// CreateBookingParams defines parameters for CreateBooking.
+type CreateBookingParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetCalendarParams defines parameters for GetCalendar.
+type GetCalendarParams struct {
+	From time.Time `form:"from" json:"from"`
+	To   time.Time `form:"to" json:"to"`
+}
+
+// ListCustomersParams defines parameters for ListCustomers.
+type ListCustomersParams struct {
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Ukuran halaman. Berpasangan dengan `cursor`; tidak ada `offset` di API ini.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Cursor buram dari halaman sebelumnya. Hanya paginasi cursor — `offset` yang dalam di
+	// tabel besar adalah sequential scan, jadi parameternya tidak ada.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
 type AcceptInvitationJSONRequestBody AcceptInvitationJSONBody
 
@@ -1297,6 +1703,21 @@ type RegisterJSONRequestBody = RegisterRequest
 
 // VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
 type VerifyEmailJSONRequestBody VerifyEmailJSONBody
+
+// CreateBookingJSONRequestBody defines body for CreateBooking for application/json ContentType.
+type CreateBookingJSONRequestBody = BookingCreate
+
+// UpdateBookingJSONRequestBody defines body for UpdateBooking for application/json ContentType.
+type UpdateBookingJSONRequestBody = BookingUpdate
+
+// CreateCustomerJSONRequestBody defines body for CreateCustomer for application/json ContentType.
+type CreateCustomerJSONRequestBody = CustomerCreate
+
+// UpdateCustomerJSONRequestBody defines body for UpdateCustomer for application/json ContentType.
+type UpdateCustomerJSONRequestBody = CustomerUpdate
+
+// BlacklistCustomerJSONRequestBody defines body for BlacklistCustomer for application/json ContentType.
+type BlacklistCustomerJSONRequestBody = BlacklistRequest
 
 // CreateResourceJSONRequestBody defines body for CreateResource for application/json ContentType.
 type CreateResourceJSONRequestBody = ResourceCreate
@@ -1423,6 +1844,48 @@ type ServerInterface interface {
 	// ResendVerification Kirim ulang surel verifikasi
 	// (POST /auth/verify-email/resend)
 	ResendVerification(w http.ResponseWriter, r *http.Request)
+	// GetAvailability Unit yang tersedia pada satu rentang
+	// (GET /availability)
+	GetAvailability(w http.ResponseWriter, r *http.Request, params GetAvailabilityParams)
+	// ListBookings Booking di usaha ini
+	// (GET /bookings)
+	ListBookings(w http.ResponseWriter, r *http.Request, params ListBookingsParams)
+	// CreateBooking Buat booking dari backoffice
+	// (POST /bookings)
+	CreateBooking(w http.ResponseWriter, r *http.Request, params CreateBookingParams)
+	// GetBooking Satu booking
+	// (GET /bookings/{id})
+	GetBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UpdateBooking Tukar unit booking
+	// (PATCH /bookings/{id})
+	UpdateBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// CancelBooking Batalkan booking
+	// (POST /bookings/{id}/cancel)
+	CancelBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// ConfirmBooking Konfirmasi draft jadi reserved
+	// (POST /bookings/{id}/confirm)
+	ConfirmBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// GetCalendar Lajur per unit untuk layar kalender
+	// (GET /calendar)
+	GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams)
+	// ListCustomers Penyewa di usaha ini
+	// (GET /customers)
+	ListCustomers(w http.ResponseWriter, r *http.Request, params ListCustomersParams)
+	// CreateCustomer Catat penyewa baru
+	// (POST /customers)
+	CreateCustomer(w http.ResponseWriter, r *http.Request)
+	// GetCustomer Satu penyewa
+	// (GET /customers/{id})
+	GetCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UpdateCustomer Ubah data penyewa
+	// (PATCH /customers/{id})
+	UpdateCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UnblacklistCustomer Buka blokir penyewa
+	// (DELETE /customers/{id}/blacklist)
+	UnblacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// BlacklistCustomer Blokir penyewa
+	// (POST /customers/{id}/blacklist)
+	BlacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -1516,6 +1979,90 @@ func (_ Unimplemented) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 // ResendVerification Kirim ulang surel verifikasi
 // (POST /auth/verify-email/resend)
 func (_ Unimplemented) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAvailability Unit yang tersedia pada satu rentang
+// (GET /availability)
+func (_ Unimplemented) GetAvailability(w http.ResponseWriter, r *http.Request, params GetAvailabilityParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListBookings Booking di usaha ini
+// (GET /bookings)
+func (_ Unimplemented) ListBookings(w http.ResponseWriter, r *http.Request, params ListBookingsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateBooking Buat booking dari backoffice
+// (POST /bookings)
+func (_ Unimplemented) CreateBooking(w http.ResponseWriter, r *http.Request, params CreateBookingParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetBooking Satu booking
+// (GET /bookings/{id})
+func (_ Unimplemented) GetBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateBooking Tukar unit booking
+// (PATCH /bookings/{id})
+func (_ Unimplemented) UpdateBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CancelBooking Batalkan booking
+// (POST /bookings/{id}/cancel)
+func (_ Unimplemented) CancelBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ConfirmBooking Konfirmasi draft jadi reserved
+// (POST /bookings/{id}/confirm)
+func (_ Unimplemented) ConfirmBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetCalendar Lajur per unit untuk layar kalender
+// (GET /calendar)
+func (_ Unimplemented) GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListCustomers Penyewa di usaha ini
+// (GET /customers)
+func (_ Unimplemented) ListCustomers(w http.ResponseWriter, r *http.Request, params ListCustomersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateCustomer Catat penyewa baru
+// (POST /customers)
+func (_ Unimplemented) CreateCustomer(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetCustomer Satu penyewa
+// (GET /customers/{id})
+func (_ Unimplemented) GetCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateCustomer Ubah data penyewa
+// (PATCH /customers/{id})
+func (_ Unimplemented) UpdateCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UnblacklistCustomer Buka blokir penyewa
+// (DELETE /customers/{id}/blacklist)
+func (_ Unimplemented) UnblacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// BlacklistCustomer Blokir penyewa
+// (POST /customers/{id}/blacklist)
+func (_ Unimplemented) BlacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1713,6 +2260,561 @@ func (siw *ServerInterfaceWrapper) ResendVerification(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ResendVerification(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAvailability operation middleware
+func (siw *ServerInterfaceWrapper) GetAvailability(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAvailabilityParams
+
+	// ------------- Required query parameter "start_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "start_at", r.URL.Query(), &params.StartAt, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start_at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "end_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "end_at", r.URL.Query(), &params.EndAt, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end_at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resource_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource_id", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAvailability(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBookings operation middleware
+func (siw *ServerInterfaceWrapper) ListBookings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBookingsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "unit_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "unit_id", r.URL.Query(), &params.UnitId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "unit_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "unit_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "customer_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "customer_id", r.URL.Query(), &params.CustomerId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "customer_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customer_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "overdue" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "overdue", r.URL.Query(), &params.Overdue, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "overdue"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "overdue", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBookings(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBooking operation middleware
+func (siw *ServerInterfaceWrapper) CreateBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateBookingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBooking(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBooking operation middleware
+func (siw *ServerInterfaceWrapper) GetBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBooking(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBooking operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBooking(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelBooking operation middleware
+func (siw *ServerInterfaceWrapper) CancelBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelBooking(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmBooking operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmBooking(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCalendar operation middleware
+func (siw *ServerInterfaceWrapper) GetCalendar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCalendarParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCalendar(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCustomers operation middleware
+func (siw *ServerInterfaceWrapper) ListCustomers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCustomersParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCustomers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCustomer operation middleware
+func (siw *ServerInterfaceWrapper) CreateCustomer(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCustomer(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCustomer operation middleware
+func (siw *ServerInterfaceWrapper) GetCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCustomer(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCustomer operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCustomer(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnblacklistCustomer operation middleware
+func (siw *ServerInterfaceWrapper) UnblacklistCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnblacklistCustomer(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BlacklistCustomer operation middleware
+func (siw *ServerInterfaceWrapper) BlacklistCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BlacklistCustomer(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2236,6 +3338,48 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/units/{id}", wrapper.UpdateUnit)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/customers", wrapper.ListCustomers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/customers", wrapper.CreateCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/customers/{id}", wrapper.GetCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/customers/{id}", wrapper.UpdateCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/customers/{id}/blacklist", wrapper.UnblacklistCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/customers/{id}/blacklist", wrapper.BlacklistCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/availability", wrapper.GetAvailability)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/calendar", wrapper.GetCalendar)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/bookings", wrapper.ListBookings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings", wrapper.CreateBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/bookings/{id}", wrapper.GetBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/bookings/{id}", wrapper.UpdateBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings/{id}/confirm", wrapper.ConfirmBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings/{id}/cancel", wrapper.CancelBooking)
+	})
 
 	return r
 }
@@ -2643,6 +3787,1138 @@ func (response ResendVerification429ApplicationProblemPlusJSONResponse) VisitRes
 		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
 	}
 	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAvailabilityRequestObject struct {
+	Params GetAvailabilityParams
+}
+
+type GetAvailabilityResponseObject interface {
+	VisitGetAvailabilityResponse(w http.ResponseWriter) error
+}
+
+type GetAvailability200JSONResponse struct {
+	Data []AvailabilityResult `json:"data"`
+}
+
+func (response GetAvailability200JSONResponse) VisitGetAvailabilityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAvailability401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAvailability401ApplicationProblemPlusJSONResponse) VisitGetAvailabilityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAvailability403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAvailability403ApplicationProblemPlusJSONResponse) VisitGetAvailabilityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAvailability422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response GetAvailability422ApplicationProblemPlusJSONResponse) VisitGetAvailabilityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListBookingsRequestObject struct {
+	Params ListBookingsParams
+}
+
+type ListBookingsResponseObject interface {
+	VisitListBookingsResponse(w http.ResponseWriter) error
+}
+
+type ListBookings200JSONResponse BookingPage
+
+func (response ListBookings200JSONResponse) VisitListBookingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListBookings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListBookings401ApplicationProblemPlusJSONResponse) VisitListBookingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListBookings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListBookings403ApplicationProblemPlusJSONResponse) VisitListBookingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListBookings422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ListBookings422ApplicationProblemPlusJSONResponse) VisitListBookingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBookingRequestObject struct {
+	Params CreateBookingParams
+	Body   *CreateBookingJSONRequestBody
+}
+
+type CreateBookingResponseObject interface {
+	VisitCreateBookingResponse(w http.ResponseWriter) error
+}
+
+type CreateBooking201JSONResponse Booking
+
+func (response CreateBooking201JSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateBooking401ApplicationProblemPlusJSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateBooking403ApplicationProblemPlusJSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateBooking404ApplicationProblemPlusJSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateBooking409ApplicationProblemPlusJSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateBooking422ApplicationProblemPlusJSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBookingRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetBookingResponseObject interface {
+	VisitGetBookingResponse(w http.ResponseWriter) error
+}
+
+type GetBooking200JSONResponse Booking
+
+func (response GetBooking200JSONResponse) VisitGetBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetBooking401ApplicationProblemPlusJSONResponse) VisitGetBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetBooking403ApplicationProblemPlusJSONResponse) VisitGetBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetBooking404ApplicationProblemPlusJSONResponse) VisitGetBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBookingRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateBookingJSONRequestBody
+}
+
+type UpdateBookingResponseObject interface {
+	VisitUpdateBookingResponse(w http.ResponseWriter) error
+}
+
+type UpdateBooking200JSONResponse Booking
+
+func (response UpdateBooking200JSONResponse) VisitUpdateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBooking401ApplicationProblemPlusJSONResponse) VisitUpdateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBooking403ApplicationProblemPlusJSONResponse) VisitUpdateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBooking404ApplicationProblemPlusJSONResponse) VisitUpdateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBooking409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBooking409ApplicationProblemPlusJSONResponse) VisitUpdateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBooking422ApplicationProblemPlusJSONResponse) VisitUpdateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelBookingRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type CancelBookingResponseObject interface {
+	VisitCancelBookingResponse(w http.ResponseWriter) error
+}
+
+type CancelBooking200JSONResponse Booking
+
+func (response CancelBooking200JSONResponse) VisitCancelBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CancelBooking401ApplicationProblemPlusJSONResponse) VisitCancelBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CancelBooking403ApplicationProblemPlusJSONResponse) VisitCancelBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CancelBooking404ApplicationProblemPlusJSONResponse) VisitCancelBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CancelBooking422ApplicationProblemPlusJSONResponse) VisitCancelBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmBookingRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ConfirmBookingResponseObject interface {
+	VisitConfirmBookingResponse(w http.ResponseWriter) error
+}
+
+type ConfirmBooking200JSONResponse Booking
+
+func (response ConfirmBooking200JSONResponse) VisitConfirmBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ConfirmBooking401ApplicationProblemPlusJSONResponse) VisitConfirmBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ConfirmBooking403ApplicationProblemPlusJSONResponse) VisitConfirmBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ConfirmBooking404ApplicationProblemPlusJSONResponse) VisitConfirmBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmBooking409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ConfirmBooking409ApplicationProblemPlusJSONResponse) VisitConfirmBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ConfirmBooking422ApplicationProblemPlusJSONResponse) VisitConfirmBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarRequestObject struct {
+	Params GetCalendarParams
+}
+
+type GetCalendarResponseObject interface {
+	VisitGetCalendarResponse(w http.ResponseWriter) error
+}
+
+type GetCalendar200JSONResponse struct {
+	Data []CalendarRow `json:"data"`
+}
+
+func (response GetCalendar200JSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendar401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetCalendar401ApplicationProblemPlusJSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendar403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetCalendar403ApplicationProblemPlusJSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendar422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response GetCalendar422ApplicationProblemPlusJSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomersRequestObject struct {
+	Params ListCustomersParams
+}
+
+type ListCustomersResponseObject interface {
+	VisitListCustomersResponse(w http.ResponseWriter) error
+}
+
+type ListCustomers200JSONResponse CustomerPage
+
+func (response ListCustomers200JSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomers401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCustomers401ApplicationProblemPlusJSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCustomers403ApplicationProblemPlusJSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomers422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ListCustomers422ApplicationProblemPlusJSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCustomerRequestObject struct {
+	Body *CreateCustomerJSONRequestBody
+}
+
+type CreateCustomerResponseObject interface {
+	VisitCreateCustomerResponse(w http.ResponseWriter) error
+}
+
+type CreateCustomer201JSONResponse Customer
+
+func (response CreateCustomer201JSONResponse) VisitCreateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCustomer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCustomer401ApplicationProblemPlusJSONResponse) VisitCreateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCustomer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCustomer403ApplicationProblemPlusJSONResponse) VisitCreateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCustomer422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCustomer422ApplicationProblemPlusJSONResponse) VisitCreateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomerRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetCustomerResponseObject interface {
+	VisitGetCustomerResponse(w http.ResponseWriter) error
+}
+
+type GetCustomer200JSONResponse Customer
+
+func (response GetCustomer200JSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetCustomer401ApplicationProblemPlusJSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetCustomer403ApplicationProblemPlusJSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetCustomer404ApplicationProblemPlusJSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomerRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateCustomerJSONRequestBody
+}
+
+type UpdateCustomerResponseObject interface {
+	VisitUpdateCustomerResponse(w http.ResponseWriter) error
+}
+
+type UpdateCustomer200JSONResponse Customer
+
+func (response UpdateCustomer200JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateCustomer401ApplicationProblemPlusJSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateCustomer403ApplicationProblemPlusJSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateCustomer404ApplicationProblemPlusJSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateCustomer422ApplicationProblemPlusJSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnblacklistCustomerRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type UnblacklistCustomerResponseObject interface {
+	VisitUnblacklistCustomerResponse(w http.ResponseWriter) error
+}
+
+type UnblacklistCustomer200JSONResponse Customer
+
+func (response UnblacklistCustomer200JSONResponse) VisitUnblacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnblacklistCustomer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UnblacklistCustomer401ApplicationProblemPlusJSONResponse) VisitUnblacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnblacklistCustomer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UnblacklistCustomer403ApplicationProblemPlusJSONResponse) VisitUnblacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnblacklistCustomer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UnblacklistCustomer404ApplicationProblemPlusJSONResponse) VisitUnblacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BlacklistCustomerRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *BlacklistCustomerJSONRequestBody
+}
+
+type BlacklistCustomerResponseObject interface {
+	VisitBlacklistCustomerResponse(w http.ResponseWriter) error
+}
+
+type BlacklistCustomer200JSONResponse Customer
+
+func (response BlacklistCustomer200JSONResponse) VisitBlacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BlacklistCustomer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response BlacklistCustomer401ApplicationProblemPlusJSONResponse) VisitBlacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BlacklistCustomer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response BlacklistCustomer403ApplicationProblemPlusJSONResponse) VisitBlacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BlacklistCustomer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response BlacklistCustomer404ApplicationProblemPlusJSONResponse) VisitBlacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BlacklistCustomer422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response BlacklistCustomer422ApplicationProblemPlusJSONResponse) VisitBlacklistCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3756,6 +6032,48 @@ type StrictServerInterface interface {
 	// ResendVerification Kirim ulang surel verifikasi
 	// (POST /auth/verify-email/resend)
 	ResendVerification(ctx context.Context, request ResendVerificationRequestObject) (ResendVerificationResponseObject, error)
+	// GetAvailability Unit yang tersedia pada satu rentang
+	// (GET /availability)
+	GetAvailability(ctx context.Context, request GetAvailabilityRequestObject) (GetAvailabilityResponseObject, error)
+	// ListBookings Booking di usaha ini
+	// (GET /bookings)
+	ListBookings(ctx context.Context, request ListBookingsRequestObject) (ListBookingsResponseObject, error)
+	// CreateBooking Buat booking dari backoffice
+	// (POST /bookings)
+	CreateBooking(ctx context.Context, request CreateBookingRequestObject) (CreateBookingResponseObject, error)
+	// GetBooking Satu booking
+	// (GET /bookings/{id})
+	GetBooking(ctx context.Context, request GetBookingRequestObject) (GetBookingResponseObject, error)
+	// UpdateBooking Tukar unit booking
+	// (PATCH /bookings/{id})
+	UpdateBooking(ctx context.Context, request UpdateBookingRequestObject) (UpdateBookingResponseObject, error)
+	// CancelBooking Batalkan booking
+	// (POST /bookings/{id}/cancel)
+	CancelBooking(ctx context.Context, request CancelBookingRequestObject) (CancelBookingResponseObject, error)
+	// ConfirmBooking Konfirmasi draft jadi reserved
+	// (POST /bookings/{id}/confirm)
+	ConfirmBooking(ctx context.Context, request ConfirmBookingRequestObject) (ConfirmBookingResponseObject, error)
+	// GetCalendar Lajur per unit untuk layar kalender
+	// (GET /calendar)
+	GetCalendar(ctx context.Context, request GetCalendarRequestObject) (GetCalendarResponseObject, error)
+	// ListCustomers Penyewa di usaha ini
+	// (GET /customers)
+	ListCustomers(ctx context.Context, request ListCustomersRequestObject) (ListCustomersResponseObject, error)
+	// CreateCustomer Catat penyewa baru
+	// (POST /customers)
+	CreateCustomer(ctx context.Context, request CreateCustomerRequestObject) (CreateCustomerResponseObject, error)
+	// GetCustomer Satu penyewa
+	// (GET /customers/{id})
+	GetCustomer(ctx context.Context, request GetCustomerRequestObject) (GetCustomerResponseObject, error)
+	// UpdateCustomer Ubah data penyewa
+	// (PATCH /customers/{id})
+	UpdateCustomer(ctx context.Context, request UpdateCustomerRequestObject) (UpdateCustomerResponseObject, error)
+	// UnblacklistCustomer Buka blokir penyewa
+	// (DELETE /customers/{id}/blacklist)
+	UnblacklistCustomer(ctx context.Context, request UnblacklistCustomerRequestObject) (UnblacklistCustomerResponseObject, error)
+	// BlacklistCustomer Blokir penyewa
+	// (POST /customers/{id}/blacklist)
+	BlacklistCustomer(ctx context.Context, request BlacklistCustomerRequestObject) (BlacklistCustomerResponseObject, error)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -4034,6 +6352,403 @@ func (sh *strictHandler) ResendVerification(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ResendVerificationResponseObject); ok {
 		if err := validResponse.VisitResendVerificationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAvailability operation middleware
+func (sh *strictHandler) GetAvailability(w http.ResponseWriter, r *http.Request, params GetAvailabilityParams) {
+	var request GetAvailabilityRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAvailability(ctx, request.(GetAvailabilityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAvailability")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAvailabilityResponseObject); ok {
+		if err := validResponse.VisitGetAvailabilityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListBookings operation middleware
+func (sh *strictHandler) ListBookings(w http.ResponseWriter, r *http.Request, params ListBookingsParams) {
+	var request ListBookingsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListBookings(ctx, request.(ListBookingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListBookings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListBookingsResponseObject); ok {
+		if err := validResponse.VisitListBookingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateBooking operation middleware
+func (sh *strictHandler) CreateBooking(w http.ResponseWriter, r *http.Request, params CreateBookingParams) {
+	var request CreateBookingRequestObject
+
+	request.Params = params
+
+	var body CreateBookingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateBooking(ctx, request.(CreateBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateBookingResponseObject); ok {
+		if err := validResponse.VisitCreateBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetBooking operation middleware
+func (sh *strictHandler) GetBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetBookingRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBooking(ctx, request.(GetBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetBookingResponseObject); ok {
+		if err := validResponse.VisitGetBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateBooking operation middleware
+func (sh *strictHandler) UpdateBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateBookingRequestObject
+
+	request.Id = id
+
+	var body UpdateBookingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateBooking(ctx, request.(UpdateBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateBookingResponseObject); ok {
+		if err := validResponse.VisitUpdateBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelBooking operation middleware
+func (sh *strictHandler) CancelBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CancelBookingRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelBooking(ctx, request.(CancelBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelBookingResponseObject); ok {
+		if err := validResponse.VisitCancelBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConfirmBooking operation middleware
+func (sh *strictHandler) ConfirmBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ConfirmBookingRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmBooking(ctx, request.(ConfirmBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmBookingResponseObject); ok {
+		if err := validResponse.VisitConfirmBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCalendar operation middleware
+func (sh *strictHandler) GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams) {
+	var request GetCalendarRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCalendar(ctx, request.(GetCalendarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCalendar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCalendarResponseObject); ok {
+		if err := validResponse.VisitGetCalendarResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCustomers operation middleware
+func (sh *strictHandler) ListCustomers(w http.ResponseWriter, r *http.Request, params ListCustomersParams) {
+	var request ListCustomersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCustomers(ctx, request.(ListCustomersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCustomers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCustomersResponseObject); ok {
+		if err := validResponse.VisitListCustomersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCustomer operation middleware
+func (sh *strictHandler) CreateCustomer(w http.ResponseWriter, r *http.Request) {
+	var request CreateCustomerRequestObject
+
+	var body CreateCustomerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateCustomer(ctx, request.(CreateCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCustomerResponseObject); ok {
+		if err := validResponse.VisitCreateCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCustomer operation middleware
+func (sh *strictHandler) GetCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetCustomerRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCustomer(ctx, request.(GetCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCustomerResponseObject); ok {
+		if err := validResponse.VisitGetCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCustomer operation middleware
+func (sh *strictHandler) UpdateCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateCustomerRequestObject
+
+	request.Id = id
+
+	var body UpdateCustomerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCustomer(ctx, request.(UpdateCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCustomerResponseObject); ok {
+		if err := validResponse.VisitUpdateCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnblacklistCustomer operation middleware
+func (sh *strictHandler) UnblacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UnblacklistCustomerRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnblacklistCustomer(ctx, request.(UnblacklistCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnblacklistCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnblacklistCustomerResponseObject); ok {
+		if err := validResponse.VisitUnblacklistCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BlacklistCustomer operation middleware
+func (sh *strictHandler) BlacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request BlacklistCustomerRequestObject
+
+	request.Id = id
+
+	var body BlacklistCustomerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BlacklistCustomer(ctx, request.(BlacklistCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BlacklistCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BlacklistCustomerResponseObject); ok {
+		if err := validResponse.VisitBlacklistCustomerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

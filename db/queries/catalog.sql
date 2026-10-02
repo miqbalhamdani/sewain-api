@@ -204,3 +204,17 @@ UPDATE vehicle_unit_details SET
     registration_valid_until = $5,
     updated_at               = now()
  WHERE resource_unit_id = $1;
+
+-- name: CountActiveBookings :one
+-- Bookings still holding this resource's old prices (BR-014): anything that has
+-- not finished or been called off.
+SELECT count(*) FROM bookings
+ WHERE resource_id = $1 AND status IN ('draft', 'reserved', 'picked_up')
+   AND deleted_at IS NULL;
+
+-- name: ListAffectedBookings :many
+-- What a unit going out of service does NOT cancel (BR-013).
+SELECT code, start_at, end_at, status FROM bookings
+ WHERE resource_unit_id = $1 AND status IN ('draft', 'reserved', 'picked_up')
+   AND end_at > now() AND deleted_at IS NULL
+ ORDER BY start_at;

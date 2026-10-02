@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -35,7 +36,22 @@ const (
 	CodeEmailNotVerified         = "email-not-verified"         // BR-006, S1-084
 	CodeVerificationTokenInvalid = "verification-token-invalid" // BR-006, S1-084
 	CodeRequestInFlight          = "request-in-flight"          // BR-090, S1-012
+
+	CodeBookingConflict     = "booking-conflict"      // BR-022, S1-022
+	CodeDurationOutOfRange  = "duration-out-of-range" // BR-021, S1-026
+	CodeCustomerBlacklisted = "customer-blacklisted"  // BR-028, S1-026
+	CodeUnitNotSwappable    = "unit-not-swappable"    // BR-029, S1-027
 )
+
+// Conflict is one booking that holds a unit over the range somebody asked for.
+// It rides on booking-conflict so the screen can point at it rather than say
+// "failed" (04-api-spec.md section 2).
+type Conflict struct {
+	Code    string
+	StartAt time.Time
+	EndAt   time.Time
+	Status  string
+}
 
 // Field is one entry in a Problem's errors array: which field, and what about
 // it. Extra carries whatever the specific failure needs -- a version conflict
@@ -57,6 +73,9 @@ type Error struct {
 	Title  string
 	Detail string
 	Fields []Field
+
+	// Conflicts is set only on booking-conflict.
+	Conflicts []Conflict
 
 	// cause is logged, never sent. It is what makes a trace_id worth quoting:
 	// the id reaches a support ticket, this reaches the operator.
@@ -171,6 +190,44 @@ func RequestInFlight() *Error {
 		Title: "Request already in flight",
 		Detail: "An identical request is still being processed. Wait for it to finish; " +
 			"do not send it again with a new Idempotency-Key."}
+}
+
+// BookingConflict is the answer to a unit already held on that range (BR-022).
+//
+// 409, and the same answer whether the app's pre-check caught it or the
+// exclusion constraint did after losing a race -- two operators pressing save
+// in the same second get exactly one success and this, never a 500.
+func BookingConflict(conflicts []Conflict) *Error {
+	return &Error{Code: CodeBookingConflict, Status: http.StatusConflict,
+		Title:     "Unit already booked on that range",
+		Detail:    "That unit is already held by another booking over this time. Pick another unit or another time.",
+		Conflicts: conflicts}
+}
+
+// DurationOutOfRange names the bound that was crossed, in the resource's own
+// pricing unit (BR-021).
+func DurationOutOfRange(detail string) *Error {
+	return (&Error{Code: CodeDurationOutOfRange, Status: http.StatusUnprocessableEntity,
+		Title: "Duration out of range", Detail: detail}).
+		WithFields(Field{Name: "end_at"})
+}
+
+// CustomerBlacklisted refuses a new booking for a blocked renter (BR-028). The
+// reason is not in the detail: the backoffice reads it from the customer, and
+// the public page must never see it.
+func CustomerBlacklisted() *Error {
+	return (&Error{Code: CodeCustomerBlacklisted, Status: http.StatusUnprocessableEntity,
+		Title:  "Customer is blacklisted",
+		Detail: "This customer is blocked from new bookings."}).
+		WithFields(Field{Name: "customer_id"})
+}
+
+// UnitNotSwappable is a swap attempted after the unit has left, or on a booking
+// that no longer holds one (BR-029).
+func UnitNotSwappable(status string) *Error {
+	return &Error{Code: CodeUnitNotSwappable, Status: http.StatusConflict,
+		Title:  "Unit cannot be swapped",
+		Detail: "Only a reserved booking can change unit; this one is " + status + "."}
 }
 
 // Internal wraps anything the client has no business seeing.

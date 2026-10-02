@@ -167,8 +167,6 @@ func (s *Server) updateResource(w http.ResponseWriter, r *http.Request, id uuid.
 		return
 	}
 
-	// Always 0 until S1-022. The field is here now so the screen that reads it
-	// is written once -- see catalog.ActiveBookings.
 	active, err := s.catalog.ActiveBookings(r.Context(), id)
 	if err != nil {
 		writeError(w, r, err)

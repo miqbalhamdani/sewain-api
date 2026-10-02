@@ -33,7 +33,9 @@ import (
 	httpapi "github.com/miqbalhamdani/sewain-api/internal/http"
 
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
+	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
+	"github.com/miqbalhamdani/sewain-api/internal/customer"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
@@ -76,6 +78,10 @@ type seeded struct {
 	// Set by seedCatalogOwner; empty for the fixtures that do not need them.
 	resourceID string
 	unitID     string
+
+	// customerID and bookingID, set by seedBookingOwner (M2).
+	customerID string
+	bookingID  string
 }
 
 // isolationCase says how to exercise one route as owner A after owner B owns
@@ -339,8 +345,18 @@ var newServer = func(t *testing.T) http.Handler {
 	authSvc := auth.NewService(store, signer).
 		WithMail(redis, mail.Discard{}, "http://localhost:3000")
 
+	identityKey, err := config.IdentityKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	customers, err := customer.New(store, identityKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(store), catalog.New(store),
+			customers, booking.New(store),
 			ratelimit.New(redis), false), signer, redis)
 }
 

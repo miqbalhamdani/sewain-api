@@ -7,7 +7,9 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"os"
 )
 
@@ -46,6 +48,10 @@ const (
 	// so this one is obviously not a secret -- JWTSecret refuses it whenever
 	// the environment is not "development".
 	devJWTSecret = "insecure-development-only-signing-key-32b"
+
+	// Exactly 32 bytes, and as obviously not a secret. IdentityKey refuses it
+	// outside development.
+	devIdentityKey = "insecure-dev-identity-key-32byte"
 )
 
 // Getenv returns the value of key, or fallback when it is unset or empty.
@@ -87,6 +93,30 @@ func Environment() string { return Getenv("ENVIRONMENT", "development") }
 
 // IsDevelopment reports whether this is a developer's machine.
 func IsDevelopment() bool { return Environment() == "development" }
+
+// IdentityKey returns the 32-byte AES-256 key that encrypts identity numbers
+// (BR-085), from IDENTITY_ENC_KEY as standard base64.
+//
+// Same rule as JWTSecret: outside development a missing key is a startup
+// failure. The key lives outside the database on purpose -- a dump of the
+// customers table without it is ciphertext and four digits.
+func IdentityKey() ([]byte, error) {
+	v := os.Getenv("IDENTITY_ENC_KEY")
+	if v == "" {
+		if IsDevelopment() {
+			return []byte(devIdentityKey), nil
+		}
+		return nil, errors.New("IDENTITY_ENC_KEY is required when ENVIRONMENT is not \"development\"")
+	}
+	key, err := base64.StdEncoding.DecodeString(v)
+	if err != nil {
+		return nil, fmt.Errorf("IDENTITY_ENC_KEY is not base64: %w", err)
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("IDENTITY_ENC_KEY decodes to %d bytes; AES-256 needs 32", len(key))
+	}
+	return key, nil
+}
 
 // JWTSecret returns the access-token signing key.
 //
