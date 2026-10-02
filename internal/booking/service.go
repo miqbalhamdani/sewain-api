@@ -24,17 +24,21 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/db/sqlcgen"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
+	"github.com/miqbalhamdani/sewain-api/internal/storage"
 )
 
 type Service struct {
 	store   *db.Store
 	objects Objects
+	jobs    Enqueuer
+	scanner Scanner
 }
 
 // Objects is what handovers need from object storage (internal/storage),
 // declared here by the consumer.
 type Objects interface {
-	Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string) (string, error)
+	Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string,
+		allowed map[string]bool) (storage.Object, string, error)
 	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
 }
 
@@ -63,6 +67,11 @@ type Booking struct {
 	ExpiresAt       *time.Time
 	CreatedAt       time.Time
 	ActualReturnAt  *time.Time
+
+	DepositWaivedAt  *time.Time
+	DepositSettledAt *time.Time
+	DepositDeducted  int64
+	DepositRefunded  int64
 
 	CustomerID          uuid.UUID
 	CustomerName        string
@@ -446,8 +455,10 @@ func bookingOf(r sqlcgen.GetBookingRow) Booking {
 		DurationQty: r.DurationQty, Subtotal: r.Subtotal,
 		DepositAmount: r.DepositAmount, LateFeePerUnit: r.LateFeePerUnit,
 		CancelledReason: r.CancelledReason, ExpiresAt: r.ExpiresAt, CreatedAt: r.CreatedAt,
-		ActualReturnAt: r.ActualReturnAt,
-		CustomerID:     r.CustomerID, CustomerName: r.CustomerName, CustomerPhone: r.CustomerPhone,
+		ActualReturnAt:  r.ActualReturnAt,
+		DepositWaivedAt: r.DepositWaivedAt, DepositSettledAt: r.DepositSettledAt,
+		DepositDeducted: r.DepositDeducted, DepositRefunded: r.DepositRefunded,
+		CustomerID: r.CustomerID, CustomerName: r.CustomerName, CustomerPhone: r.CustomerPhone,
 		CustomerBlacklisted: r.CustomerBlacklisted,
 		ResourceID:          r.ResourceID, ResourceName: r.ResourceName,
 		UnitID: r.UnitID, UnitCode: r.UnitCode, UnitLabel: r.UnitLabel,

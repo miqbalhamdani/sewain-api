@@ -159,12 +159,17 @@ func (e CancelledReason) Valid() bool {
 const (
 	ErrorCodeBookingConflict             ErrorCode = "booking-conflict"
 	ErrorCodeCustomerBlacklisted         ErrorCode = "customer-blacklisted"
+	ErrorCodeDepositAlreadyPaid          ErrorCode = "deposit-already-paid"
+	ErrorCodeDepositNotApplicable        ErrorCode = "deposit-not-applicable"
+	ErrorCodeDepositNotCollected         ErrorCode = "deposit-not-collected"
+	ErrorCodeDepositNotSettled           ErrorCode = "deposit-not-settled"
 	ErrorCodeDurationOutOfRange          ErrorCode = "duration-out-of-range"
 	ErrorCodeEmailNotVerified            ErrorCode = "email-not-verified"
 	ErrorCodeEmailTaken                  ErrorCode = "email-taken"
 	ErrorCodeEvidenceImmutable           ErrorCode = "evidence-immutable"
 	ErrorCodeHandoverPhotoRequired       ErrorCode = "handover-photo-required"
 	ErrorCodeInternal                    ErrorCode = "internal"
+	ErrorCodeInvoiceAlreadyPaid          ErrorCode = "invoice-already-paid"
 	ErrorCodeMeterValueRequired          ErrorCode = "meter-value-required"
 	ErrorCodeNotFound                    ErrorCode = "not-found"
 	ErrorCodePaymentRequiredBeforePickup ErrorCode = "payment-required-before-pickup"
@@ -190,6 +195,14 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeCustomerBlacklisted:
 		return true
+	case ErrorCodeDepositAlreadyPaid:
+		return true
+	case ErrorCodeDepositNotApplicable:
+		return true
+	case ErrorCodeDepositNotCollected:
+		return true
+	case ErrorCodeDepositNotSettled:
+		return true
 	case ErrorCodeDurationOutOfRange:
 		return true
 	case ErrorCodeEmailNotVerified:
@@ -201,6 +214,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeHandoverPhotoRequired:
 		return true
 	case ErrorCodeInternal:
+		return true
+	case ErrorCodeInvoiceAlreadyPaid:
 		return true
 	case ErrorCodeMeterValueRequired:
 		return true
@@ -374,16 +389,79 @@ func (e InvoiceStatus) Valid() bool {
 	}
 }
 
+// Defines values for PaymentProofMatchStatus.
+const (
+	Match      PaymentProofMatchStatus = "match"
+	Mismatch   PaymentProofMatchStatus = "mismatch"
+	Unreadable PaymentProofMatchStatus = "unreadable"
+)
+
+// Valid indicates whether the value is a known member of the PaymentProofMatchStatus enum.
+func (e PaymentProofMatchStatus) Valid() bool {
+	switch e {
+	case Match:
+		return true
+	case Mismatch:
+		return true
+	case Unreadable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PaymentProofReviewStatus.
+const (
+	Approved PaymentProofReviewStatus = "approved"
+	Pending  PaymentProofReviewStatus = "pending"
+	Rejected PaymentProofReviewStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the PaymentProofReviewStatus enum.
+func (e PaymentProofReviewStatus) Valid() bool {
+	switch e {
+	case Approved:
+		return true
+	case Pending:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PaymentRequestMethod.
+const (
+	Cash           PaymentRequestMethod = "cash"
+	ManualTransfer PaymentRequestMethod = "manual_transfer"
+)
+
+// Valid indicates whether the value is a known member of the PaymentRequestMethod enum.
+func (e PaymentRequestMethod) Valid() bool {
+	switch e {
+	case Cash:
+		return true
+	case ManualTransfer:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PresignRequestContentType.
 const (
-	Imagejpeg PresignRequestContentType = "image/jpeg"
-	Imagepng  PresignRequestContentType = "image/png"
-	Imagewebp PresignRequestContentType = "image/webp"
+	Applicationpdf PresignRequestContentType = "application/pdf"
+	Imagejpeg      PresignRequestContentType = "image/jpeg"
+	Imagepng       PresignRequestContentType = "image/png"
+	Imagewebp      PresignRequestContentType = "image/webp"
 )
 
 // Valid indicates whether the value is a known member of the PresignRequestContentType enum.
 func (e PresignRequestContentType) Valid() bool {
 	switch e {
+	case Applicationpdf:
+		return true
 	case Imagejpeg:
 		return true
 	case Imagepng:
@@ -550,16 +628,19 @@ func (e UpdateUserRequestStatus) Valid() bool {
 
 // Defines values for UploadKind.
 const (
-	HandoverPhoto UploadKind = "handover_photo"
-	IdentityPhoto UploadKind = "identity_photo"
+	UploadKindHandoverPhoto UploadKind = "handover_photo"
+	UploadKindIdentityPhoto UploadKind = "identity_photo"
+	UploadKindPaymentProof  UploadKind = "payment_proof"
 )
 
 // Valid indicates whether the value is a known member of the UploadKind enum.
 func (e UploadKind) Valid() bool {
 	switch e {
-	case HandoverPhoto:
+	case UploadKindHandoverPhoto:
 		return true
-	case IdentityPhoto:
+	case UploadKindIdentityPhoto:
+		return true
+	case UploadKindPaymentProof:
 		return true
 	default:
 		return false
@@ -677,12 +758,20 @@ type Booking struct {
 	CancelledReason *CancelledReason `json:"cancelled_reason"`
 
 	// Code Examples: SWN-0042
-	Code          string          `json:"code"`
-	CreatedAt     time.Time       `json:"created_at"`
-	Customer      BookingCustomer `json:"customer"`
-	DepositAmount *int64          `json:"deposit_amount"`
-	DurationQty   int             `json:"duration_qty"`
-	EndAt         time.Time       `json:"end_at"`
+	Code            string          `json:"code"`
+	CreatedAt       time.Time       `json:"created_at"`
+	Customer        BookingCustomer `json:"customer"`
+	DepositAmount   *int64          `json:"deposit_amount"`
+	DepositDeducted int64           `json:"deposit_deducted"`
+	DepositRefunded int64           `json:"deposit_refunded"`
+
+	// DepositSettledAt Deposit sudah diselesaikan — syarat `complete` (BR-049).
+	DepositSettledAt *time.Time `json:"deposit_settled_at"`
+
+	// DepositWaivedAt Deposit dibebaskan pemilik sebelum dibayar (BR-051).
+	DepositWaivedAt *time.Time `json:"deposit_waived_at"`
+	DurationQty     int        `json:"duration_qty"`
+	EndAt           time.Time  `json:"end_at"`
 
 	// EndAtWithBuffer Diisi trigger database, bukan aplikasi (BR-015, BR-022).
 	EndAtWithBuffer time.Time          `json:"end_at_with_buffer"`
@@ -861,6 +950,21 @@ type DamageInput struct {
 	PhotoKey string `json:"photo_key"`
 }
 
+// DepositPreview defines model for DepositPreview.
+type DepositPreview struct {
+	// Collected Invoice yang memuat deposit sudah lunas — uangnya di tangan pemilik.
+	Collected      bool  `json:"collected"`
+	DeductedAmount int64 `json:"deducted_amount"`
+	Deductions     int64 `json:"deductions"`
+
+	// DepositAmount `null` = tanpa deposit atau dibebaskan; tidak ada yang perlu diselesaikan.
+	DepositAmount    *int64     `json:"deposit_amount"`
+	NewInvoiceAmount int64      `json:"new_invoice_amount"`
+	RefundAmount     int64      `json:"refund_amount"`
+	SettledAt        *time.Time `json:"settled_at"`
+	Waived           bool       `json:"waived"`
+}
+
 // ErrorCode Kode error generik yang dipakai setiap endpoint sebelum sampai ke aturan bisnisnya.
 // Kode spesifik per aturan bisnis ada di `04-api-spec.md` §2 dan ditambahkan oleh item
 // backlog yang memilikinya.
@@ -948,6 +1052,12 @@ type InvoiceLine struct {
 // InvoiceLineKind defines model for InvoiceLine.Kind.
 type InvoiceLineKind string
 
+// InvoicePage defines model for InvoicePage.
+type InvoicePage struct {
+	Data       []Invoice `json:"data"`
+	NextCursor *string   `json:"next_cursor"`
+}
+
 // InvoiceStatus Lima nilai BR-056. `gateway_pending` tidak terjangkau di fase 1.
 type InvoiceStatus string
 
@@ -971,6 +1081,47 @@ type Me struct {
 	User  SessionUser  `json:"user"`
 }
 
+// PaymentProof defines model for PaymentProof.
+type PaymentProof struct {
+	AiAmount    *int64             `json:"ai_amount"`
+	AiPaidAt    *time.Time         `json:"ai_paid_at"`
+	ContentType string             `json:"content_type"`
+	CreatedAt   time.Time          `json:"created_at"`
+	Id          openapi_types.UUID `json:"id"`
+	InvoiceId   openapi_types.UUID `json:"invoice_id"`
+
+	// MatchStatus Rekomendasi pembacaan otomatis (BR-062), bukan keputusan. `null` = belum
+	// dibaca — di fase 1 selalu, karena belum ada model.
+	MatchStatus  *PaymentProofMatchStatus `json:"match_status"`
+	RejectReason *string                  `json:"reject_reason"`
+	ReviewStatus PaymentProofReviewStatus `json:"review_status"`
+	ReviewedAt   *time.Time               `json:"reviewed_at"`
+
+	// ReviewedBy Nama yang menyetujui atau menolak.
+	ReviewedBy *string `json:"reviewed_by"`
+
+	// Url Bertanda tangan, 15 menit.
+	Url string `json:"url"`
+}
+
+// PaymentProofMatchStatus defines model for PaymentProof.MatchStatus.
+type PaymentProofMatchStatus string
+
+// PaymentProofReviewStatus defines model for PaymentProof.ReviewStatus.
+type PaymentProofReviewStatus string
+
+// PaymentRequest defines model for PaymentRequest.
+type PaymentRequest struct {
+	Amount int64                `json:"amount"`
+	Method PaymentRequestMethod `json:"method"`
+
+	// PaidAt Kapan uangnya diterima; kosong = sekarang.
+	PaidAt *time.Time `json:"paid_at,omitempty"`
+}
+
+// PaymentRequestMethod defines model for PaymentRequest.Method.
+type PaymentRequestMethod string
+
 // PickupRequest defines model for PickupRequest.
 type PickupRequest struct {
 	// Checklist Butir periksa → nilai. Templatnya konstanta di klien per jenis barang.
@@ -983,12 +1134,14 @@ type PickupRequest struct {
 
 // PresignRequest defines model for PresignRequest.
 type PresignRequest struct {
-	Bytes       int64                     `json:"bytes"`
+	Bytes int64 `json:"bytes"`
+
+	// ContentType `application/pdf` hanya untuk `payment_proof`.
 	ContentType PresignRequestContentType `json:"content_type"`
 	Kind        UploadKind                `json:"kind"`
 }
 
-// PresignRequestContentType defines model for PresignRequest.ContentType.
+// PresignRequestContentType `application/pdf` hanya untuk `payment_proof`.
 type PresignRequestContentType string
 
 // PresignedUpload defines model for PresignedUpload.
@@ -1059,6 +1212,11 @@ type ProblemError struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// ProofInput defines model for ProofInput.
+type ProofInput struct {
+	ObjectKey string `json:"object_key"`
+}
+
 // RegisterRequest Empat field, dan tidak lebih. Tiap satu yang ditambahkan adalah tempat orang
 // berhenti mengisi (BR-005).
 type RegisterRequest struct {
@@ -1086,6 +1244,11 @@ type RegisterRequest struct {
 	// Examples: budi@contoh.id
 	Email    openapi_types.Email `json:"email"`
 	Password string              `json:"password"`
+}
+
+// RejectRequest defines model for RejectRequest.
+type RejectRequest struct {
+	Reason string `json:"reason"`
 }
 
 // Resource Jenis barang. Unit fisiknya ada di `ResourceUnit`, dan booking selalu menunjuk
@@ -1647,6 +1810,12 @@ type SettingsUpdate struct {
 	Whatsapp *string `json:"whatsapp,omitempty"`
 }
 
+// SettleRequest defines model for SettleRequest.
+type SettleRequest struct {
+	// Note Wajib bila ada potongan (BR-049).
+	Note *string `json:"note,omitempty"`
+}
+
 // SignedURL defines model for SignedURL.
 type SignedURL struct {
 	ExpiresIn int    `json:"expires_in"`
@@ -1893,6 +2062,11 @@ type VehicleUnitDetailInput struct {
 	Year                   int                 `json:"year"`
 }
 
+// WaiveRequest defines model for WaiveRequest.
+type WaiveRequest struct {
+	Reason string `json:"reason"`
+}
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
@@ -2005,6 +2179,36 @@ type CreateBookingParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// CompleteBookingParams defines parameters for CompleteBooking.
+type CompleteBookingParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// SettleDepositParams defines parameters for SettleDeposit.
+type SettleDepositParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// WaiveDepositParams defines parameters for WaiveDeposit.
+type WaiveDepositParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // PickupBookingParams defines parameters for PickupBooking.
 type PickupBookingParams struct {
 	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
@@ -2046,7 +2250,35 @@ type ListCustomersParams struct {
 
 // ListInvoicesParams defines parameters for ListInvoices.
 type ListInvoicesParams struct {
-	BookingId openapi_types.UUID `form:"booking_id" json:"booking_id"`
+	BookingId *openapi_types.UUID `form:"booking_id,omitempty" json:"booking_id,omitempty"`
+	Status    *InvoiceStatus      `form:"status,omitempty" json:"status,omitempty"`
+
+	// Limit Ukuran halaman. Berpasangan dengan `cursor`; tidak ada `offset` di API ini.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Cursor buram dari halaman sebelumnya. Hanya paginasi cursor — `offset` yang dalam di
+	// tabel besar adalah sequential scan, jadi parameternya tidak ada.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// RecordPaymentParams defines parameters for RecordPayment.
+type RecordPaymentParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ApproveProofParams defines parameters for ApproveProof.
+type ApproveProofParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
@@ -2067,6 +2299,12 @@ type CreateBookingJSONRequestBody = BookingCreate
 // UpdateBookingJSONRequestBody defines body for UpdateBooking for application/json ContentType.
 type UpdateBookingJSONRequestBody = BookingUpdate
 
+// SettleDepositJSONRequestBody defines body for SettleDeposit for application/json ContentType.
+type SettleDepositJSONRequestBody = SettleRequest
+
+// WaiveDepositJSONRequestBody defines body for WaiveDeposit for application/json ContentType.
+type WaiveDepositJSONRequestBody = WaiveRequest
+
 // PickupBookingJSONRequestBody defines body for PickupBooking for application/json ContentType.
 type PickupBookingJSONRequestBody = PickupRequest
 
@@ -2084,6 +2322,15 @@ type BlacklistCustomerJSONRequestBody = BlacklistRequest
 
 // SetCustomerIdentityPhotoJSONRequestBody defines body for SetCustomerIdentityPhoto for application/json ContentType.
 type SetCustomerIdentityPhotoJSONRequestBody = IdentityPhotoInput
+
+// RecordPaymentJSONRequestBody defines body for RecordPayment for application/json ContentType.
+type RecordPaymentJSONRequestBody = PaymentRequest
+
+// UploadProofJSONRequestBody defines body for UploadProof for application/json ContentType.
+type UploadProofJSONRequestBody = ProofInput
+
+// RejectProofJSONRequestBody defines body for RejectProof for application/json ContentType.
+type RejectProofJSONRequestBody = RejectRequest
 
 // CreateResourceJSONRequestBody defines body for CreateResource for application/json ContentType.
 type CreateResourceJSONRequestBody = ResourceCreate
@@ -2231,9 +2478,21 @@ type ServerInterface interface {
 	// CancelBooking Batalkan booking
 	// (POST /bookings/{id}/cancel)
 	CancelBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// CompleteBooking Tandai booking selesai
+	// (POST /bookings/{id}/complete)
+	CompleteBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CompleteBookingParams)
 	// ConfirmBooking Konfirmasi draft jadi reserved
 	// (POST /bookings/{id}/confirm)
 	ConfirmBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// PreviewDeposit Pratinjau penyelesaian deposit
+	// (GET /bookings/{id}/deposit)
+	PreviewDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// SettleDeposit Selesaikan deposit
+	// (POST /bookings/{id}/deposit/settle)
+	SettleDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SettleDepositParams)
+	// WaiveDeposit Bebaskan deposit
+	// (POST /bookings/{id}/deposit/waive)
+	WaiveDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params WaiveDepositParams)
 	// ListHandovers Bukti kondisi satu booking
 	// (GET /bookings/{id}/handovers)
 	ListHandovers(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -2279,15 +2538,30 @@ type ServerInterface interface {
 	// PatchHandover Tidak ada — bukti kondisi tidak bisa diubah
 	// (PATCH /handovers/{id})
 	PatchHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-	// ListInvoices Invoice satu booking
+	// ListInvoices Invoice — per booking, atau daftar penuh untuk owner
 	// (GET /invoices)
 	ListInvoices(w http.ResponseWriter, r *http.Request, params ListInvoicesParams)
 	// GetInvoice Satu invoice beserta barisnya
 	// (GET /invoices/{id})
 	GetInvoice(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// RecordPayment Catat pembayaran tunai atau transfer yang sudah dicek
+	// (POST /invoices/{id}/payments)
+	RecordPayment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordPaymentParams)
+	// ListProofs Bukti transfer satu invoice
+	// (GET /invoices/{id}/proofs)
+	ListProofs(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UploadProof Serahkan bukti transfer
+	// (POST /invoices/{id}/proofs)
+	UploadProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// ApproveProof Setujui bukti — invoice lunas
+	// (POST /proofs/{id}/approve)
+	ApproveProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ApproveProofParams)
+	// RejectProof Tolak bukti transfer
+	// (POST /proofs/{id}/reject)
+	RejectProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// ListResources Jenis barang di usaha ini
 	// (GET /resources)
 	ListResources(w http.ResponseWriter, r *http.Request)
@@ -2420,9 +2694,33 @@ func (_ Unimplemented) CancelBooking(w http.ResponseWriter, r *http.Request, id 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// CompleteBooking Tandai booking selesai
+// (POST /bookings/{id}/complete)
+func (_ Unimplemented) CompleteBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CompleteBookingParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ConfirmBooking Konfirmasi draft jadi reserved
 // (POST /bookings/{id}/confirm)
 func (_ Unimplemented) ConfirmBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PreviewDeposit Pratinjau penyelesaian deposit
+// (GET /bookings/{id}/deposit)
+func (_ Unimplemented) PreviewDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SettleDeposit Selesaikan deposit
+// (POST /bookings/{id}/deposit/settle)
+func (_ Unimplemented) SettleDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SettleDepositParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// WaiveDeposit Bebaskan deposit
+// (POST /bookings/{id}/deposit/waive)
+func (_ Unimplemented) WaiveDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params WaiveDepositParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2516,7 +2814,7 @@ func (_ Unimplemented) PatchHandover(w http.ResponseWriter, r *http.Request, id 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ListInvoices Invoice satu booking
+// ListInvoices Invoice — per booking, atau daftar penuh untuk owner
 // (GET /invoices)
 func (_ Unimplemented) ListInvoices(w http.ResponseWriter, r *http.Request, params ListInvoicesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -2528,9 +2826,39 @@ func (_ Unimplemented) GetInvoice(w http.ResponseWriter, r *http.Request, id ope
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// RecordPayment Catat pembayaran tunai atau transfer yang sudah dicek
+// (POST /invoices/{id}/payments)
+func (_ Unimplemented) RecordPayment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordPaymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListProofs Bukti transfer satu invoice
+// (GET /invoices/{id}/proofs)
+func (_ Unimplemented) ListProofs(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UploadProof Serahkan bukti transfer
+// (POST /invoices/{id}/proofs)
+func (_ Unimplemented) UploadProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 // (GET /me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ApproveProof Setujui bukti — invoice lunas
+// (POST /proofs/{id}/approve)
+func (_ Unimplemented) ApproveProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ApproveProofParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RejectProof Tolak bukti transfer
+// (POST /proofs/{id}/reject)
+func (_ Unimplemented) RejectProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3069,6 +3397,60 @@ func (siw *ServerInterfaceWrapper) CancelBooking(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// CompleteBooking operation middleware
+func (siw *ServerInterfaceWrapper) CompleteBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteBookingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteBooking(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ConfirmBooking operation middleware
 func (siw *ServerInterfaceWrapper) ConfirmBooking(w http.ResponseWriter, r *http.Request) {
 
@@ -3086,6 +3468,140 @@ func (siw *ServerInterfaceWrapper) ConfirmBooking(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ConfirmBooking(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewDeposit operation middleware
+func (siw *ServerInterfaceWrapper) PreviewDeposit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewDeposit(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SettleDeposit operation middleware
+func (siw *ServerInterfaceWrapper) SettleDeposit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SettleDepositParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SettleDeposit(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// WaiveDeposit operation middleware
+func (siw *ServerInterfaceWrapper) WaiveDeposit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params WaiveDepositParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.WaiveDeposit(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3604,15 +4120,54 @@ func (siw *ServerInterfaceWrapper) ListInvoices(w http.ResponseWriter, r *http.R
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListInvoicesParams
 
-	// ------------- Required query parameter "booking_id" -------------
+	// ------------- Optional query parameter "booking_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "booking_id", r.URL.Query(), &params.BookingId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "booking_id", r.URL.Query(), &params.BookingId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "booking_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "booking_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
 		}
 		return
 	}
@@ -3654,11 +4209,197 @@ func (siw *ServerInterfaceWrapper) GetInvoice(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// RecordPayment operation middleware
+func (siw *ServerInterfaceWrapper) RecordPayment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RecordPaymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecordPayment(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListProofs operation middleware
+func (siw *ServerInterfaceWrapper) ListProofs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListProofs(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadProof operation middleware
+func (siw *ServerInterfaceWrapper) UploadProof(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadProof(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveProof operation middleware
+func (siw *ServerInterfaceWrapper) ApproveProof(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApproveProofParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveProof(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RejectProof operation middleware
+func (siw *ServerInterfaceWrapper) RejectProof(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RejectProof(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4256,6 +4997,33 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/invoices/{id}", wrapper.GetInvoice)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/bookings/{id}/deposit", wrapper.PreviewDeposit)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings/{id}/deposit/settle", wrapper.SettleDeposit)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings/{id}/deposit/waive", wrapper.WaiveDeposit)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings/{id}/complete", wrapper.CompleteBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/invoices/{id}/payments", wrapper.RecordPayment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/invoices/{id}/proofs", wrapper.ListProofs)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/invoices/{id}/proofs", wrapper.UploadProof)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/proofs/{id}/approve", wrapper.ApproveProof)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/proofs/{id}/reject", wrapper.RejectProof)
 	})
 
 	return r
@@ -5174,6 +5942,109 @@ func (response CancelBooking422ApplicationProblemPlusJSONResponse) VisitCancelBo
 	return err
 }
 
+type CompleteBookingRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params CompleteBookingParams
+}
+
+type CompleteBookingResponseObject interface {
+	VisitCompleteBookingResponse(w http.ResponseWriter) error
+}
+
+type CompleteBooking200JSONResponse Booking
+
+func (response CompleteBooking200JSONResponse) VisitCompleteBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteBooking401ApplicationProblemPlusJSONResponse) VisitCompleteBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteBooking403ApplicationProblemPlusJSONResponse) VisitCompleteBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteBooking404ApplicationProblemPlusJSONResponse) VisitCompleteBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteBooking409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteBooking409ApplicationProblemPlusJSONResponse) VisitCompleteBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteBooking422ApplicationProblemPlusJSONResponse) VisitCompleteBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ConfirmBookingRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -5265,6 +6136,284 @@ type ConfirmBooking422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ConfirmBooking422ApplicationProblemPlusJSONResponse) VisitConfirmBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDepositRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type PreviewDepositResponseObject interface {
+	VisitPreviewDepositResponse(w http.ResponseWriter) error
+}
+
+type PreviewDeposit200JSONResponse DepositPreview
+
+func (response PreviewDeposit200JSONResponse) VisitPreviewDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDeposit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDeposit401ApplicationProblemPlusJSONResponse) VisitPreviewDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDeposit403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDeposit403ApplicationProblemPlusJSONResponse) VisitPreviewDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewDeposit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewDeposit404ApplicationProblemPlusJSONResponse) VisitPreviewDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SettleDepositRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params SettleDepositParams
+	Body   *SettleDepositJSONRequestBody
+}
+
+type SettleDepositResponseObject interface {
+	VisitSettleDepositResponse(w http.ResponseWriter) error
+}
+
+type SettleDeposit200JSONResponse Booking
+
+func (response SettleDeposit200JSONResponse) VisitSettleDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SettleDeposit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SettleDeposit401ApplicationProblemPlusJSONResponse) VisitSettleDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SettleDeposit403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SettleDeposit403ApplicationProblemPlusJSONResponse) VisitSettleDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SettleDeposit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SettleDeposit404ApplicationProblemPlusJSONResponse) VisitSettleDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SettleDeposit409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SettleDeposit409ApplicationProblemPlusJSONResponse) VisitSettleDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SettleDeposit422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response SettleDeposit422ApplicationProblemPlusJSONResponse) VisitSettleDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WaiveDepositRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params WaiveDepositParams
+	Body   *WaiveDepositJSONRequestBody
+}
+
+type WaiveDepositResponseObject interface {
+	VisitWaiveDepositResponse(w http.ResponseWriter) error
+}
+
+type WaiveDeposit200JSONResponse Booking
+
+func (response WaiveDeposit200JSONResponse) VisitWaiveDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WaiveDeposit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response WaiveDeposit401ApplicationProblemPlusJSONResponse) VisitWaiveDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WaiveDeposit403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response WaiveDeposit403ApplicationProblemPlusJSONResponse) VisitWaiveDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WaiveDeposit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response WaiveDeposit404ApplicationProblemPlusJSONResponse) VisitWaiveDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WaiveDeposit409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response WaiveDeposit409ApplicationProblemPlusJSONResponse) VisitWaiveDepositResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WaiveDeposit422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response WaiveDeposit422ApplicationProblemPlusJSONResponse) VisitWaiveDepositResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6379,7 +7528,7 @@ type ListInvoicesResponseObject interface {
 	VisitListInvoicesResponse(w http.ResponseWriter) error
 }
 
-type ListInvoices200JSONResponse []Invoice
+type ListInvoices200JSONResponse InvoicePage
 
 func (response ListInvoices200JSONResponse) VisitListInvoicesResponse(w http.ResponseWriter) error {
 
@@ -6495,6 +7644,283 @@ func (response GetInvoice404ApplicationProblemPlusJSONResponse) VisitGetInvoiceR
 	return err
 }
 
+type RecordPaymentRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params RecordPaymentParams
+	Body   *RecordPaymentJSONRequestBody
+}
+
+type RecordPaymentResponseObject interface {
+	VisitRecordPaymentResponse(w http.ResponseWriter) error
+}
+
+type RecordPayment201JSONResponse Invoice
+
+func (response RecordPayment201JSONResponse) VisitRecordPaymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordPayment401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RecordPayment401ApplicationProblemPlusJSONResponse) VisitRecordPaymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordPayment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RecordPayment403ApplicationProblemPlusJSONResponse) VisitRecordPaymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordPayment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RecordPayment404ApplicationProblemPlusJSONResponse) VisitRecordPaymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordPayment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RecordPayment409ApplicationProblemPlusJSONResponse) VisitRecordPaymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordPayment422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response RecordPayment422ApplicationProblemPlusJSONResponse) VisitRecordPaymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProofsRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListProofsResponseObject interface {
+	VisitListProofsResponse(w http.ResponseWriter) error
+}
+
+type ListProofs200JSONResponse []PaymentProof
+
+func (response ListProofs200JSONResponse) VisitListProofsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProofs401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListProofs401ApplicationProblemPlusJSONResponse) VisitListProofsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProofs403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListProofs403ApplicationProblemPlusJSONResponse) VisitListProofsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProofs404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListProofs404ApplicationProblemPlusJSONResponse) VisitListProofsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadProofRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UploadProofJSONRequestBody
+}
+
+type UploadProofResponseObject interface {
+	VisitUploadProofResponse(w http.ResponseWriter) error
+}
+
+type UploadProof202JSONResponse PaymentProof
+
+func (response UploadProof202JSONResponse) VisitUploadProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadProof401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UploadProof401ApplicationProblemPlusJSONResponse) VisitUploadProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadProof403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UploadProof403ApplicationProblemPlusJSONResponse) VisitUploadProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadProof404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UploadProof404ApplicationProblemPlusJSONResponse) VisitUploadProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadProof409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UploadProof409ApplicationProblemPlusJSONResponse) VisitUploadProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadProof422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UploadProof422ApplicationProblemPlusJSONResponse) VisitUploadProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -6528,6 +7954,196 @@ func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveProofRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params ApproveProofParams
+}
+
+type ApproveProofResponseObject interface {
+	VisitApproveProofResponse(w http.ResponseWriter) error
+}
+
+type ApproveProof200JSONResponse Invoice
+
+func (response ApproveProof200JSONResponse) VisitApproveProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveProof401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveProof401ApplicationProblemPlusJSONResponse) VisitApproveProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveProof403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveProof403ApplicationProblemPlusJSONResponse) VisitApproveProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveProof404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveProof404ApplicationProblemPlusJSONResponse) VisitApproveProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveProof409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveProof409ApplicationProblemPlusJSONResponse) VisitApproveProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveProof422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveProof422ApplicationProblemPlusJSONResponse) VisitApproveProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectProofRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *RejectProofJSONRequestBody
+}
+
+type RejectProofResponseObject interface {
+	VisitRejectProofResponse(w http.ResponseWriter) error
+}
+
+type RejectProof200JSONResponse PaymentProof
+
+func (response RejectProof200JSONResponse) VisitRejectProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectProof401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RejectProof401ApplicationProblemPlusJSONResponse) VisitRejectProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectProof403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RejectProof403ApplicationProblemPlusJSONResponse) VisitRejectProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectProof404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RejectProof404ApplicationProblemPlusJSONResponse) VisitRejectProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectProof422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response RejectProof422ApplicationProblemPlusJSONResponse) VisitRejectProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -7717,9 +9333,21 @@ type StrictServerInterface interface {
 	// CancelBooking Batalkan booking
 	// (POST /bookings/{id}/cancel)
 	CancelBooking(ctx context.Context, request CancelBookingRequestObject) (CancelBookingResponseObject, error)
+	// CompleteBooking Tandai booking selesai
+	// (POST /bookings/{id}/complete)
+	CompleteBooking(ctx context.Context, request CompleteBookingRequestObject) (CompleteBookingResponseObject, error)
 	// ConfirmBooking Konfirmasi draft jadi reserved
 	// (POST /bookings/{id}/confirm)
 	ConfirmBooking(ctx context.Context, request ConfirmBookingRequestObject) (ConfirmBookingResponseObject, error)
+	// PreviewDeposit Pratinjau penyelesaian deposit
+	// (GET /bookings/{id}/deposit)
+	PreviewDeposit(ctx context.Context, request PreviewDepositRequestObject) (PreviewDepositResponseObject, error)
+	// SettleDeposit Selesaikan deposit
+	// (POST /bookings/{id}/deposit/settle)
+	SettleDeposit(ctx context.Context, request SettleDepositRequestObject) (SettleDepositResponseObject, error)
+	// WaiveDeposit Bebaskan deposit
+	// (POST /bookings/{id}/deposit/waive)
+	WaiveDeposit(ctx context.Context, request WaiveDepositRequestObject) (WaiveDepositResponseObject, error)
 	// ListHandovers Bukti kondisi satu booking
 	// (GET /bookings/{id}/handovers)
 	ListHandovers(ctx context.Context, request ListHandoversRequestObject) (ListHandoversResponseObject, error)
@@ -7765,15 +9393,30 @@ type StrictServerInterface interface {
 	// PatchHandover Tidak ada — bukti kondisi tidak bisa diubah
 	// (PATCH /handovers/{id})
 	PatchHandover(ctx context.Context, request PatchHandoverRequestObject) (PatchHandoverResponseObject, error)
-	// ListInvoices Invoice satu booking
+	// ListInvoices Invoice — per booking, atau daftar penuh untuk owner
 	// (GET /invoices)
 	ListInvoices(ctx context.Context, request ListInvoicesRequestObject) (ListInvoicesResponseObject, error)
 	// GetInvoice Satu invoice beserta barisnya
 	// (GET /invoices/{id})
 	GetInvoice(ctx context.Context, request GetInvoiceRequestObject) (GetInvoiceResponseObject, error)
+	// RecordPayment Catat pembayaran tunai atau transfer yang sudah dicek
+	// (POST /invoices/{id}/payments)
+	RecordPayment(ctx context.Context, request RecordPaymentRequestObject) (RecordPaymentResponseObject, error)
+	// ListProofs Bukti transfer satu invoice
+	// (GET /invoices/{id}/proofs)
+	ListProofs(ctx context.Context, request ListProofsRequestObject) (ListProofsResponseObject, error)
+	// UploadProof Serahkan bukti transfer
+	// (POST /invoices/{id}/proofs)
+	UploadProof(ctx context.Context, request UploadProofRequestObject) (UploadProofResponseObject, error)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ApproveProof Setujui bukti — invoice lunas
+	// (POST /proofs/{id}/approve)
+	ApproveProof(ctx context.Context, request ApproveProofRequestObject) (ApproveProofResponseObject, error)
+	// RejectProof Tolak bukti transfer
+	// (POST /proofs/{id}/reject)
+	RejectProof(ctx context.Context, request RejectProofRequestObject) (RejectProofResponseObject, error)
 	// ListResources Jenis barang di usaha ini
 	// (GET /resources)
 	ListResources(ctx context.Context, request ListResourcesRequestObject) (ListResourcesResponseObject, error)
@@ -8229,6 +9872,33 @@ func (sh *strictHandler) CancelBooking(w http.ResponseWriter, r *http.Request, i
 	}
 }
 
+// CompleteBooking operation middleware
+func (sh *strictHandler) CompleteBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CompleteBookingParams) {
+	var request CompleteBookingRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteBooking(ctx, request.(CompleteBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteBookingResponseObject); ok {
+		if err := validResponse.VisitCompleteBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ConfirmBooking operation middleware
 func (sh *strictHandler) ConfirmBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request ConfirmBookingRequestObject
@@ -8248,6 +9918,100 @@ func (sh *strictHandler) ConfirmBooking(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ConfirmBookingResponseObject); ok {
 		if err := validResponse.VisitConfirmBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PreviewDeposit operation middleware
+func (sh *strictHandler) PreviewDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request PreviewDepositRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewDeposit(ctx, request.(PreviewDepositRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewDeposit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PreviewDepositResponseObject); ok {
+		if err := validResponse.VisitPreviewDepositResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SettleDeposit operation middleware
+func (sh *strictHandler) SettleDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SettleDepositParams) {
+	var request SettleDepositRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body SettleDepositJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SettleDeposit(ctx, request.(SettleDepositRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SettleDeposit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SettleDepositResponseObject); ok {
+		if err := validResponse.VisitSettleDepositResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// WaiveDeposit operation middleware
+func (sh *strictHandler) WaiveDeposit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params WaiveDepositParams) {
+	var request WaiveDepositRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body WaiveDepositJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.WaiveDeposit(ctx, request.(WaiveDepositRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "WaiveDeposit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(WaiveDepositResponseObject); ok {
+		if err := validResponse.VisitWaiveDepositResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8739,6 +10503,99 @@ func (sh *strictHandler) GetInvoice(w http.ResponseWriter, r *http.Request, id o
 	}
 }
 
+// RecordPayment operation middleware
+func (sh *strictHandler) RecordPayment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordPaymentParams) {
+	var request RecordPaymentRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body RecordPaymentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RecordPayment(ctx, request.(RecordPaymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecordPayment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecordPaymentResponseObject); ok {
+		if err := validResponse.VisitRecordPaymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListProofs operation middleware
+func (sh *strictHandler) ListProofs(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListProofsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListProofs(ctx, request.(ListProofsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListProofs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListProofsResponseObject); ok {
+		if err := validResponse.VisitListProofsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadProof operation middleware
+func (sh *strictHandler) UploadProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UploadProofRequestObject
+
+	request.Id = id
+
+	var body UploadProofJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadProof(ctx, request.(UploadProofRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadProof")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadProofResponseObject); ok {
+		if err := validResponse.VisitUploadProofResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -8756,6 +10613,66 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveProof operation middleware
+func (sh *strictHandler) ApproveProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ApproveProofParams) {
+	var request ApproveProofRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveProof(ctx, request.(ApproveProofRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveProof")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveProofResponseObject); ok {
+		if err := validResponse.VisitApproveProofResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RejectProof operation middleware
+func (sh *strictHandler) RejectProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request RejectProofRequestObject
+
+	request.Id = id
+
+	var body RejectProofJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RejectProof(ctx, request.(RejectProofRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RejectProof")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RejectProofResponseObject); ok {
+		if err := validResponse.VisitRejectProofResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

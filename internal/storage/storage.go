@@ -43,9 +43,16 @@ const (
 	MaxUploadBytes = 10 << 20
 )
 
-// AllowedTypes are the image types phase 1 accepts for every kind it has.
-// payment_proof adds application/pdf when S1-046 lands.
-var AllowedTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
+// ImageTypes are what a photo may be: handover and identity (BR-093).
+var ImageTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
+
+// ProofTypes add PDF, for a transfer proof only -- a bank's e-statement is a PDF
+// more often than a screenshot (04-api-spec.md 2.2, S1-046). Per kind, so a
+// handover never accepts a PDF as a photo of a car.
+var ProofTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true, "application/pdf": true}
+
+// ProofTTL is how long a transfer-proof read URL lives.
+const ProofTTL = 15 * time.Minute
 
 type Store struct {
 	client  *s3.Client
@@ -136,27 +143,28 @@ func (s *Store) Copy(ctx context.Context, src, dst string) error {
 // points at an object that exists. ponytail: if that transaction then fails,
 // the copied object is orphaned under its final prefix; pending/ has a
 // lifecycle, final prefixes do not. Add a sweep if orphans ever add up.
-func (s *Store) Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string) (string, error) {
+func (s *Store) Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string,
+	allowed map[string]bool) (Object, string, error) {
 	// The prefix check is the tenancy check: a key from another rental's
 	// pending/ is answered exactly like a key that does not exist.
 	if !strings.HasPrefix(pendingKey, "pending/"+ownerID.String()+"/") || strings.Contains(pendingKey, "..") {
-		return "", apperrors.UploadNotFound(field)
+		return Object{}, "", apperrors.UploadNotFound(field)
 	}
 	obj, err := s.Head(ctx, pendingKey)
 	if errors.Is(err, ErrNotFound) {
-		return "", apperrors.UploadNotFound(field)
+		return Object{}, "", apperrors.UploadNotFound(field)
 	}
 	if err != nil {
-		return "", err
+		return Object{}, "", err
 	}
-	if !AllowedTypes[obj.ContentType] || obj.Size > MaxUploadBytes || obj.Size == 0 {
-		return "", apperrors.UploadTypeMismatch(field)
+	if !allowed[obj.ContentType] || obj.Size > MaxUploadBytes || obj.Size == 0 {
+		return Object{}, "", apperrors.UploadTypeMismatch(field)
 	}
 	final := finalPrefix + "/" + uuid.Must(uuid.NewV7()).String()
 	if err := s.Copy(ctx, pendingKey, final); err != nil {
-		return "", err
+		return Object{}, "", err
 	}
-	return final, nil
+	return obj, final, nil
 }
 
 // Ping is the signed health probe: HEAD on the bucket. Unlike the old

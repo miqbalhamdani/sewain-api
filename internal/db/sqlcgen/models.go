@@ -53,6 +53,7 @@ type Booking struct {
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	DeletedAt           *time.Time
+	DepositSettledAt    *time.Time
 }
 
 type BookingCounter struct {
@@ -149,6 +150,36 @@ type Owner struct {
 	Whatsapp                   *string
 	Address                    *string
 	OperatingHours             *string
+}
+
+type Payment struct {
+	ID         uuid.UUID
+	OwnerID    uuid.UUID
+	InvoiceID  uuid.UUID
+	Method     string
+	Amount     int64
+	Status     string
+	PaidAt     time.Time
+	ApprovedBy uuid.UUID
+	CreatedAt  time.Time
+}
+
+type PaymentProof struct {
+	ID           uuid.UUID
+	OwnerID      uuid.UUID
+	InvoiceID    uuid.UUID
+	ObjectKey    string
+	ContentType  string
+	MatchStatus  *string
+	AiAmount     *int64
+	AiPaidAt     *time.Time
+	ReviewStatus string
+	ReviewedBy   *uuid.UUID
+	ReviewedAt   *time.Time
+	RejectReason *string
+	PaymentID    *uuid.UUID
+	CreatedBy    *uuid.UUID
+	CreatedAt    time.Time
 }
 
 type RefreshToken struct {

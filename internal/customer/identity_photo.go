@@ -31,8 +31,8 @@ func (s *Service) SetIdentityPhoto(ctx context.Context, id uuid.UUID, pendingKey
 	if _, err := s.Get(ctx, id); err != nil {
 		return Customer{}, err
 	}
-	final, err := s.objects.Promote(ctx, ownerID, pendingKey,
-		"identity/"+ownerID.String()+"/"+id.String(), "object_key")
+	_, final, err := s.objects.Promote(ctx, ownerID, pendingKey,
+		"identity/"+ownerID.String()+"/"+id.String(), "object_key", storage.ImageTypes)
 	if err != nil {
 		return Customer{}, err
 	}

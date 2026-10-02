@@ -33,13 +33,18 @@ func (s *Server) PresignUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, malformed(err))
 		return
 	}
-	if body.Kind != HandoverPhoto && body.Kind != IdentityPhoto {
-		writeError(w, r, apperrors.ValidationFailed("kind is not one this system accepts yet.").
+	allowed := storage.ImageTypes
+	switch body.Kind {
+	case UploadKindHandoverPhoto, UploadKindIdentityPhoto:
+	case UploadKindPaymentProof:
+		allowed = storage.ProofTypes // a bank e-statement is often a PDF (S1-046)
+	default:
+		writeError(w, r, apperrors.ValidationFailed("kind is not one this system accepts.").
 			WithFields(apperrors.Field{Name: "kind"}))
 		return
 	}
-	if !storage.AllowedTypes[string(body.ContentType)] {
-		writeError(w, r, apperrors.ValidationFailed("content_type must be a JPEG, PNG or WebP image.").
+	if !allowed[string(body.ContentType)] {
+		writeError(w, r, apperrors.ValidationFailed("content_type is not allowed for this kind of upload.").
 			WithFields(apperrors.Field{Name: "content_type"}))
 		return
 	}
@@ -186,20 +191,49 @@ func (s *Server) DeleteHandover(w http.ResponseWriter, r *http.Request, _ uuid.U
 	writeError(w, r, apperrors.EvidenceImmutable())
 }
 
-// ListInvoices handles GET /invoices?booking_id=. Per booking only in M3; the
-// owner's full list lands in M4 (BR-003).
+// ListInvoices handles GET /invoices. With booking_id: that booking's invoices,
+// every role. Without: the full list across bookings, owner only (reports:read,
+// BR-003) -- an operator sees invoices through the booking they are serving.
 func (s *Server) ListInvoices(w http.ResponseWriter, r *http.Request, params ListInvoicesParams) {
-	requirePermission(auth.PermInvoicesRead, func(w http.ResponseWriter, r *http.Request) {
-		invs, err := s.bookings.Invoices(r.Context(), params.BookingId)
+	perm := auth.PermInvoicesRead
+	if params.BookingId == nil {
+		perm = auth.PermReportsRead
+	}
+	requirePermission(perm, func(w http.ResponseWriter, r *http.Request) {
+		page := InvoicePage{Data: []Invoice{}}
+		if params.BookingId != nil {
+			invs, err := s.bookings.Invoices(r.Context(), *params.BookingId)
+			if err != nil {
+				writeError(w, r, err)
+				return
+			}
+			for _, inv := range invs {
+				page.Data = append(page.Data, invoiceBody(inv))
+			}
+			writeJSON(w, r, http.StatusOK, page)
+			return
+		}
+		var after *booking.InvoiceCursor
+		if params.Cursor != nil {
+			c, ok := decodeInvoiceCursor(*params.Cursor)
+			if !ok {
+				writeError(w, r, badCursor())
+				return
+			}
+			after = &c
+		}
+		invs, next, err := s.bookings.OwnerInvoices(r.Context(), stringPtr(params.Status), after, pageLimit(params.Limit))
 		if err != nil {
 			writeError(w, r, err)
 			return
 		}
-		out := make([]Invoice, 0, len(invs))
 		for _, inv := range invs {
-			out = append(out, invoiceBody(inv))
+			page.Data = append(page.Data, invoiceBody(inv))
 		}
-		writeJSON(w, r, http.StatusOK, out)
+		if next != nil {
+			page.NextCursor = ptr(encodeInvoiceCursor(*next))
+		}
+		writeJSON(w, r, http.StatusOK, page)
 	})(w, r)
 }
 

@@ -221,6 +221,8 @@ func bookingBody(b booking.Booking) Booking {
 		DepositAmount: b.DepositAmount, LateFeePerUnit: b.LateFeePerUnit,
 		CancelledReason: (*CancelledReason)(b.CancelledReason), ExpiresAt: b.ExpiresAt,
 		CreatedAt: b.CreatedAt, ActualReturnAt: b.ActualReturnAt,
+		DepositWaivedAt: b.DepositWaivedAt, DepositSettledAt: b.DepositSettledAt,
+		DepositDeducted: b.DepositDeducted, DepositRefunded: b.DepositRefunded,
 	}
 }
 

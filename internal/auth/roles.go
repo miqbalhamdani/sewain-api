@@ -57,6 +57,10 @@ const (
 	// BR-003's lines, which is why it is its own permission rather than riding
 	// on customers:write -- an operator has that, and must keep it.
 	PermCustomersBlacklist = "customers:blacklist"
+
+	// BR-051 as decided in M4: giving up a deposit is the owner's call.
+	// Operators still waive late fees and damage at return, with a reason.
+	PermDepositsWaive = "deposits:waive"
 )
 
 // operatorPermissions is BR-003's "operator boleh" list, verbatim: membuat &
@@ -82,7 +86,7 @@ var ownerPermissions = concat(operatorPermissions, []string{
 	PermUsersRead, PermUsersWrite,
 	PermSettingsRead, PermSettingsWrite,
 	PermSubscriptionRead, PermSubscriptionWrite,
-	PermDelete, PermCustomersBlacklist,
+	PermDelete, PermCustomersBlacklist, PermDepositsWaive,
 })
 
 var rolePermissions = map[string][]string{

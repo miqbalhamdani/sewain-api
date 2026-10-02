@@ -22,6 +22,24 @@ func (q *Queries) CancelBooking(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const cancelInvoice = `-- name: CancelInvoice :exec
+UPDATE invoices SET status = 'cancelled', updated_at = now() WHERE id = $1
+`
+
+func (q *Queries) CancelInvoice(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, cancelInvoice, id)
+	return err
+}
+
+const completeBooking = `-- name: CompleteBooking :exec
+UPDATE bookings SET status = 'completed', updated_at = now() WHERE id = $1
+`
+
+func (q *Queries) CompleteBooking(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, completeBooking, id)
+	return err
+}
+
 const confirmBooking = `-- name: ConfirmBooking :exec
 UPDATE bookings SET status = 'reserved', expires_at = NULL, updated_at = now()
  WHERE id = $1
@@ -30,6 +48,42 @@ UPDATE bookings SET status = 'reserved', expires_at = NULL, updated_at = now()
 func (q *Queries) ConfirmBooking(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, confirmBooking, id)
 	return err
+}
+
+const deleteDepositLine = `-- name: DeleteDepositLine :execrows
+DELETE FROM invoice_lines WHERE invoice_id = $1 AND kind = 'deposit'
+`
+
+// BR-051: the line is removed, not offset with a discount -- a discount counts
+// as revenue (BR-076), and offsetting would shrink revenue by the deposit.
+func (q *Queries) DeleteDepositLine(ctx context.Context, invoiceID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteDepositLine, invoiceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const depositInvoice = `-- name: DepositInvoice :one
+SELECT i.id, i.status
+  FROM invoices i
+  JOIN invoice_lines l ON l.invoice_id = i.id AND l.kind = 'deposit'
+ WHERE i.booking_id = $1 AND i.deleted_at IS NULL
+ LIMIT 1
+`
+
+type DepositInvoiceRow struct {
+	ID     uuid.UUID
+	Status string
+}
+
+// The invoice carrying the deposit line, and whether it is paid -- "the money
+// is in the owner's hands" (BR-048) or "can still be waived" (BR-051).
+func (q *Queries) DepositInvoice(ctx context.Context, bookingID *uuid.UUID) (DepositInvoiceRow, error) {
+	row := q.db.QueryRow(ctx, depositInvoice, bookingID)
+	var i DepositInvoiceRow
+	err := row.Scan(&i.ID, &i.Status)
+	return i, err
 }
 
 const findConflicts = `-- name: FindConflicts :many
@@ -192,7 +246,8 @@ const getBooking = `-- name: GetBooking :one
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at, b.actual_return_at,
+       b.created_at, b.actual_return_at, b.deposit_waived_at, b.deposit_settled_at,
+       b.deposit_deducted, b.deposit_refunded,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -224,6 +279,10 @@ type GetBookingRow struct {
 	ExpiresAt           *time.Time
 	CreatedAt           time.Time
 	ActualReturnAt      *time.Time
+	DepositWaivedAt     *time.Time
+	DepositSettledAt    *time.Time
+	DepositDeducted     int64
+	DepositRefunded     int64
 	Overdue             bool
 	CustomerID          uuid.UUID
 	CustomerName        string
@@ -258,6 +317,10 @@ func (q *Queries) GetBooking(ctx context.Context, id uuid.UUID) (GetBookingRow, 
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.ActualReturnAt,
+		&i.DepositWaivedAt,
+		&i.DepositSettledAt,
+		&i.DepositDeducted,
+		&i.DepositRefunded,
 		&i.Overdue,
 		&i.CustomerID,
 		&i.CustomerName,
@@ -462,7 +525,8 @@ const listBookings = `-- name: ListBookings :many
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at, b.actual_return_at,
+       b.created_at, b.actual_return_at, b.deposit_waived_at, b.deposit_settled_at,
+       b.deposit_deducted, b.deposit_refunded,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -522,6 +586,10 @@ type ListBookingsRow struct {
 	ExpiresAt           *time.Time
 	CreatedAt           time.Time
 	ActualReturnAt      *time.Time
+	DepositWaivedAt     *time.Time
+	DepositSettledAt    *time.Time
+	DepositDeducted     int64
+	DepositRefunded     int64
 	Overdue             bool
 	CustomerID          uuid.UUID
 	CustomerName        string
@@ -578,6 +646,10 @@ func (q *Queries) ListBookings(ctx context.Context, arg ListBookingsParams) ([]L
 			&i.ExpiresAt,
 			&i.CreatedAt,
 			&i.ActualReturnAt,
+			&i.DepositWaivedAt,
+			&i.DepositSettledAt,
+			&i.DepositDeducted,
+			&i.DepositRefunded,
 			&i.Overdue,
 			&i.CustomerID,
 			&i.CustomerName,
@@ -736,6 +808,36 @@ func (q *Queries) LockBooking(ctx context.Context, id uuid.UUID) (LockBookingRow
 	return i, err
 }
 
+const lockBookingDeposit = `-- name: LockBookingDeposit :one
+SELECT status, code, customer_id, deposit_amount, deposit_waived_at, deposit_settled_at
+  FROM bookings
+ WHERE id = $1 AND deleted_at IS NULL
+   FOR UPDATE
+`
+
+type LockBookingDepositRow struct {
+	Status           string
+	Code             string
+	CustomerID       uuid.UUID
+	DepositAmount    *int64
+	DepositWaivedAt  *time.Time
+	DepositSettledAt *time.Time
+}
+
+func (q *Queries) LockBookingDeposit(ctx context.Context, id uuid.UUID) (LockBookingDepositRow, error) {
+	row := q.db.QueryRow(ctx, lockBookingDeposit, id)
+	var i LockBookingDepositRow
+	err := row.Scan(
+		&i.Status,
+		&i.Code,
+		&i.CustomerID,
+		&i.DepositAmount,
+		&i.DepositWaivedAt,
+		&i.DepositSettledAt,
+	)
+	return i, err
+}
+
 const lockBookingForHandover = `-- name: LockBookingForHandover :one
 SELECT b.status, b.code, b.customer_id, b.resource_unit_id, b.start_at, b.end_at,
        b.pricing_unit, b.late_fee_per_unit, b.deposit_amount,
@@ -832,6 +934,53 @@ func (q *Queries) NextBookingNumber(ctx context.Context, ownerID uuid.UUID) (int
 	return last_number, err
 }
 
+const returnCharges = `-- name: ReturnCharges :many
+SELECT l.invoice_id, l.kind, l.description, l.amount, l.handover_photo_id
+  FROM invoice_lines l
+  JOIN invoices i ON i.id = l.invoice_id
+ WHERE i.booking_id = $1 AND i.deleted_at IS NULL AND i.status IN ('unpaid', 'overdue')
+   AND l.kind IN ('late_fee', 'damage')
+ ORDER BY l.created_at, l.id
+`
+
+type ReturnChargesRow struct {
+	InvoiceID       uuid.UUID
+	Kind            string
+	Description     string
+	Amount          int64
+	HandoverPhotoID *uuid.UUID
+}
+
+// What the deposit absorbs at settlement: late fee and damage lines issued at
+// return, on invoices not yet paid. A return invoice the renter already paid
+// is settled money; absorbing it again is the double charge settle exists to
+// prevent (BR-048).
+func (q *Queries) ReturnCharges(ctx context.Context, bookingID *uuid.UUID) ([]ReturnChargesRow, error) {
+	rows, err := q.db.Query(ctx, returnCharges, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReturnChargesRow
+	for rows.Next() {
+		var i ReturnChargesRow
+		if err := rows.Scan(
+			&i.InvoiceID,
+			&i.Kind,
+			&i.Description,
+			&i.Amount,
+			&i.HandoverPhotoID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setUnitMeter = `-- name: SetUnitMeter :exec
 UPDATE resource_units SET meter_value = $2, updated_at = now() WHERE id = $1
 `
@@ -844,6 +993,29 @@ type SetUnitMeterParams struct {
 // The handover is where the odometer gets read; the unit keeps the latest.
 func (q *Queries) SetUnitMeter(ctx context.Context, arg SetUnitMeterParams) error {
 	_, err := q.db.Exec(ctx, setUnitMeter, arg.ID, arg.MeterValue)
+	return err
+}
+
+const settleDeposit = `-- name: SettleDeposit :exec
+UPDATE bookings SET deposit_deducted = $2, deposit_refunded = $3, deposit_note = $4,
+       deposit_settled_at = now(), updated_at = now()
+ WHERE id = $1
+`
+
+type SettleDepositParams struct {
+	ID              uuid.UUID
+	DepositDeducted int64
+	DepositRefunded int64
+	DepositNote     *string
+}
+
+func (q *Queries) SettleDeposit(ctx context.Context, arg SettleDepositParams) error {
+	_, err := q.db.Exec(ctx, settleDeposit,
+		arg.ID,
+		arg.DepositDeducted,
+		arg.DepositRefunded,
+		arg.DepositNote,
+	)
 	return err
 }
 
@@ -861,5 +1033,22 @@ type SwapBookingUnitParams struct {
 // another kind, and the price snapshot stays the original resource's (BR-029).
 func (q *Queries) SwapBookingUnit(ctx context.Context, arg SwapBookingUnitParams) error {
 	_, err := q.db.Exec(ctx, swapBookingUnit, arg.UnitID, arg.ID)
+	return err
+}
+
+const waiveDeposit = `-- name: WaiveDeposit :exec
+UPDATE bookings SET deposit_waived_at = now(), deposit_waived_by = $2, deposit_waiver_reason = $3,
+       updated_at = now()
+ WHERE id = $1
+`
+
+type WaiveDepositParams struct {
+	ID                  uuid.UUID
+	DepositWaivedBy     *uuid.UUID
+	DepositWaiverReason *string
+}
+
+func (q *Queries) WaiveDeposit(ctx context.Context, arg WaiveDepositParams) error {
+	_, err := q.db.Exec(ctx, waiveDeposit, arg.ID, arg.DepositWaivedBy, arg.DepositWaiverReason)
 	return err
 }

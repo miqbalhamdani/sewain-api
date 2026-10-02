@@ -64,6 +64,8 @@ func newFixture(t *testing.T, units int) fixture {
 		ctx := context.WithoutCancel(f.ctx)
 		_ = store.InOwnerTx(ctx, func(tx pgx.Tx) error {
 			for _, q := range []string{
+				`DELETE FROM payment_proofs`, `DELETE FROM payments`, `DELETE FROM invoice_lines`,
+				`DELETE FROM invoices`,
 				`DELETE FROM bookings`, `DELETE FROM booking_counters`, `DELETE FROM customers`,
 				`DELETE FROM resource_units`, `DELETE FROM resources`, `DELETE FROM users`,
 				`DELETE FROM owners WHERE id = $1`,

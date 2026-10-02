@@ -122,6 +122,37 @@ func init() {
 		c("GET", "/api/v1/invoices/{id}", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
 			return bearerRequest(t, http.MethodGet, "/api/v1/invoices/"+s.invoiceID, s.accessToken)
 		}),
+
+		// M4. Proof ids are the booking id -- a 404 that must still not print B.
+		c("GET", "/api/v1/bookings/{id}/deposit", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodGet, "/api/v1/bookings/"+s.bookingID+"/deposit", s.accessToken)
+		}),
+		c("POST", "/api/v1/bookings/{id}/deposit/settle", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return idemRequest(t, http.MethodPost, "/api/v1/bookings/"+s.bookingID+"/deposit/settle", s.accessToken, `{}`)
+		}),
+		c("POST", "/api/v1/bookings/{id}/deposit/waive", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return idemRequest(t, http.MethodPost, "/api/v1/bookings/"+s.bookingID+"/deposit/waive", s.accessToken, `{"reason":"iso"}`)
+		}),
+		c("POST", "/api/v1/bookings/{id}/complete", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return idemRequest(t, http.MethodPost, "/api/v1/bookings/"+s.bookingID+"/complete", s.accessToken, ``)
+		}),
+		c("POST", "/api/v1/invoices/{id}/payments", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return idemRequest(t, http.MethodPost, "/api/v1/invoices/"+s.invoiceID+"/payments", s.accessToken,
+				`{"method":"cash","amount":700000}`)
+		}),
+		c("GET", "/api/v1/invoices/{id}/proofs", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodGet, "/api/v1/invoices/"+s.invoiceID+"/proofs", s.accessToken)
+		}),
+		c("POST", "/api/v1/invoices/{id}/proofs", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bodyRequest(t, http.MethodPost, "/api/v1/invoices/"+s.invoiceID+"/proofs", s.accessToken,
+				`{"object_key":"pending/x/y"}`)
+		}),
+		c("POST", "/api/v1/proofs/{id}/approve", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return idemRequest(t, http.MethodPost, "/api/v1/proofs/"+s.bookingID+"/approve", s.accessToken, ``)
+		}),
+		c("POST", "/api/v1/proofs/{id}/reject", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bodyRequest(t, http.MethodPost, "/api/v1/proofs/"+s.bookingID+"/reject", s.accessToken, `{"reason":"x"}`)
+		}),
 	)
 }
 
@@ -174,6 +205,8 @@ func seedBookingOwner(ctx context.Context, t *testing.T, store *db.Store, ownerI
 			// nor its customer can go either. Fresh owners per test keep
 			// that from mattering.
 			for _, q := range []string{
+				`DELETE FROM payment_proofs WHERE owner_id = $1`,
+				`DELETE FROM payments WHERE owner_id = $1`,
 				`DELETE FROM invoice_lines WHERE owner_id = $1`,
 				`DELETE FROM invoices WHERE owner_id = $1`,
 				`DELETE FROM bookings WHERE owner_id = $1`,
@@ -201,4 +234,11 @@ func seedBookingOwnerByUnit(ctx context.Context, t *testing.T, store *db.Store, 
 	s := seedBookingOwner(ctx, t, store, ownerID)
 	s.marker = "ISO-" + ownerID.String()
 	return s
+}
+
+func idemRequest(t *testing.T, method, path, token, body string) *http.Request {
+	t.Helper()
+	r := bodyRequest(t, method, path, token, body)
+	r.Header.Set("Idempotency-Key", uuid.Must(uuid.NewV7()).String())
+	return r
 }

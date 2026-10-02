@@ -297,7 +297,7 @@ func (s *Service) writeHandover(ctx context.Context, q *sqlcgen.Queries, ownerID
 		if _, dup := ids[key]; dup {
 			continue
 		}
-		final, err := s.objects.Promote(ctx, ownerID, key, prefix, fmt.Sprintf("photo_keys[%d]", i))
+		_, final, err := s.objects.Promote(ctx, ownerID, key, prefix, fmt.Sprintf("photo_keys[%d]", i), storage.ImageTypes)
 		if err != nil {
 			return nil, err
 		}

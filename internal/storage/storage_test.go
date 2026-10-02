@@ -73,15 +73,15 @@ func TestPresignedUploadBindsTypeAndLength(t *testing.T) {
 	// Promote: another rental's prefix and a key never uploaded both read as
 	// "not found"; the real one is copied and readable through a signed GET.
 	var known *apperrors.Error
-	if _, err := s.Promote(t.Context(), uuid.Must(uuid.NewV7()), key, "handovers/x", "photo_keys"); !errors.As(err, &known) ||
+	if _, _, err := s.Promote(t.Context(), uuid.Must(uuid.NewV7()), key, "handovers/x", "photo_keys", ImageTypes); !errors.As(err, &known) ||
 		known.Code != apperrors.CodeUploadNotFound {
 		t.Errorf("promote with another owner = %v, want upload-not-found", err)
 	}
-	if _, err := s.Promote(t.Context(), owner, PendingKey(owner), "handovers/x", "photo_keys"); !errors.As(err, &known) ||
+	if _, _, err := s.Promote(t.Context(), owner, PendingKey(owner), "handovers/x", "photo_keys", ImageTypes); !errors.As(err, &known) ||
 		known.Code != apperrors.CodeUploadNotFound {
 		t.Errorf("promote of a key never uploaded = %v, want upload-not-found", err)
 	}
-	final, err := s.Promote(t.Context(), owner, key, "handovers/"+owner.String()+"/b", "photo_keys")
+	_, final, err := s.Promote(t.Context(), owner, key, "handovers/"+owner.String()+"/b", "photo_keys", ImageTypes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestPromoteRefusesWrongType(t *testing.T) {
 		t.Fatalf("PUT = %d", code)
 	}
 	var known *apperrors.Error
-	if _, err := s.Promote(t.Context(), owner, key, "handovers/x", "photo_keys"); !errors.As(err, &known) ||
+	if _, _, err := s.Promote(t.Context(), owner, key, "handovers/x", "photo_keys", ImageTypes); !errors.As(err, &known) ||
 		known.Code != apperrors.CodeUploadTypeMismatch {
 		t.Fatalf("promote of text/plain = %v, want upload-type-mismatch", err)
 	}

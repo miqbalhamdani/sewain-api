@@ -115,15 +115,19 @@ var routeAccessTable = map[string]routeAccess{
 	"POST /api/v1/bookings/{id}/pickup": {idempotent: true}, // S1-035
 	"POST /api/v1/bookings/{id}/return": {idempotent: true}, // S1-036
 
-	// The eight that will require Idempotency-Key (04-api-spec.md §2.1). Each
-	// arrives with the item that adds it, and adding the route without the
-	// flag is the mistake this list exists to make visible:
+	// M4: every POST that produces or releases money (BR-090).
+	"POST /api/v1/bookings/{id}/deposit/settle": {idempotent: true}, // S1-042
+	"POST /api/v1/bookings/{id}/deposit/waive":  {idempotent: true}, // S1-042
+	"POST /api/v1/bookings/{id}/complete":       {idempotent: true}, // S1-042
+	"POST /api/v1/invoices/{id}/payments":       {idempotent: true}, // S1-044
+	"POST /api/v1/proofs/{id}/approve":          {idempotent: true}, // S1-046
+
+	// Still to come from 04-api-spec.md §2.1, each with the item that adds the
+	// route -- adding it without the flag is the mistake this list exists to
+	// make visible:
 	//
-	//   S1-051  POST /public/bookings       (POST /bookings is listed above)
-	//   S1-041  POST /invoices/{id}/lines
-	//   S1-042  POST /bookings/{id}/deposit/settle
-	//           POST /bookings/{id}/deposit/waive
-	//   S1-044  POST /invoices/{id}/payments
+	//   S1-051  POST /public/bookings
+	//           POST /invoices/{id}/lines   (discount lines, owner)
 }
 
 // accessFor looks a request up by its route pattern. Every path parameter in

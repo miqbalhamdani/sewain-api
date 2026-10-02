@@ -37,6 +37,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
 	"github.com/miqbalhamdani/sewain-api/internal/customer"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
+	"github.com/miqbalhamdani/sewain-api/internal/jobs"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/mail"
@@ -362,7 +363,7 @@ var newServer = func(t *testing.T) http.Handler {
 
 	return httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(store), catalog.New(store),
-			customers, booking.New(store, objects), objects,
+			customers, booking.New(store, objects).WithJobs(jobs.NewQueue(redis.Raw(), testJobs), booking.NoScanner{}), objects,
 			ratelimit.New(redis), false), signer, redis)
 }
 
@@ -447,3 +448,7 @@ func collectNotes(rows pgx.Rows) ([]string, error) {
 	}
 	return notes, rows.Err()
 }
+
+// testJobs keeps the router's enqueued jobs off the real stream, so a worker
+// running on the developer's machine never picks up a test's proof.
+var testJobs = jobs.Names{Stream: "test:jobs", Group: "test", Retry: "test:jobs:retry", Dead: "test:jobs:dead"}

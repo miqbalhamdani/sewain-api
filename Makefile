@@ -5,11 +5,19 @@ DOCS    ?= ../docs
 # a host install, so a .env is only needed to deviate from them.
 LOAD_ENV = set -a; [ -f .env ] && . ./.env; set +a;
 
-.PHONY: dev db-create storage-init migrate migrate-down generate generated-diff fmt-check vet lint test test-iso test-race lint-imports lint-rls check
+.PHONY: dev worker scheduler db-create storage-init migrate migrate-down generate generated-diff fmt-check vet lint test test-iso test-race lint-imports lint-rls check
 
 ## dev: run the API against host PostgreSQL and Redis
 dev:
 	@$(LOAD_ENV) go run ./cmd/api
+
+## worker: consume the job stream -- proof reading today (S1-040)
+worker:
+	@$(LOAD_ENV) go run ./cmd/worker
+
+## scheduler: enqueue scheduled work; only the lease holder fires (S1-040)
+scheduler:
+	@$(LOAD_ENV) go run ./cmd/scheduler
 
 ## db-create: create the local development database if it is not there yet
 db-create:

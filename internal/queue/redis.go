@@ -42,6 +42,11 @@ func New(ctx context.Context, url string) (*Client, error) {
 	return &Client{rdb: rdb}, nil
 }
 
+// Raw is the underlying client, for internal/jobs only: the Streams runner
+// (S1-040) needs XREADGROUP, XAUTOCLAIM and Lua, and wrapping each one here would
+// be a second API for no gain. Everything else keeps to the methods below.
+func (c *Client) Raw() *redis.Client { return c.rdb }
+
 // Close releases the connection.
 func (c *Client) Close() error { return c.rdb.Close() }
 

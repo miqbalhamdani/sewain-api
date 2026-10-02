@@ -66,7 +66,8 @@ VALUES (sqlc.arg(id), sqlc.arg(owner_id), sqlc.arg(created_by), sqlc.arg(code),
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at, b.actual_return_at,
+       b.created_at, b.actual_return_at, b.deposit_waived_at, b.deposit_settled_at,
+       b.deposit_deducted, b.deposit_refunded,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -86,7 +87,8 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at, b.actual_return_at,
+       b.created_at, b.actual_return_at, b.deposit_waived_at, b.deposit_settled_at,
+       b.deposit_deducted, b.deposit_refunded,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -219,3 +221,51 @@ UPDATE bookings SET status = 'returned', actual_return_at = $2, updated_at = now
 -- name: SetUnitMeter :exec
 -- The handover is where the odometer gets read; the unit keeps the latest.
 UPDATE resource_units SET meter_value = $2, updated_at = now() WHERE id = $1;
+
+-- name: LockBookingDeposit :one
+SELECT status, code, customer_id, deposit_amount, deposit_waived_at, deposit_settled_at
+  FROM bookings
+ WHERE id = $1 AND deleted_at IS NULL
+   FOR UPDATE;
+
+-- name: DepositInvoice :one
+-- The invoice carrying the deposit line, and whether it is paid -- "the money
+-- is in the owner's hands" (BR-048) or "can still be waived" (BR-051).
+SELECT i.id, i.status
+  FROM invoices i
+  JOIN invoice_lines l ON l.invoice_id = i.id AND l.kind = 'deposit'
+ WHERE i.booking_id = $1 AND i.deleted_at IS NULL
+ LIMIT 1;
+
+-- name: ReturnCharges :many
+-- What the deposit absorbs at settlement: late fee and damage lines issued at
+-- return, on invoices not yet paid. A return invoice the renter already paid
+-- is settled money; absorbing it again is the double charge settle exists to
+-- prevent (BR-048).
+SELECT l.invoice_id, l.kind, l.description, l.amount, l.handover_photo_id
+  FROM invoice_lines l
+  JOIN invoices i ON i.id = l.invoice_id
+ WHERE i.booking_id = $1 AND i.deleted_at IS NULL AND i.status IN ('unpaid', 'overdue')
+   AND l.kind IN ('late_fee', 'damage')
+ ORDER BY l.created_at, l.id;
+
+-- name: CancelInvoice :exec
+UPDATE invoices SET status = 'cancelled', updated_at = now() WHERE id = $1;
+
+-- name: SettleDeposit :exec
+UPDATE bookings SET deposit_deducted = $2, deposit_refunded = $3, deposit_note = $4,
+       deposit_settled_at = now(), updated_at = now()
+ WHERE id = $1;
+
+-- name: CompleteBooking :exec
+UPDATE bookings SET status = 'completed', updated_at = now() WHERE id = $1;
+
+-- name: DeleteDepositLine :execrows
+-- BR-051: the line is removed, not offset with a discount -- a discount counts
+-- as revenue (BR-076), and offsetting would shrink revenue by the deposit.
+DELETE FROM invoice_lines WHERE invoice_id = $1 AND kind = 'deposit';
+
+-- name: WaiveDeposit :exec
+UPDATE bookings SET deposit_waived_at = now(), deposit_waived_by = $2, deposit_waiver_reason = $3,
+       updated_at = now()
+ WHERE id = $1;

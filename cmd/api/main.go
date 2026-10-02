@@ -21,6 +21,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/customer"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	httpapi "github.com/miqbalhamdani/sewain-api/internal/http"
+	"github.com/miqbalhamdani/sewain-api/internal/jobs"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/mail"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
@@ -112,7 +113,7 @@ func run() error {
 	))
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(pool), catalog.New(pool),
-			customerSvc, booking.New(pool, store), store,
+			customerSvc, booking.New(pool, store).WithJobs(jobs.NewQueue(redis.Raw(), jobs.Default), booking.NoScanner{}), store,
 			ratelimit.New(redis), !config.IsDevelopment()),
 		signer,
 		redis,

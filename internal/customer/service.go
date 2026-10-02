@@ -21,6 +21,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/db/sqlcgen"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
+	"github.com/miqbalhamdani/sewain-api/internal/storage"
 )
 
 type Service struct {
@@ -31,7 +32,8 @@ type Service struct {
 
 // Objects is what identity photos need from object storage (internal/storage).
 type Objects interface {
-	Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string) (string, error)
+	Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string,
+		allowed map[string]bool) (storage.Object, string, error)
 	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
 }
 

@@ -50,6 +50,12 @@ const (
 	CodePaymentRequiredBeforePickup = "payment-required-before-pickup" // BR-038, S1-035
 	CodePhysicalConflictUnconfirmed = "physical-conflict-unconfirmed"  // BR-042, S1-035
 	CodeWaiverReasonRequired        = "waiver-reason-required"         // BR-051, S1-036
+
+	CodeDepositNotSettled    = "deposit-not-settled"    // BR-049, S1-042
+	CodeDepositNotCollected  = "deposit-not-collected"  // BR-048, S1-042
+	CodeDepositAlreadyPaid   = "deposit-already-paid"   // BR-051, S1-042
+	CodeDepositNotApplicable = "deposit-not-applicable" // BR-016, S1-042
+	CodeInvoiceAlreadyPaid   = "invoice-already-paid"   // BR-060, S1-044
 )
 
 // Conflict is one booking that holds a unit over the range somebody asked for.
@@ -298,6 +304,40 @@ func WaiverReasonRequired() *Error {
 		Title:  "Waiver reason required",
 		Detail: "Waiving any part of a late fee needs a reason."}).
 		WithFields(Field{Name: "waiver_reason"})
+}
+
+func DepositNotSettled() *Error {
+	return &Error{Code: CodeDepositNotSettled, Status: http.StatusConflict,
+		Title:  "Deposit not settled",
+		Detail: "Settle the deposit -- refund, deduct, or both -- before completing this booking."}
+}
+
+// DepositNotCollected: the invoice carrying the deposit is not paid, so there is
+// nothing in the owner's hands to refund or deduct from (BR-048).
+func DepositNotCollected() *Error {
+	return &Error{Code: CodeDepositNotCollected, Status: http.StatusConflict,
+		Title:  "Deposit not collected",
+		Detail: "The deposit has not been paid yet. Record its payment first, or waive it."}
+}
+
+func DepositAlreadyPaid() *Error {
+	return &Error{Code: CodeDepositAlreadyPaid, Status: http.StatusConflict,
+		Title:  "Deposit already paid",
+		Detail: "A paid deposit cannot be waived; it is refunded at settlement instead."}
+}
+
+func DepositNotApplicable() *Error {
+	return &Error{Code: CodeDepositNotApplicable, Status: http.StatusConflict,
+		Title:  "No deposit to act on",
+		Detail: "This booking has no deposit, or it was waived."}
+}
+
+// InvoiceAlreadyPaid is the second successful payment on one invoice -- whether
+// it arrived second or lost a race at payments_one_success_per_invoice (BR-060).
+func InvoiceAlreadyPaid() *Error {
+	return &Error{Code: CodeInvoiceAlreadyPaid, Status: http.StatusConflict,
+		Title:  "Invoice already paid",
+		Detail: "This invoice already has a successful payment."}
 }
 
 // Internal wraps anything the client has no business seeing.

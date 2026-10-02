@@ -172,9 +172,7 @@ func TestReturn(t *testing.T) {
 		t.Fatalf("after return: %v / %v", b["status"], b["actual_return_at"])
 	}
 
-	w := c.do(http.MethodGet, "/api/v1/invoices?booking_id="+c.s.bookingID, "")
-	var invs []map[string]any
-	_ = jsonUnmarshal(w.Body.Bytes(), &invs)
+	invs := c.invoices()
 	if len(invs) != 2 || invs[1]["number"] != "ISO-0001/2" || invs[1]["total"] != float64(450000) {
 		t.Fatalf("invoices = %v, want the rent one plus ISO-0001/2 for 200000 + 250000", invs)
 	}
@@ -229,8 +227,11 @@ func TestCreateIssuesFirstInvoice(t *testing.T) {
 	c.exec(`UPDATE resources SET deposit_amount = 500000 WHERE id = $1`, c.s.resourceID)
 	b := expect(t, c.book("2027-04-01T09:00:00+07:00", "2027-04-03T09:00:00+07:00"), http.StatusCreated, "")
 
+	m := expect(t, c.do(http.MethodGet, "/api/v1/invoices?booking_id="+b["id"].(string), ""), http.StatusOK, "")
 	var invs []map[string]any
-	_ = jsonUnmarshal(c.do(http.MethodGet, "/api/v1/invoices?booking_id="+b["id"].(string), "").Body.Bytes(), &invs)
+	for _, v := range m["data"].([]any) {
+		invs = append(invs, v.(map[string]any))
+	}
 	if len(invs) != 1 || invs[0]["number"] != b["code"].(string)+"/1" || invs[0]["total"] != float64(1200000) {
 		t.Fatalf("first invoice = %v, want %v/1 for 700000 rent + 500000 deposit", invs, b["code"])
 	}
