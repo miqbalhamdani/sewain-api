@@ -47,6 +47,7 @@ type calBooking struct {
 	SegmentBooking
 	StartAt, EndAt, EndAtWithBuffer time.Time
 	Status                          string
+	RentPaid                        bool
 }
 
 // Calendar computes every lane on the server (BR-033): the client never
@@ -79,6 +80,7 @@ func (s *Service) Calendar(ctx context.Context, from, to, now time.Time) ([]Cale
 			EndAt:           b.EndAt,
 			EndAtWithBuffer: b.EndAtWithBuffer,
 			Status:          b.Status,
+			RentPaid:        b.RentPaid,
 		})
 	}
 	out := make([]CalendarRow, 0, len(units))
@@ -96,8 +98,9 @@ func (s *Service) Calendar(ctx context.Context, from, to, now time.Time) ([]Cale
 // by start and, thanks to bookings_no_overlap, never overlap each other --
 // buffer included -- so a single forward walk is enough.
 //
-// reserved is always reserved_unpaid until S1-041 brings invoices: nothing has
-// been paid yet, so that is the true state, not a placeholder.
+// reserved splits on the rent invoice (S1-041). Nothing reaches paid until
+// payments exist (S1-044), so reserved_paid stays unseen until then -- which is
+// the true state, not a placeholder.
 func segments(from, to time.Time, unitStatus string, bookings []calBooking, now time.Time) []Segment {
 	if unitStatus == "maintenance" {
 		return []Segment{{From: from, To: to, State: StateMaintenance}}
@@ -119,6 +122,9 @@ func segments(from, to time.Time, unitStatus string, bookings []calBooking, now 
 		b := bookings[i]
 		add(cursor, b.StartAt, StateAvailable, nil)
 		state := StateReservedUnpaid
+		if b.RentPaid {
+			state = StateReservedPaid
+		}
 		if b.Status == "picked_up" {
 			state = StatePickedUp
 			if b.EndAt.Before(now) {

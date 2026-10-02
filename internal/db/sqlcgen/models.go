@@ -78,6 +78,58 @@ type Customer struct {
 	DeletedAt       *time.Time
 }
 
+type Handover struct {
+	ID             uuid.UUID
+	OwnerID        uuid.UUID
+	BookingID      uuid.UUID
+	Direction      string
+	PerformedBy    uuid.UUID
+	PerformedAt    time.Time
+	MeterValue     *int64
+	Checklist      []byte
+	ConditionNotes *string
+	LateFeeWaived  *int64
+	WaiverReason   *string
+	CreatedAt      time.Time
+}
+
+type HandoverPhoto struct {
+	ID         uuid.UUID
+	OwnerID    uuid.UUID
+	HandoverID uuid.UUID
+	ObjectKey  string
+	CapturedAt time.Time
+}
+
+type Invoice struct {
+	ID             uuid.UUID
+	OwnerID        uuid.UUID
+	Kind           string
+	BookingID      *uuid.UUID
+	SubscriptionID *uuid.UUID
+	CustomerID     *uuid.UUID
+	Number         string
+	Status         string
+	DueAt          time.Time
+	PaidAt         *time.Time
+	CreatedBy      *uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+}
+
+type InvoiceLine struct {
+	ID              uuid.UUID
+	OwnerID         uuid.UUID
+	InvoiceID       uuid.UUID
+	Kind            string
+	Description     string
+	Amount          int64
+	HandoverPhotoID *uuid.UUID
+	WaiverReason    *string
+	CreatedAt       time.Time
+}
+
 type Owner struct {
 	ID                         uuid.UUID
 	Slug                       *string

@@ -11,6 +11,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
+	"github.com/miqbalhamdani/sewain-api/internal/storage"
 )
 
 // TestHealthzReportsEveryService is S1-001's acceptance criterion: the API
@@ -36,11 +37,16 @@ func TestHealthzReportsEveryService(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = redis.Close() })
 
+	store, err := storage.FromConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	rec := httptest.NewRecorder()
 	newHealthHandler(
 		checker{name: "postgres", version: pool.ServerVersion},
 		checker{name: "redis", version: redis.ServerVersion},
-		objectStoreChecker(config.ObjectStoreURL()),
+		objectStoreChecker(store),
 	).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
 	if rec.Code != http.StatusOK {
@@ -85,16 +91,14 @@ func TestHealthzReportsEveryService(t *testing.T) {
 		t.Logf("%s %s", want.service, svc.Version)
 	}
 
-	// MinIO reports its product rather than its build, so there is no major
-	// version to pin -- what matters is that it answered at all. Production
-	// has no MinIO; this is the local stand-in for R2 (S1-033).
-	store, ok := got.Services["objectstore"]
+	// The probe is a signed HEAD on the bucket (S1-033), so "ok" proves the
+	// credentials and the bucket, not only that something answers on :9000.
+	obj, ok := got.Services["objectstore"]
 	if !ok {
 		t.Fatal("/healthz reported no \"objectstore\" service")
 	}
-	if store.Status != "ok" {
-		t.Errorf("objectstore status = %q (%s), want %q\n\nIs MinIO running?\n"+
-			"  minio server --address=:9000 ~/minio-data", store.Status, store.Error, "ok")
+	if obj.Status != "ok" {
+		t.Errorf("objectstore status = %q (%s), want %q\n\nIs MinIO running, and was the bucket made?\n"+
+			"  minio server --address=:9000 ~/minio-data\n  make storage-init", obj.Status, obj.Error, "ok")
 	}
-	t.Logf("objectstore %s", store.Version)
 }

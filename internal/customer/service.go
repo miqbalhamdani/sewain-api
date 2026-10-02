@@ -24,17 +24,24 @@ import (
 )
 
 type Service struct {
-	store *db.Store
-	box   *identityBox
+	store   *db.Store
+	box     *identityBox
+	objects Objects
+}
+
+// Objects is what identity photos need from object storage (internal/storage).
+type Objects interface {
+	Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string) (string, error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
 }
 
 // New takes the 32-byte key from config.IdentityKey.
-func New(store *db.Store, identityKey []byte) (*Service, error) {
+func New(store *db.Store, identityKey []byte, objects Objects) (*Service, error) {
 	box, err := newIdentityBox(identityKey)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{store: store, box: box}, nil
+	return &Service{store: store, box: box, objects: objects}, nil
 }
 
 // Customer is what any backoffice role may read. The identity number is not
@@ -48,6 +55,7 @@ type Customer struct {
 	IsBlacklisted   bool
 	BlacklistReason *string
 	CreatedAt       time.Time
+	HasIDPhoto      bool
 }
 
 // Input is what create and update accept. On update every nil field is left
@@ -251,7 +259,7 @@ func customerOf(r sqlcgen.GetCustomerRow) Customer {
 	return Customer{
 		ID: r.ID, Name: r.Name, Phone: r.Phone, IDType: r.IDType,
 		IDNumberLast4: r.IDNumberLast4, IsBlacklisted: r.IsBlacklisted,
-		BlacklistReason: r.BlacklistReason, CreatedAt: r.CreatedAt,
+		BlacklistReason: r.BlacklistReason, CreatedAt: r.CreatedAt, HasIDPhoto: r.HasIDPhoto,
 	}
 }
 

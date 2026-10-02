@@ -13,6 +13,7 @@ import (
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
+	"github.com/miqbalhamdani/sewain-api/internal/storage"
 )
 
 // refreshCookieName is the only place the refresh token lives on a client.
@@ -29,6 +30,7 @@ type Server struct {
 	catalog   *catalog.Service
 	customers *customer.Service
 	bookings  *booking.Service
+	objects   *storage.Store
 	limiter   *ratelimit.Limiter
 
 	// secureCookies is false only for local development over plain HTTP, where
@@ -37,7 +39,7 @@ type Server struct {
 }
 
 func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, catalogSvc *catalog.Service,
-	customerSvc *customer.Service, bookingSvc *booking.Service,
+	customerSvc *customer.Service, bookingSvc *booking.Service, objects *storage.Store,
 	limiter *ratelimit.Limiter, secureCookies bool) *Server {
 	return &Server{
 		auth:          authSvc,
@@ -45,6 +47,7 @@ func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, catalogSvc 
 		catalog:       catalogSvc,
 		customers:     customerSvc,
 		bookings:      bookingSvc,
+		objects:       objects,
 		limiter:       limiter,
 		secureCookies: secureCookies,
 	}

@@ -5,7 +5,7 @@ DOCS    ?= ../docs
 # a host install, so a .env is only needed to deviate from them.
 LOAD_ENV = set -a; [ -f .env ] && . ./.env; set +a;
 
-.PHONY: dev db-create migrate migrate-down generate generated-diff fmt-check vet lint test test-iso test-race lint-imports lint-rls check
+.PHONY: dev db-create storage-init migrate migrate-down generate generated-diff fmt-check vet lint test test-iso test-race lint-imports lint-rls check
 
 ## dev: run the API against host PostgreSQL and Redis
 dev:
@@ -15,6 +15,10 @@ dev:
 db-create:
 	@psql -lqtA -F'|' | cut -d'|' -f1 | grep -qx '$(DB_NAME)' || createdb '$(DB_NAME)'
 	@echo "$(DB_NAME) ready"
+
+## storage-init: create the private bucket and the pending/ 24h expiry (S1-033)
+storage-init:
+	@$(LOAD_ENV) go run ./cmd/storage-init
 
 ## migrate: apply every migration and exit
 migrate:

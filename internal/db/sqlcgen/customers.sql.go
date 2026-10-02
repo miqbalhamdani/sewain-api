@@ -50,7 +50,7 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 
 const getCustomer = `-- name: GetCustomer :one
 SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
-       blacklist_reason, created_at
+       blacklist_reason, created_at, (id_photo_key IS NOT NULL)::boolean AS has_id_photo
   FROM customers
  WHERE id = $1 AND deleted_at IS NULL
 `
@@ -64,6 +64,7 @@ type GetCustomerRow struct {
 	IsBlacklisted   bool
 	BlacklistReason *string
 	CreatedAt       time.Time
+	HasIDPhoto      bool
 }
 
 func (q *Queries) GetCustomer(ctx context.Context, id uuid.UUID) (GetCustomerRow, error) {
@@ -78,8 +79,20 @@ func (q *Queries) GetCustomer(ctx context.Context, id uuid.UUID) (GetCustomerRow
 		&i.IsBlacklisted,
 		&i.BlacklistReason,
 		&i.CreatedAt,
+		&i.HasIDPhoto,
 	)
 	return i, err
+}
+
+const getCustomerPhotoKey = `-- name: GetCustomerPhotoKey :one
+SELECT id_photo_key FROM customers WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetCustomerPhotoKey(ctx context.Context, id uuid.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, getCustomerPhotoKey, id)
+	var id_photo_key *string
+	err := row.Scan(&id_photo_key)
+	return id_photo_key, err
 }
 
 const insertAuditLog = `-- name: InsertAuditLog :exec
@@ -114,7 +127,7 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 
 const listCustomers = `-- name: ListCustomers :many
 SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
-       blacklist_reason, created_at
+       blacklist_reason, created_at, (id_photo_key IS NOT NULL)::boolean AS has_id_photo
   FROM customers
  WHERE deleted_at IS NULL
    AND ($1::text IS NULL
@@ -142,6 +155,7 @@ type ListCustomersRow struct {
 	IsBlacklisted   bool
 	BlacklistReason *string
 	CreatedAt       time.Time
+	HasIDPhoto      bool
 }
 
 // Keyset on id: UUID v7 is creation order, so "newest first" and the cursor are
@@ -170,6 +184,7 @@ func (q *Queries) ListCustomers(ctx context.Context, arg ListCustomersParams) ([
 			&i.IsBlacklisted,
 			&i.BlacklistReason,
 			&i.CreatedAt,
+			&i.HasIDPhoto,
 		); err != nil {
 			return nil, err
 		}
@@ -199,6 +214,26 @@ type SetCustomerBlacklistParams struct {
 // flag and the reason travel together, so unblocking passes NULL for both.
 func (q *Queries) SetCustomerBlacklist(ctx context.Context, arg SetCustomerBlacklistParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setCustomerBlacklist, arg.IsBlacklisted, arg.BlacklistReason, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setCustomerIdentityPhoto = `-- name: SetCustomerIdentityPhoto :execrows
+UPDATE customers SET id_photo_key = $2, id_type = $3, updated_at = now()
+ WHERE id = $1 AND deleted_at IS NULL
+`
+
+type SetCustomerIdentityPhotoParams struct {
+	ID         uuid.UUID
+	IDPhotoKey *string
+	IDType     *string
+}
+
+// Replaced, not appended: an identity photo is not handover evidence.
+func (q *Queries) SetCustomerIdentityPhoto(ctx context.Context, arg SetCustomerIdentityPhotoParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setCustomerIdentityPhoto, arg.ID, arg.IDPhotoKey, arg.IDType)
 	if err != nil {
 		return 0, err
 	}

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -109,26 +110,36 @@ var routeAccessTable = map[string]routeAccess{
 	"POST /api/v1/auth/verify-email/resend": {preVerification: true},
 	"GET /api/v1/me":                        {preVerification: true},
 
-	// S1-026. The literal path works here because it has no parameter; the
-	// first one that does (S1-035's pickup) has to teach accessFor about
-	// patterns before it can be listed.
-	"POST /api/v1/bookings": {idempotent: true},
+	// Idempotency-Key required (BR-090). Patterns use {id}; see accessFor.
+	"POST /api/v1/bookings":             {idempotent: true}, // S1-026
+	"POST /api/v1/bookings/{id}/pickup": {idempotent: true}, // S1-035
+	"POST /api/v1/bookings/{id}/return": {idempotent: true}, // S1-036
 
 	// The eight that will require Idempotency-Key (04-api-spec.md §2.1). Each
 	// arrives with the item that adds it, and adding the route without the
 	// flag is the mistake this list exists to make visible:
 	//
 	//   S1-051  POST /public/bookings       (POST /bookings is listed above)
-	//   S1-035  POST /bookings/{id}/pickup
-	//   S1-036  POST /bookings/{id}/return
 	//   S1-041  POST /invoices/{id}/lines
 	//   S1-042  POST /bookings/{id}/deposit/settle
 	//           POST /bookings/{id}/deposit/waive
 	//   S1-044  POST /invoices/{id}/payments
 }
 
+// accessFor looks a request up by its route pattern. Every path parameter in
+// this API is a UUID, and these middlewares run before chi has routed (so
+// RoutePattern is still empty) -- normalising UUID segments to {id} is the
+// whole of the matching. A malformed id falls to the zero row: auth and
+// verification still required, never idempotent, and the generated binder
+// answers 400 after.
 func accessFor(r *http.Request) routeAccess {
-	return routeAccessTable[r.Method+" "+r.URL.Path]
+	segs := strings.Split(r.URL.Path, "/")
+	for i, seg := range segs {
+		if uuid.Validate(seg) == nil {
+			segs[i] = "{id}"
+		}
+	}
+	return routeAccessTable[r.Method+" "+strings.Join(segs, "/")]
 }
 
 // RequireVerifiedEmail is the gate on the whole backoffice (BR-006).

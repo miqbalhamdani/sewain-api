@@ -27,6 +27,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/platform/telemetry"
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
+	"github.com/miqbalhamdani/sewain-api/internal/storage"
 )
 
 func main() {
@@ -88,11 +89,16 @@ func run() error {
 
 	authSvc := auth.NewService(pool, signer).WithMail(redis, mailer, config.AppBaseURL())
 
+	store, err := storage.FromConfig()
+	if err != nil {
+		return err
+	}
+
 	identityKey, err := config.IdentityKey()
 	if err != nil {
 		return err
 	}
-	customerSvc, err := customer.New(pool, identityKey)
+	customerSvc, err := customer.New(pool, identityKey, store)
 	if err != nil {
 		return err
 	}
@@ -102,11 +108,11 @@ func run() error {
 	mux.Handle("GET /healthz", newHealthHandler(
 		checker{name: "postgres", version: pool.ServerVersion},
 		checker{name: "redis", version: redis.ServerVersion},
-		objectStoreChecker(config.ObjectStoreURL()),
+		objectStoreChecker(store),
 	))
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(pool), catalog.New(pool),
-			customerSvc, booking.New(pool),
+			customerSvc, booking.New(pool, store), store,
 			ratelimit.New(redis), !config.IsDevelopment()),
 		signer,
 		redis,

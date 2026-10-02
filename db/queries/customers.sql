@@ -10,7 +10,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 
 -- name: GetCustomer :one
 SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
-       blacklist_reason, created_at
+       blacklist_reason, created_at, (id_photo_key IS NOT NULL)::boolean AS has_id_photo
   FROM customers
  WHERE id = $1 AND deleted_at IS NULL;
 
@@ -19,7 +19,7 @@ SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
 -- the same column. q matches name or phone, case-insensitively -- the booking
 -- form searches while the operator types.
 SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
-       blacklist_reason, created_at
+       blacklist_reason, created_at, (id_photo_key IS NOT NULL)::boolean AS has_id_photo
   FROM customers
  WHERE deleted_at IS NULL
    AND (sqlc.narg(q)::text IS NULL
@@ -56,3 +56,11 @@ UPDATE customers SET
 -- and 000012 revokes both from app_user so there cannot be one (BR-085).
 INSERT INTO audit_logs (id, owner_id, actor_user_id, action, entity, entity_id, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7);
+
+-- name: SetCustomerIdentityPhoto :execrows
+-- Replaced, not appended: an identity photo is not handover evidence.
+UPDATE customers SET id_photo_key = $2, id_type = $3, updated_at = now()
+ WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: GetCustomerPhotoKey :one
+SELECT id_photo_key FROM customers WHERE id = $1 AND deleted_at IS NULL;

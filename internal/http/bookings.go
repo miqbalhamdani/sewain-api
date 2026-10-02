@@ -220,7 +220,7 @@ func bookingBody(b booking.Booking) Booking {
 		BufferMinutes: int(b.BufferMinutes), DurationQty: int(b.DurationQty), Subtotal: b.Subtotal,
 		DepositAmount: b.DepositAmount, LateFeePerUnit: b.LateFeePerUnit,
 		CancelledReason: (*CancelledReason)(b.CancelledReason), ExpiresAt: b.ExpiresAt,
-		CreatedAt: b.CreatedAt,
+		CreatedAt: b.CreatedAt, ActualReturnAt: b.ActualReturnAt,
 	}
 }
 

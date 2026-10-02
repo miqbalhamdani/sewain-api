@@ -27,10 +27,18 @@ import (
 )
 
 type Service struct {
-	store *db.Store
+	store   *db.Store
+	objects Objects
 }
 
-func New(store *db.Store) *Service { return &Service{store: store} }
+// Objects is what handovers need from object storage (internal/storage),
+// declared here by the consumer.
+type Objects interface {
+	Promote(ctx context.Context, ownerID uuid.UUID, pendingKey, finalPrefix, field string) (string, error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
+}
+
+func New(store *db.Store, objects Objects) *Service { return &Service{store: store, objects: objects} }
 
 // Booking is one booking as every backoffice screen reads it.
 type Booking struct {
@@ -54,6 +62,7 @@ type Booking struct {
 	CancelledReason *string
 	ExpiresAt       *time.Time
 	CreatedAt       time.Time
+	ActualReturnAt  *time.Time
 
 	CustomerID          uuid.UUID
 	CustomerName        string
@@ -182,6 +191,29 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, n NewBooking) (B
 			DepositAmount:  unit.DepositAmount,
 			LateFeePerUnit: unit.LateFeePerUnit,
 		}); err != nil {
+			return err
+		}
+
+		// BR-045 + BR-057: the first invoice is issued with the booking, in the
+		// same transaction -- rent, plus the deposit when the resource takes one.
+		code := fmt.Sprintf("%s-%04d", prefix, number)
+		dueHours, err := q.GetPaymentDueHours(ctx, ownerID)
+		if err != nil {
+			return err
+		}
+		due := time.Now().Add(time.Duration(dueHours) * time.Hour)
+		if n.StartAt.Before(due) {
+			due = n.StartAt
+		}
+		var lines []line
+		if subtotal := int64(qty) * unit.BasePrice; subtotal > 0 {
+			lines = append(lines, line{kind: "rent", amount: subtotal,
+				description: fmt.Sprintf("Sewa %d %s", qty, unitName[unit.PricingUnit])})
+		}
+		if unit.DepositAmount != nil {
+			lines = append(lines, line{kind: "deposit", amount: *unit.DepositAmount, description: "Deposit"})
+		}
+		if err := issueInvoice(ctx, q, ownerID, userID, id, n.CustomerID, code, due, lines); err != nil {
 			return err
 		}
 		row, err = q.GetBooking(ctx, id)
@@ -414,7 +446,8 @@ func bookingOf(r sqlcgen.GetBookingRow) Booking {
 		DurationQty: r.DurationQty, Subtotal: r.Subtotal,
 		DepositAmount: r.DepositAmount, LateFeePerUnit: r.LateFeePerUnit,
 		CancelledReason: r.CancelledReason, ExpiresAt: r.ExpiresAt, CreatedAt: r.CreatedAt,
-		CustomerID: r.CustomerID, CustomerName: r.CustomerName, CustomerPhone: r.CustomerPhone,
+		ActualReturnAt: r.ActualReturnAt,
+		CustomerID:     r.CustomerID, CustomerName: r.CustomerName, CustomerPhone: r.CustomerPhone,
 		CustomerBlacklisted: r.CustomerBlacklisted,
 		ResourceID:          r.ResourceID, ResourceName: r.ResourceName,
 		UnitID: r.UnitID, UnitCode: r.UnitCode, UnitLabel: r.UnitLabel,

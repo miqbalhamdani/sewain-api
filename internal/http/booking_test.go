@@ -302,6 +302,8 @@ func TestSwapUnit(t *testing.T) {
 	c.exec(`INSERT INTO resource_units (id, owner_id, resource_id, code) VALUES ($1, $2, $3, $4)`,
 		foreign, c.ownerID, foreignRes, "FOREIGN-"+foreign.String())
 	t.Cleanup(func() {
+		c.exec(`DELETE FROM invoice_lines WHERE owner_id = $1`, c.ownerID)
+		c.exec(`DELETE FROM invoices WHERE owner_id = $1`, c.ownerID)
 		c.exec(`DELETE FROM bookings WHERE owner_id = $1`, c.ownerID)
 		c.exec(`DELETE FROM resource_units WHERE id IN ($1, $2)`, other, foreign)
 		c.exec(`DELETE FROM resources WHERE id = $1`, foreignRes)
@@ -497,3 +499,5 @@ func TestListCustomersBlacklisted(t *testing.T) {
 		}
 	}
 }
+
+func jsonUnmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }

@@ -78,6 +78,50 @@ func init() {
 		c("POST", "/api/v1/bookings/{id}/cancel", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
 			return bearerRequest(t, http.MethodPost, "/api/v1/bookings/"+s.bookingID+"/cancel", s.accessToken)
 		}),
+
+		// M3. Bodies carry keys that do not exist: the refusal is the point
+		// -- a pickup that reached B's booking would print B's renter.
+		c("POST", "/api/v1/uploads/presign", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bodyRequest(t, http.MethodPost, "/api/v1/uploads/presign", s.accessToken,
+				`{"kind":"handover_photo","content_type":"image/jpeg","bytes":1024}`)
+		}),
+		c("POST", "/api/v1/customers/{id}/identity", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bodyRequest(t, http.MethodPost, "/api/v1/customers/"+s.customerID+"/identity", s.accessToken,
+				`{"object_key":"pending/x/y","id_type":"ktp"}`)
+		}),
+		c("GET", "/api/v1/customers/{id}/identity", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodGet, "/api/v1/customers/"+s.customerID+"/identity", s.accessToken)
+		}),
+		c("POST", "/api/v1/bookings/{id}/pickup", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			r := bodyRequest(t, http.MethodPost, "/api/v1/bookings/"+s.bookingID+"/pickup", s.accessToken,
+				`{"photo_keys":["pending/x/y"],"meter_value":1}`)
+			r.Header.Set("Idempotency-Key", uuid.Must(uuid.NewV7()).String())
+			return r
+		}),
+		c("GET", "/api/v1/bookings/{id}/return-preview", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodGet, "/api/v1/bookings/"+s.bookingID+"/return-preview", s.accessToken)
+		}),
+		c("POST", "/api/v1/bookings/{id}/return", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			r := bodyRequest(t, http.MethodPost, "/api/v1/bookings/"+s.bookingID+"/return", s.accessToken,
+				`{"photo_keys":["pending/x/y"],"meter_value":1}`)
+			r.Header.Set("Idempotency-Key", uuid.Must(uuid.NewV7()).String())
+			return r
+		}),
+		c("GET", "/api/v1/bookings/{id}/handovers", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodGet, "/api/v1/bookings/"+s.bookingID+"/handovers", s.accessToken)
+		}),
+		c("PATCH", "/api/v1/handovers/{id}", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bodyRequest(t, http.MethodPatch, "/api/v1/handovers/"+s.bookingID, s.accessToken, `{}`)
+		}),
+		c("DELETE", "/api/v1/handovers/{id}", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodDelete, "/api/v1/handovers/"+s.bookingID, s.accessToken)
+		}),
+		c("GET", "/api/v1/invoices", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodGet, "/api/v1/invoices?booking_id="+s.bookingID, s.accessToken)
+		}),
+		c("GET", "/api/v1/invoices/{id}", seedBookingOwner, func(t *testing.T, s seeded) *http.Request {
+			return bearerRequest(t, http.MethodGet, "/api/v1/invoices/"+s.invoiceID, s.accessToken)
+		}),
 	)
 }
 
@@ -87,7 +131,7 @@ func seedBookingOwner(ctx context.Context, t *testing.T, store *db.Store, ownerI
 	t.Helper()
 	s := seedCatalogOwner(ctx, t, store, ownerID)
 
-	customerID, bookingID := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	customerID, bookingID, invoiceID := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
 	name := "iso-customer-" + ownerID.String()
 	unitID, resourceID := uuid.MustParse(s.unitID), uuid.MustParse(s.resourceID)
 
@@ -97,13 +141,26 @@ func seedBookingOwner(ctx context.Context, t *testing.T, store *db.Store, ownerI
 			customerID, ownerID, name); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx,
+		if _, err := tx.Exec(ctx,
 			`INSERT INTO bookings (id, owner_id, code, customer_id, resource_id, resource_unit_id,
 			                       start_at, end_at, status, unit_price, pricing_unit,
 			                       duration_qty, subtotal)
 			 VALUES ($1, $2, 'ISO-0001', $3, $4, $5, '2026-09-03 09:00+07', '2026-09-05 09:00+07',
 			         'reserved', 350000, 'day', 2, 700000)`,
-			bookingID, ownerID, customerID, resourceID, unitID)
+			bookingID, ownerID, customerID, resourceID, unitID); err != nil {
+			return err
+		}
+		// The first invoice, as booking create would have issued it (S1-041).
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO invoices (id, owner_id, booking_id, customer_id, number, due_at)
+			 VALUES ($1, $2, $3, $4, 'ISO-0001/1', '2026-09-03 09:00+07')`,
+			invoiceID, ownerID, bookingID, customerID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`INSERT INTO invoice_lines (id, owner_id, invoice_id, kind, description, amount)
+			 VALUES ($1, $2, $3, 'rent', 'Sewa 2 hari', 700000)`,
+			uuid.Must(uuid.NewV7()), ownerID, invoiceID)
 		return err
 	}); err != nil {
 		t.Fatalf("seed bookings for owner %s: %v", ownerID, err)
@@ -112,7 +169,13 @@ func seedBookingOwner(ctx context.Context, t *testing.T, store *db.Store, ownerI
 	t.Cleanup(func() {
 		cleanup := context.WithoutCancel(ctx)
 		_ = store.InOwnerTx(owner.NewContext(cleanup, ownerID), func(tx pgx.Tx) error {
+			// Bookings with a handover stay: handovers are append-only and
+			// app_user cannot delete them (BR-037), so neither the booking
+			// nor its customer can go either. Fresh owners per test keep
+			// that from mattering.
 			for _, q := range []string{
+				`DELETE FROM invoice_lines WHERE owner_id = $1`,
+				`DELETE FROM invoices WHERE owner_id = $1`,
 				`DELETE FROM bookings WHERE owner_id = $1`,
 				`DELETE FROM booking_counters WHERE owner_id = $1`,
 				`DELETE FROM customers WHERE owner_id = $1`,
@@ -128,6 +191,7 @@ func seedBookingOwner(ctx context.Context, t *testing.T, store *db.Store, ownerI
 	s.marker = name
 	s.customerID = customerID.String()
 	s.bookingID = bookingID.String()
+	s.invoiceID = invoiceID.String()
 	return s
 }
 

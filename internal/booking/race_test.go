@@ -29,7 +29,7 @@ import (
 //     into an application check, and this goes red every time.
 func TestConcurrentCreate(t *testing.T) {
 	f := newFixture(t, 1)
-	s := New(f.store)
+	s := New(f.store, nil)
 
 	for round := range 10 {
 		start := time.Date(2027, 1, 1, 9, 0, 0, 0, time.UTC).AddDate(0, 0, round*3)

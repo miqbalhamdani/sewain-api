@@ -66,7 +66,7 @@ VALUES (sqlc.arg(id), sqlc.arg(owner_id), sqlc.arg(created_by), sqlc.arg(code),
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at,
+       b.created_at, b.actual_return_at,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -86,7 +86,7 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at,
+       b.created_at, b.actual_return_at,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -172,10 +172,50 @@ SELECT u.id, u.resource_id, u.code, u.label, u.status
 -- Only the two statuses that lock (BR-023): draft never appears, returned shows
 -- as available.
 SELECT b.id, b.code, b.resource_unit_id, b.start_at, b.end_at, b.end_at_with_buffer,
-       b.status, c.name AS customer_name
+       b.status, c.name AS customer_name,
+       -- reserved_paid vs reserved_unpaid (BR-033): the rent invoice's status.
+       EXISTS (SELECT 1 FROM invoices i
+                 JOIN invoice_lines l ON l.invoice_id = i.id AND l.kind = 'rent'
+                WHERE i.booking_id = b.id AND i.status = 'paid')::boolean AS rent_paid
   FROM bookings b
   JOIN customers c ON c.id = b.customer_id
  WHERE b.status IN ('reserved', 'picked_up') AND b.deleted_at IS NULL
    AND b.start_at < sqlc.arg(to_at)::timestamptz
    AND b.end_at_with_buffer > sqlc.arg(from_at)::timestamptz
  ORDER BY b.resource_unit_id, b.start_at;
+
+-- name: LockBookingForHandover :one
+-- Everything pickup and return decide from, read under the row lock.
+-- is_vehicle is the "metered" rule (S1-035): a resource with vehicle specs.
+SELECT b.status, b.code, b.customer_id, b.resource_unit_id, b.start_at, b.end_at,
+       b.pricing_unit, b.late_fee_per_unit, b.deposit_amount,
+       EXISTS (SELECT 1 FROM vehicle_specs v WHERE v.resource_id = b.resource_id)::boolean AS is_vehicle,
+       o.require_payment_before_pickup
+  FROM bookings b
+  JOIN owners o ON o.id = b.owner_id
+ WHERE b.id = $1 AND b.deleted_at IS NULL
+   FOR UPDATE OF b;
+
+-- name: FindPhysicalConflicts :many
+-- BR-042: the unit is still out with an earlier booking past its end. The
+-- schedule does not clash -- bookings_no_overlap compared ranges that have
+-- already ended -- but the car is not in the yard. Plain timestamptz
+-- comparison, not a range, for the RLS reason in 000013.
+SELECT code, start_at, end_at, status
+  FROM bookings
+ WHERE resource_unit_id = sqlc.arg(unit_id) AND id <> sqlc.arg(exclude_id)
+   AND status = 'picked_up' AND end_at < now() AND deleted_at IS NULL
+ ORDER BY start_at;
+
+-- name: MarkPickedUp :exec
+UPDATE bookings SET status = 'picked_up', updated_at = now() WHERE id = $1;
+
+-- name: MarkReturned :exec
+-- BR-040: the server's clock, never the body's -- the same instant the late
+-- fee was computed from, passed in so the two cannot disagree.
+UPDATE bookings SET status = 'returned', actual_return_at = $2, updated_at = now()
+ WHERE id = $1;
+
+-- name: SetUnitMeter :exec
+-- The handover is where the odometer gets read; the unit keeps the latest.
+UPDATE resource_units SET meter_value = $2, updated_at = now() WHERE id = $1;

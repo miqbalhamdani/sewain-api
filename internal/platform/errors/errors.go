@@ -41,6 +41,15 @@ const (
 	CodeDurationOutOfRange  = "duration-out-of-range" // BR-021, S1-026
 	CodeCustomerBlacklisted = "customer-blacklisted"  // BR-028, S1-026
 	CodeUnitNotSwappable    = "unit-not-swappable"    // BR-029, S1-027
+
+	CodeEvidenceImmutable           = "evidence-immutable"             // BR-037, S1-034
+	CodeUploadNotFound              = "upload-not-found"               // BR-093, S1-033
+	CodeUploadTypeMismatch          = "upload-type-mismatch"           // BR-093, S1-033
+	CodeHandoverPhotoRequired       = "handover-photo-required"        // BR-036, S1-035
+	CodeMeterValueRequired          = "meter-value-required"           // BR-036, S1-035
+	CodePaymentRequiredBeforePickup = "payment-required-before-pickup" // BR-038, S1-035
+	CodePhysicalConflictUnconfirmed = "physical-conflict-unconfirmed"  // BR-042, S1-035
+	CodeWaiverReasonRequired        = "waiver-reason-required"         // BR-051, S1-036
 )
 
 // Conflict is one booking that holds a unit over the range somebody asked for.
@@ -228,6 +237,67 @@ func UnitNotSwappable(status string) *Error {
 	return &Error{Code: CodeUnitNotSwappable, Status: http.StatusConflict,
 		Title:  "Unit cannot be swapped",
 		Detail: "Only a reserved booking can change unit; this one is " + status + "."}
+}
+
+// EvidenceImmutable is the only answer PATCH or DELETE on a handover ever gets,
+// for every role including the owner (BR-037).
+func EvidenceImmutable() *Error {
+	return &Error{Code: CodeEvidenceImmutable, Status: http.StatusMethodNotAllowed,
+		Title:  "Evidence cannot be changed",
+		Detail: "Handover records and their photos are append-only. Add a note instead of changing one."}
+}
+
+// UploadNotFound covers a key that does not exist, was never uploaded, or does
+// not carry this rental's prefix -- one answer, so a guessed key learns nothing
+// about another rental's objects (BR-001, BR-093).
+func UploadNotFound(field string) *Error {
+	return (&Error{Code: CodeUploadNotFound, Status: http.StatusUnprocessableEntity,
+		Title:  "Upload not found",
+		Detail: "That upload does not exist or does not belong to this business. Upload the photo again."}).
+		WithFields(Field{Name: field})
+}
+
+func UploadTypeMismatch(field string) *Error {
+	return (&Error{Code: CodeUploadTypeMismatch, Status: http.StatusUnprocessableEntity,
+		Title:  "Upload type not allowed",
+		Detail: "That upload is not an allowed image type or is larger than 10 MB."}).
+		WithFields(Field{Name: field})
+}
+
+func HandoverPhotoRequired() *Error {
+	return (&Error{Code: CodeHandoverPhotoRequired, Status: http.StatusUnprocessableEntity,
+		Title:  "Photo required",
+		Detail: "A handover needs at least one photo of the unit's condition."}).
+		WithFields(Field{Name: "photo_keys"})
+}
+
+func MeterValueRequired() *Error {
+	return (&Error{Code: CodeMeterValueRequired, Status: http.StatusUnprocessableEntity,
+		Title:  "Odometer required",
+		Detail: "A vehicle handover needs the odometer reading."}).
+		WithFields(Field{Name: "meter_value"})
+}
+
+func PaymentRequiredBeforePickup() *Error {
+	return &Error{Code: CodePaymentRequiredBeforePickup, Status: http.StatusConflict,
+		Title:  "Payment required before pickup",
+		Detail: "This business requires the rent invoice to be paid before the unit leaves."}
+}
+
+// PhysicalConflictUnconfirmed carries the booking whose unit is still out, in
+// the same conflicts[] shape booking-conflict uses (BR-042).
+func PhysicalConflictUnconfirmed(conflicts []Conflict) *Error {
+	return &Error{Code: CodePhysicalConflictUnconfirmed, Status: http.StatusConflict,
+		Title:     "Unit has not come back yet",
+		Detail:    "The previous booking for this unit is past its end and has not been returned. Confirm that the unit is physically here to continue.",
+		Conflicts: conflicts}
+}
+
+func WaiverReasonRequired() *Error {
+	return (&Error{Code: CodeWaiverReasonRequired, Status: http.StatusUnprocessableEntity,
+		Title:  "Waiver reason required",
+		Detail: "Waiving any part of a late fee needs a reason."}).
+		WithFields(Field{Name: "waiver_reason"})
 }
 
 // Internal wraps anything the client has no business seeing.

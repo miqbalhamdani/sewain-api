@@ -95,6 +95,55 @@ func (q *Queries) FindConflicts(ctx context.Context, arg FindConflictsParams) ([
 	return items, nil
 }
 
+const findPhysicalConflicts = `-- name: FindPhysicalConflicts :many
+SELECT code, start_at, end_at, status
+  FROM bookings
+ WHERE resource_unit_id = $1 AND id <> $2
+   AND status = 'picked_up' AND end_at < now() AND deleted_at IS NULL
+ ORDER BY start_at
+`
+
+type FindPhysicalConflictsParams struct {
+	UnitID    uuid.UUID
+	ExcludeID uuid.UUID
+}
+
+type FindPhysicalConflictsRow struct {
+	Code    string
+	StartAt time.Time
+	EndAt   time.Time
+	Status  string
+}
+
+// BR-042: the unit is still out with an earlier booking past its end. The
+// schedule does not clash -- bookings_no_overlap compared ranges that have
+// already ended -- but the car is not in the yard. Plain timestamptz
+// comparison, not a range, for the RLS reason in 000013.
+func (q *Queries) FindPhysicalConflicts(ctx context.Context, arg FindPhysicalConflictsParams) ([]FindPhysicalConflictsRow, error) {
+	rows, err := q.db.Query(ctx, findPhysicalConflicts, arg.UnitID, arg.ExcludeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindPhysicalConflictsRow
+	for rows.Next() {
+		var i FindPhysicalConflictsRow
+		if err := rows.Scan(
+			&i.Code,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getBookableUnit = `-- name: GetBookableUnit :one
 SELECT u.id AS unit_id, u.resource_id, u.status AS unit_status,
        r.status AS resource_status, r.base_price, r.pricing_unit, r.buffer_minutes,
@@ -143,7 +192,7 @@ const getBooking = `-- name: GetBooking :one
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at,
+       b.created_at, b.actual_return_at,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -174,6 +223,7 @@ type GetBookingRow struct {
 	CancelledReason     *string
 	ExpiresAt           *time.Time
 	CreatedAt           time.Time
+	ActualReturnAt      *time.Time
 	Overdue             bool
 	CustomerID          uuid.UUID
 	CustomerName        string
@@ -207,6 +257,7 @@ func (q *Queries) GetBooking(ctx context.Context, id uuid.UUID) (GetBookingRow, 
 		&i.CancelledReason,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.ActualReturnAt,
 		&i.Overdue,
 		&i.CustomerID,
 		&i.CustomerName,
@@ -411,7 +462,7 @@ const listBookings = `-- name: ListBookings :many
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
-       b.created_at,
+       b.created_at, b.actual_return_at,
        (b.status = 'picked_up' AND b.end_at < now())::boolean AS overdue,
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
@@ -470,6 +521,7 @@ type ListBookingsRow struct {
 	CancelledReason     *string
 	ExpiresAt           *time.Time
 	CreatedAt           time.Time
+	ActualReturnAt      *time.Time
 	Overdue             bool
 	CustomerID          uuid.UUID
 	CustomerName        string
@@ -525,6 +577,7 @@ func (q *Queries) ListBookings(ctx context.Context, arg ListBookingsParams) ([]L
 			&i.CancelledReason,
 			&i.ExpiresAt,
 			&i.CreatedAt,
+			&i.ActualReturnAt,
 			&i.Overdue,
 			&i.CustomerID,
 			&i.CustomerName,
@@ -548,7 +601,11 @@ func (q *Queries) ListBookings(ctx context.Context, arg ListBookingsParams) ([]L
 
 const listCalendarBookings = `-- name: ListCalendarBookings :many
 SELECT b.id, b.code, b.resource_unit_id, b.start_at, b.end_at, b.end_at_with_buffer,
-       b.status, c.name AS customer_name
+       b.status, c.name AS customer_name,
+       -- reserved_paid vs reserved_unpaid (BR-033): the rent invoice's status.
+       EXISTS (SELECT 1 FROM invoices i
+                 JOIN invoice_lines l ON l.invoice_id = i.id AND l.kind = 'rent'
+                WHERE i.booking_id = b.id AND i.status = 'paid')::boolean AS rent_paid
   FROM bookings b
   JOIN customers c ON c.id = b.customer_id
  WHERE b.status IN ('reserved', 'picked_up') AND b.deleted_at IS NULL
@@ -571,6 +628,7 @@ type ListCalendarBookingsRow struct {
 	EndAtWithBuffer time.Time
 	Status          string
 	CustomerName    string
+	RentPaid        bool
 }
 
 // Only the two statuses that lock (BR-023): draft never appears, returned shows
@@ -593,6 +651,7 @@ func (q *Queries) ListCalendarBookings(ctx context.Context, arg ListCalendarBook
 			&i.EndAtWithBuffer,
 			&i.Status,
 			&i.CustomerName,
+			&i.RentPaid,
 		); err != nil {
 			return nil, err
 		}
@@ -677,6 +736,78 @@ func (q *Queries) LockBooking(ctx context.Context, id uuid.UUID) (LockBookingRow
 	return i, err
 }
 
+const lockBookingForHandover = `-- name: LockBookingForHandover :one
+SELECT b.status, b.code, b.customer_id, b.resource_unit_id, b.start_at, b.end_at,
+       b.pricing_unit, b.late_fee_per_unit, b.deposit_amount,
+       EXISTS (SELECT 1 FROM vehicle_specs v WHERE v.resource_id = b.resource_id)::boolean AS is_vehicle,
+       o.require_payment_before_pickup
+  FROM bookings b
+  JOIN owners o ON o.id = b.owner_id
+ WHERE b.id = $1 AND b.deleted_at IS NULL
+   FOR UPDATE OF b
+`
+
+type LockBookingForHandoverRow struct {
+	Status                     string
+	Code                       string
+	CustomerID                 uuid.UUID
+	ResourceUnitID             uuid.UUID
+	StartAt                    time.Time
+	EndAt                      time.Time
+	PricingUnit                string
+	LateFeePerUnit             *int64
+	DepositAmount              *int64
+	IsVehicle                  bool
+	RequirePaymentBeforePickup bool
+}
+
+// Everything pickup and return decide from, read under the row lock.
+// is_vehicle is the "metered" rule (S1-035): a resource with vehicle specs.
+func (q *Queries) LockBookingForHandover(ctx context.Context, id uuid.UUID) (LockBookingForHandoverRow, error) {
+	row := q.db.QueryRow(ctx, lockBookingForHandover, id)
+	var i LockBookingForHandoverRow
+	err := row.Scan(
+		&i.Status,
+		&i.Code,
+		&i.CustomerID,
+		&i.ResourceUnitID,
+		&i.StartAt,
+		&i.EndAt,
+		&i.PricingUnit,
+		&i.LateFeePerUnit,
+		&i.DepositAmount,
+		&i.IsVehicle,
+		&i.RequirePaymentBeforePickup,
+	)
+	return i, err
+}
+
+const markPickedUp = `-- name: MarkPickedUp :exec
+UPDATE bookings SET status = 'picked_up', updated_at = now() WHERE id = $1
+`
+
+func (q *Queries) MarkPickedUp(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markPickedUp, id)
+	return err
+}
+
+const markReturned = `-- name: MarkReturned :exec
+UPDATE bookings SET status = 'returned', actual_return_at = $2, updated_at = now()
+ WHERE id = $1
+`
+
+type MarkReturnedParams struct {
+	ID             uuid.UUID
+	ActualReturnAt *time.Time
+}
+
+// BR-040: the server's clock, never the body's -- the same instant the late
+// fee was computed from, passed in so the two cannot disagree.
+func (q *Queries) MarkReturned(ctx context.Context, arg MarkReturnedParams) error {
+	_, err := q.db.Exec(ctx, markReturned, arg.ID, arg.ActualReturnAt)
+	return err
+}
+
 const nextBookingNumber = `-- name: NextBookingNumber :one
 
 INSERT INTO booking_counters (owner_id, last_number) VALUES ($1, 1)
@@ -699,6 +830,21 @@ func (q *Queries) NextBookingNumber(ctx context.Context, ownerID uuid.UUID) (int
 	var last_number int64
 	err := row.Scan(&last_number)
 	return last_number, err
+}
+
+const setUnitMeter = `-- name: SetUnitMeter :exec
+UPDATE resource_units SET meter_value = $2, updated_at = now() WHERE id = $1
+`
+
+type SetUnitMeterParams struct {
+	ID         uuid.UUID
+	MeterValue *int64
+}
+
+// The handover is where the odometer gets read; the unit keeps the latest.
+func (q *Queries) SetUnitMeter(ctx context.Context, arg SetUnitMeterParams) error {
+	_, err := q.db.Exec(ctx, setUnitMeter, arg.ID, arg.MeterValue)
+	return err
 }
 
 const swapBookingUnit = `-- name: SwapBookingUnit :exec

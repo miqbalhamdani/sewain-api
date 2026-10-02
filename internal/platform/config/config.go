@@ -74,6 +74,27 @@ func RedisURL() string { return Getenv("REDIS_URL", DefaultRedisURL) }
 
 func ObjectStoreURL() string { return Getenv("OBJECT_STORE_URL", DefaultObjectStoreURL) }
 
+// ObjectStoreBucket is the one private bucket every object lives in. Tenancy is
+// the owner_id key prefix, not a bucket per rental (CLAUDE.md, BR-093).
+func ObjectStoreBucket() string { return Getenv("OBJECT_STORE_BUCKET", "sewain") }
+
+// ObjectStoreRegion is "us-east-1" for MinIO; R2 accepts "auto".
+func ObjectStoreRegion() string { return Getenv("OBJECT_STORE_REGION", "us-east-1") }
+
+// ObjectStoreCredentials returns the access key pair. Same rule as JWTSecret:
+// the MinIO defaults only exist in development, and a deployed environment
+// without its own pair is a startup failure.
+func ObjectStoreCredentials() (accessKey, secretKey string, err error) {
+	accessKey, secretKey = os.Getenv("OBJECT_STORE_ACCESS_KEY"), os.Getenv("OBJECT_STORE_SECRET_KEY")
+	if accessKey != "" && secretKey != "" {
+		return accessKey, secretKey, nil
+	}
+	if IsDevelopment() {
+		return "minioadmin", "minioadmin", nil
+	}
+	return "", "", errors.New("OBJECT_STORE_ACCESS_KEY and OBJECT_STORE_SECRET_KEY are required when ENVIRONMENT is not \"development\"")
+}
+
 func SMTPAddr() string   { return Getenv("SMTP_ADDR", DefaultSMTPAddr) }
 func MailFrom() string   { return Getenv("MAIL_FROM", DefaultMailFrom) }
 func AppBaseURL() string { return Getenv("APP_BASE_URL", DefaultAppBaseURL) }

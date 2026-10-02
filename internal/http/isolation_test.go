@@ -43,6 +43,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
+	"github.com/miqbalhamdani/sewain-api/internal/storage"
 )
 
 const (
@@ -82,6 +83,7 @@ type seeded struct {
 	// customerID and bookingID, set by seedBookingOwner (M2).
 	customerID string
 	bookingID  string
+	invoiceID  string
 }
 
 // isolationCase says how to exercise one route as owner A after owner B owns
@@ -349,14 +351,18 @@ var newServer = func(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	customers, err := customer.New(store, identityKey)
+	objects, err := storage.FromConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	customers, err := customer.New(store, identityKey, objects)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(store), catalog.New(store),
-			customers, booking.New(store),
+			customers, booking.New(store, objects), objects,
 			ratelimit.New(redis), false), signer, redis)
 }
 

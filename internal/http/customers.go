@@ -10,6 +10,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	"github.com/miqbalhamdani/sewain-api/internal/customer"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
+	"github.com/miqbalhamdani/sewain-api/internal/storage"
 )
 
 // Renters over HTTP.  (S1-020, S1-021)
@@ -170,7 +171,7 @@ func customerBody(c customer.Customer) Customer {
 	return Customer{
 		Id: c.ID, Name: c.Name, Phone: c.Phone, IdType: (*IdType)(c.IDType),
 		IdNumberLast4: c.IDNumberLast4, IsBlacklisted: c.IsBlacklisted,
-		BlacklistReason: c.BlacklistReason, CreatedAt: c.CreatedAt,
+		BlacklistReason: c.BlacklistReason, CreatedAt: c.CreatedAt, HasIdPhoto: c.HasIDPhoto,
 	}
 }
 
@@ -195,4 +196,35 @@ func pageLimit(limit *Limit) int {
 		return 200
 	}
 	return *limit
+}
+
+// SetCustomerIdentityPhoto handles POST /customers/{id}/identity (S1-021).
+func (s *Server) SetCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	requirePermission(auth.PermCustomersWrite, func(w http.ResponseWriter, r *http.Request) {
+		var body IdentityPhotoInput
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+			writeError(w, r, malformed(err))
+			return
+		}
+		c, err := s.customers.SetIdentityPhoto(r.Context(), id, body.ObjectKey, string(body.IdType))
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+		writeJSON(w, r, http.StatusOK, customerBody(c))
+	})(w, r)
+}
+
+// ViewCustomerIdentityPhoto handles GET /customers/{id}/identity: a five-minute
+// URL, and one audit row per call (BR-085).
+func (s *Server) ViewCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	requirePermission(auth.PermCustomersRead, func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := auth.UserFromContext(r.Context())
+		url, err := s.customers.ViewIdentityPhoto(r.Context(), userID, id)
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+		writeJSON(w, r, http.StatusOK, SignedURL{Url: url, ExpiresIn: int(storage.IdentityPhotoTTL.Seconds())})
+	})(w, r)
 }

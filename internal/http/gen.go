@@ -157,22 +157,30 @@ func (e CancelledReason) Valid() bool {
 
 // Defines values for ErrorCode.
 const (
-	ErrorCodeBookingConflict          ErrorCode = "booking-conflict"
-	ErrorCodeCustomerBlacklisted      ErrorCode = "customer-blacklisted"
-	ErrorCodeDurationOutOfRange       ErrorCode = "duration-out-of-range"
-	ErrorCodeEmailNotVerified         ErrorCode = "email-not-verified"
-	ErrorCodeEmailTaken               ErrorCode = "email-taken"
-	ErrorCodeInternal                 ErrorCode = "internal"
-	ErrorCodeNotFound                 ErrorCode = "not-found"
-	ErrorCodePermissionDenied         ErrorCode = "permission-denied"
-	ErrorCodeRateLimited              ErrorCode = "rate-limited"
-	ErrorCodeRequestInFlight          ErrorCode = "request-in-flight"
-	ErrorCodeSlugInvalid              ErrorCode = "slug-invalid"
-	ErrorCodeSlugTaken                ErrorCode = "slug-taken"
-	ErrorCodeUnauthenticated          ErrorCode = "unauthenticated"
-	ErrorCodeUnitNotSwappable         ErrorCode = "unit-not-swappable"
-	ErrorCodeValidationFailed         ErrorCode = "validation-failed"
-	ErrorCodeVerificationTokenInvalid ErrorCode = "verification-token-invalid"
+	ErrorCodeBookingConflict             ErrorCode = "booking-conflict"
+	ErrorCodeCustomerBlacklisted         ErrorCode = "customer-blacklisted"
+	ErrorCodeDurationOutOfRange          ErrorCode = "duration-out-of-range"
+	ErrorCodeEmailNotVerified            ErrorCode = "email-not-verified"
+	ErrorCodeEmailTaken                  ErrorCode = "email-taken"
+	ErrorCodeEvidenceImmutable           ErrorCode = "evidence-immutable"
+	ErrorCodeHandoverPhotoRequired       ErrorCode = "handover-photo-required"
+	ErrorCodeInternal                    ErrorCode = "internal"
+	ErrorCodeMeterValueRequired          ErrorCode = "meter-value-required"
+	ErrorCodeNotFound                    ErrorCode = "not-found"
+	ErrorCodePaymentRequiredBeforePickup ErrorCode = "payment-required-before-pickup"
+	ErrorCodePermissionDenied            ErrorCode = "permission-denied"
+	ErrorCodePhysicalConflictUnconfirmed ErrorCode = "physical-conflict-unconfirmed"
+	ErrorCodeRateLimited                 ErrorCode = "rate-limited"
+	ErrorCodeRequestInFlight             ErrorCode = "request-in-flight"
+	ErrorCodeSlugInvalid                 ErrorCode = "slug-invalid"
+	ErrorCodeSlugTaken                   ErrorCode = "slug-taken"
+	ErrorCodeUnauthenticated             ErrorCode = "unauthenticated"
+	ErrorCodeUnitNotSwappable            ErrorCode = "unit-not-swappable"
+	ErrorCodeUploadNotFound              ErrorCode = "upload-not-found"
+	ErrorCodeUploadTypeMismatch          ErrorCode = "upload-type-mismatch"
+	ErrorCodeValidationFailed            ErrorCode = "validation-failed"
+	ErrorCodeVerificationTokenInvalid    ErrorCode = "verification-token-invalid"
+	ErrorCodeWaiverReasonRequired        ErrorCode = "waiver-reason-required"
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
@@ -188,11 +196,21 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeEmailTaken:
 		return true
+	case ErrorCodeEvidenceImmutable:
+		return true
+	case ErrorCodeHandoverPhotoRequired:
+		return true
 	case ErrorCodeInternal:
+		return true
+	case ErrorCodeMeterValueRequired:
 		return true
 	case ErrorCodeNotFound:
 		return true
+	case ErrorCodePaymentRequiredBeforePickup:
+		return true
 	case ErrorCodePermissionDenied:
+		return true
+	case ErrorCodePhysicalConflictUnconfirmed:
 		return true
 	case ErrorCodeRateLimited:
 		return true
@@ -206,9 +224,15 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeUnitNotSwappable:
 		return true
+	case ErrorCodeUploadNotFound:
+		return true
+	case ErrorCodeUploadTypeMismatch:
+		return true
 	case ErrorCodeValidationFailed:
 		return true
 	case ErrorCodeVerificationTokenInvalid:
+		return true
+	case ErrorCodeWaiverReasonRequired:
 		return true
 	default:
 		return false
@@ -233,6 +257,24 @@ func (e Fuel) Valid() bool {
 	case Gasoline:
 		return true
 	case Hybrid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HandoverDirection.
+const (
+	Pickup HandoverDirection = "pickup"
+	Return HandoverDirection = "return"
+)
+
+// Valid indicates whether the value is a known member of the HandoverDirection enum.
+func (e HandoverDirection) Valid() bool {
+	switch e {
+	case Pickup:
+		return true
+	case Return:
 		return true
 	default:
 		return false
@@ -278,6 +320,81 @@ func (e InviteUserRequestRole) Valid() bool {
 	}
 }
 
+// Defines values for InvoiceLineKind.
+const (
+	InvoiceLineKindDamage   InvoiceLineKind = "damage"
+	InvoiceLineKindDeposit  InvoiceLineKind = "deposit"
+	InvoiceLineKindDiscount InvoiceLineKind = "discount"
+	InvoiceLineKindLateFee  InvoiceLineKind = "late_fee"
+	InvoiceLineKindRent     InvoiceLineKind = "rent"
+)
+
+// Valid indicates whether the value is a known member of the InvoiceLineKind enum.
+func (e InvoiceLineKind) Valid() bool {
+	switch e {
+	case InvoiceLineKindDamage:
+		return true
+	case InvoiceLineKindDeposit:
+		return true
+	case InvoiceLineKindDiscount:
+		return true
+	case InvoiceLineKindLateFee:
+		return true
+	case InvoiceLineKindRent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InvoiceStatus.
+const (
+	InvoiceStatusCancelled      InvoiceStatus = "cancelled"
+	InvoiceStatusGatewayPending InvoiceStatus = "gateway_pending"
+	InvoiceStatusOverdue        InvoiceStatus = "overdue"
+	InvoiceStatusPaid           InvoiceStatus = "paid"
+	InvoiceStatusUnpaid         InvoiceStatus = "unpaid"
+)
+
+// Valid indicates whether the value is a known member of the InvoiceStatus enum.
+func (e InvoiceStatus) Valid() bool {
+	switch e {
+	case InvoiceStatusCancelled:
+		return true
+	case InvoiceStatusGatewayPending:
+		return true
+	case InvoiceStatusOverdue:
+		return true
+	case InvoiceStatusPaid:
+		return true
+	case InvoiceStatusUnpaid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PresignRequestContentType.
+const (
+	Imagejpeg PresignRequestContentType = "image/jpeg"
+	Imagepng  PresignRequestContentType = "image/png"
+	Imagewebp PresignRequestContentType = "image/webp"
+)
+
+// Valid indicates whether the value is a known member of the PresignRequestContentType enum.
+func (e PresignRequestContentType) Valid() bool {
+	switch e {
+	case Imagejpeg:
+		return true
+	case Imagepng:
+		return true
+	case Imagewebp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PricingUnit.
 const (
 	Day   PricingUnit = "day"
@@ -314,6 +431,21 @@ func (e ResourceStatus) Valid() bool {
 	case ResourceStatusActive:
 		return true
 	case ResourceStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReturnPreviewProposedLinesKind.
+const (
+	ReturnPreviewProposedLinesKindLateFee ReturnPreviewProposedLinesKind = "late_fee"
+)
+
+// Valid indicates whether the value is a known member of the ReturnPreviewProposedLinesKind enum.
+func (e ReturnPreviewProposedLinesKind) Valid() bool {
+	switch e {
+	case ReturnPreviewProposedLinesKindLateFee:
 		return true
 	default:
 		return false
@@ -410,6 +542,24 @@ func (e UpdateUserRequestStatus) Valid() bool {
 	case UpdateUserRequestStatusActive:
 		return true
 	case UpdateUserRequestStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UploadKind.
+const (
+	HandoverPhoto UploadKind = "handover_photo"
+	IdentityPhoto UploadKind = "identity_photo"
+)
+
+// Valid indicates whether the value is a known member of the UploadKind enum.
+func (e UploadKind) Valid() bool {
+	switch e {
+	case HandoverPhoto:
+		return true
+	case IdentityPhoto:
 		return true
 	default:
 		return false
@@ -521,6 +671,8 @@ type BlacklistRequest struct {
 // tidak pernah menyentuhnya (BR-014). `overdue` dihitung saat dibaca, tidak
 // tersimpan (BR-041).
 type Booking struct {
+	// ActualReturnAt Diisi jam server saat serah-terima kembali (BR-040).
+	ActualReturnAt  *time.Time       `json:"actual_return_at"`
 	BufferMinutes   int              `json:"buffer_minutes"`
 	CancelledReason *CancelledReason `json:"cancelled_reason"`
 
@@ -657,9 +809,13 @@ type CancelledReason string
 // `blacklist_reason` terbaca semua peran di backoffice — BR-028 justru mewajibkan
 // operator melihatnya. Ia tidak pernah keluar ke permukaan publik.
 type Customer struct {
-	BlacklistReason *string            `json:"blacklist_reason"`
-	CreatedAt       time.Time          `json:"created_at"`
-	Id              openapi_types.UUID `json:"id"`
+	BlacklistReason *string   `json:"blacklist_reason"`
+	CreatedAt       time.Time `json:"created_at"`
+
+	// HasIdPhoto Ada foto identitas tersimpan. Fotonya sendiri hanya lewat
+	// `GET /customers/{id}/identity`, yang tercatat di audit log (BR-085).
+	HasIdPhoto bool               `json:"has_id_photo"`
+	Id         openapi_types.UUID `json:"id"`
 
 	// IdNumberLast4 Examples: 7890
 	IdNumberLast4 *string `json:"id_number_last4"`
@@ -696,6 +852,15 @@ type CustomerUpdate struct {
 	Phone    *string `json:"phone,omitempty"`
 }
 
+// DamageInput defines model for DamageInput.
+type DamageInput struct {
+	Amount      int64  `json:"amount"`
+	Description string `json:"description"`
+
+	// PhotoKey Salah satu `photo_keys` di request yang sama (BR-047).
+	PhotoKey string `json:"photo_key"`
+}
+
 // ErrorCode Kode error generik yang dipakai setiap endpoint sebelum sampai ke aturan bisnisnya.
 // Kode spesifik per aturan bisnis ada di `04-api-spec.md` §2 dan ditambahkan oleh item
 // backlog yang memilikinya.
@@ -707,8 +872,39 @@ type ErrorCode string
 // Fuel `diesel` **hanya ada di mobil**, ditegakkan database (BR-094).
 type Fuel string
 
+// Handover defines model for Handover.
+type Handover struct {
+	Checklist      map[string]interface{} `json:"checklist"`
+	ConditionNotes *string                `json:"condition_notes"`
+	Direction      HandoverDirection      `json:"direction"`
+	Id             openapi_types.UUID     `json:"id"`
+	LateFeeWaived  *int64                 `json:"late_fee_waived"`
+	MeterValue     *int64                 `json:"meter_value"`
+	PerformedAt    time.Time              `json:"performed_at"`
+
+	// PerformedBy Nama petugasnya.
+	PerformedBy string `json:"performed_by"`
+	Photos      []struct {
+		CapturedAt time.Time          `json:"captured_at"`
+		Id         openapi_types.UUID `json:"id"`
+
+		// Url Bertanda tangan, berumur 1 jam.
+		Url string `json:"url"`
+	} `json:"photos"`
+	WaiverReason *string `json:"waiver_reason"`
+}
+
+// HandoverDirection defines model for Handover.Direction.
+type HandoverDirection string
+
 // IdType defines model for IdType.
 type IdType string
+
+// IdentityPhotoInput defines model for IdentityPhotoInput.
+type IdentityPhotoInput struct {
+	IdType    IdType `json:"id_type"`
+	ObjectKey string `json:"object_key"`
+}
 
 // InviteUserRequest defines model for InviteUserRequest.
 type InviteUserRequest struct {
@@ -719,6 +915,41 @@ type InviteUserRequest struct {
 
 // InviteUserRequestRole defines model for InviteUserRequest.Role.
 type InviteUserRequestRole string
+
+// Invoice defines model for Invoice.
+type Invoice struct {
+	BookingId openapi_types.UUID `json:"booking_id"`
+	CreatedAt time.Time          `json:"created_at"`
+	DueAt     time.Time          `json:"due_at"`
+	Id        openapi_types.UUID `json:"id"`
+	Lines     []InvoiceLine      `json:"lines"`
+
+	// Number Examples: SWN-0042/1
+	Number string     `json:"number"`
+	PaidAt *time.Time `json:"paid_at"`
+
+	// Status Lima nilai BR-056. `gateway_pending` tidak terjangkau di fase 1.
+	Status InvoiceStatus `json:"status"`
+
+	// Total `SUM(lines.amount)`, dihitung saat dibaca — tidak ada kolom total (BR-055).
+	Total int64 `json:"total"`
+}
+
+// InvoiceLine defines model for InvoiceLine.
+type InvoiceLine struct {
+	Amount          int64               `json:"amount"`
+	Description     string              `json:"description"`
+	HandoverPhotoId *openapi_types.UUID `json:"handover_photo_id"`
+	Id              openapi_types.UUID  `json:"id"`
+	Kind            InvoiceLineKind     `json:"kind"`
+	WaiverReason    *string             `json:"waiver_reason"`
+}
+
+// InvoiceLineKind defines model for InvoiceLine.Kind.
+type InvoiceLineKind string
+
+// InvoiceStatus Lima nilai BR-056. `gateway_pending` tidak terjangkau di fase 1.
+type InvoiceStatus string
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -740,6 +971,40 @@ type Me struct {
 	User  SessionUser  `json:"user"`
 }
 
+// PickupRequest defines model for PickupRequest.
+type PickupRequest struct {
+	// Checklist Butir periksa → nilai. Templatnya konstanta di klien per jenis barang.
+	Checklist               *map[string]interface{} `json:"checklist,omitempty"`
+	ConditionNotes          *string                 `json:"condition_notes,omitempty"`
+	ConfirmPhysicalConflict *bool                   `json:"confirm_physical_conflict,omitempty"`
+	MeterValue              *int64                  `json:"meter_value,omitempty"`
+	PhotoKeys               []string                `json:"photo_keys"`
+}
+
+// PresignRequest defines model for PresignRequest.
+type PresignRequest struct {
+	Bytes       int64                     `json:"bytes"`
+	ContentType PresignRequestContentType `json:"content_type"`
+	Kind        UploadKind                `json:"kind"`
+}
+
+// PresignRequestContentType defines model for PresignRequest.ContentType.
+type PresignRequestContentType string
+
+// PresignedUpload defines model for PresignedUpload.
+type PresignedUpload struct {
+	// ExpiresIn Examples: 600
+	ExpiresIn int `json:"expires_in"`
+
+	// Headers Header yang wajib ikut di `PUT` — persis yang diikat tanda tangannya.
+	// Mengirim nilai lain membuat storage menolak unggahannya.
+	Headers map[string]string `json:"headers"`
+
+	// ObjectKey Examples: pending/01926f3a-0000-7000-8000-000000000000/01926f3b-…
+	ObjectKey string `json:"object_key"`
+	UploadUrl string `json:"upload_url"`
+}
+
 // PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
 // klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
 // `ResourceCreate` maupun `ResourceUpdate`.
@@ -759,8 +1024,9 @@ type PricingUnit string
 // menunjuk ke span-nya. Tidak ada field `code` terpisah: kodenya adalah segmen terakhir
 // `type` (BR-092).
 type Problem struct {
-	// Conflicts Hanya pada `booking-conflict`: booking yang mengunci unit itu pada rentang
-	// yang diminta, supaya layar bisa menunjuknya alih-alih bilang "gagal" (BR-022).
+	// Conflicts Pada `booking-conflict`: booking yang mengunci unit itu pada rentang yang
+	// diminta (BR-022). Pada `physical-conflict-unconfirmed`: booking sebelumnya
+	// yang unitnya belum kembali (BR-042).
 	Conflicts *[]AffectedBooking `json:"conflicts,omitempty"`
 
 	// Detail Examples: Aksi ini butuh izin bookings:write.
@@ -1133,6 +1399,53 @@ type ResourceUpdated struct {
 	Vehicle *VehicleSpec `json:"vehicle"`
 }
 
+// ReturnPreview defines model for ReturnPreview.
+type ReturnPreview struct {
+	ActualReturnAt time.Time `json:"actual_return_at"`
+	DepositAmount  *int64    `json:"deposit_amount"`
+	EndAt          time.Time `json:"end_at"`
+	LateFeePerUnit *int64    `json:"late_fee_per_unit"`
+	LateFeeTotal   int64     `json:"late_fee_total"`
+	OverdueUnits   int       `json:"overdue_units"`
+
+	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+	// `ResourceCreate` maupun `ResourceUpdate`.
+	//
+	// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+	// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+	// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+	//
+	// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+	// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+	// melihat field satuan harga di layar mana pun.
+	PricingUnit   PricingUnit `json:"pricing_unit"`
+	ProposedLines []struct {
+		Amount      int64                          `json:"amount"`
+		Description string                         `json:"description"`
+		Kind        ReturnPreviewProposedLinesKind `json:"kind"`
+	} `json:"proposed_lines"`
+}
+
+// ReturnPreviewProposedLinesKind defines model for ReturnPreview.ProposedLines.Kind.
+type ReturnPreviewProposedLinesKind string
+
+// ReturnRequest defines model for ReturnRequest.
+type ReturnRequest struct {
+	Checklist      *map[string]interface{} `json:"checklist,omitempty"`
+	ConditionNotes *string                 `json:"condition_notes,omitempty"`
+
+	// ConfirmLateFee Terbitkan baris `late_fee` yang diusulkan preview.
+	ConfirmLateFee *bool          `json:"confirm_late_fee,omitempty"`
+	Damages        *[]DamageInput `json:"damages,omitempty"`
+
+	// LateFeeWaived Bagian denda yang dibebaskan. Seluruhnya = tidak ada baris.
+	LateFeeWaived *int64   `json:"late_fee_waived,omitempty"`
+	MeterValue    *int64   `json:"meter_value,omitempty"`
+	PhotoKeys     []string `json:"photo_keys"`
+	WaiverReason  *string  `json:"waiver_reason,omitempty"`
+}
+
 // Session Dikembalikan login dan refresh. Membawa semua yang dibutuhkan klien untuk merender
 // kerangka aplikasi tanpa request kedua.
 //
@@ -1334,6 +1647,12 @@ type SettingsUpdate struct {
 	Whatsapp *string `json:"whatsapp,omitempty"`
 }
 
+// SignedURL defines model for SignedURL.
+type SignedURL struct {
+	ExpiresIn int    `json:"expires_in"`
+	Url       string `json:"url"`
+}
+
 // Transmission `clutch` (kopling) **hanya ada di motor**, ditegakkan database (BR-094).
 type Transmission string
 
@@ -1447,6 +1766,9 @@ type UpdateUserRequestRole string
 // UpdateUserRequestStatus `invited` tidak ada di sini — ia dikelola server dan cuma berlaku sebelum
 // undangannya diterima.
 type UpdateUserRequestStatus string
+
+// UploadKind defines model for UploadKind.
+type UploadKind string
 
 // User Akun di usaha ini. Tidak pernah memuat `password_hash` maupun `owner_id` — yang
 // pertama rahasia, yang kedua sudah tersirat dari usaha pemanggilnya.
@@ -1601,6 +1923,13 @@ type Conflict = Problem
 // `type` (BR-092).
 type Forbidden = Problem
 
+// MethodNotAllowed RFC 9457 `application/problem+json`. Setiap respons error di API ini memakainya.
+//
+// `trace_id` adalah trace id OpenTelemetry — tiket support yang mengutipnya langsung
+// menunjuk ke span-nya. Tidak ada field `code` terpisah: kodenya adalah segmen terakhir
+// `type` (BR-092).
+type MethodNotAllowed = Problem
+
 // NotFound RFC 9457 `application/problem+json`. Setiap respons error di API ini memakainya.
 //
 // `trace_id` adalah trace id OpenTelemetry — tiket support yang mengutipnya langsung
@@ -1676,6 +2005,26 @@ type CreateBookingParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// PickupBookingParams defines parameters for PickupBooking.
+type PickupBookingParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ReturnBookingParams defines parameters for ReturnBooking.
+type ReturnBookingParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // GetCalendarParams defines parameters for GetCalendar.
 type GetCalendarParams struct {
 	From time.Time `form:"from" json:"from"`
@@ -1693,6 +2042,11 @@ type ListCustomersParams struct {
 	// Cursor Cursor buram dari halaman sebelumnya. Hanya paginasi cursor — `offset` yang dalam di
 	// tabel besar adalah sequential scan, jadi parameternya tidak ada.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListInvoicesParams defines parameters for ListInvoices.
+type ListInvoicesParams struct {
+	BookingId openapi_types.UUID `form:"booking_id" json:"booking_id"`
 }
 
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
@@ -1713,6 +2067,12 @@ type CreateBookingJSONRequestBody = BookingCreate
 // UpdateBookingJSONRequestBody defines body for UpdateBooking for application/json ContentType.
 type UpdateBookingJSONRequestBody = BookingUpdate
 
+// PickupBookingJSONRequestBody defines body for PickupBooking for application/json ContentType.
+type PickupBookingJSONRequestBody = PickupRequest
+
+// ReturnBookingJSONRequestBody defines body for ReturnBooking for application/json ContentType.
+type ReturnBookingJSONRequestBody = ReturnRequest
+
 // CreateCustomerJSONRequestBody defines body for CreateCustomer for application/json ContentType.
 type CreateCustomerJSONRequestBody = CustomerCreate
 
@@ -1721,6 +2081,9 @@ type UpdateCustomerJSONRequestBody = CustomerUpdate
 
 // BlacklistCustomerJSONRequestBody defines body for BlacklistCustomer for application/json ContentType.
 type BlacklistCustomerJSONRequestBody = BlacklistRequest
+
+// SetCustomerIdentityPhotoJSONRequestBody defines body for SetCustomerIdentityPhoto for application/json ContentType.
+type SetCustomerIdentityPhotoJSONRequestBody = IdentityPhotoInput
 
 // CreateResourceJSONRequestBody defines body for CreateResource for application/json ContentType.
 type CreateResourceJSONRequestBody = ResourceCreate
@@ -1736,6 +2099,9 @@ type UpdateSettingsJSONRequestBody = SettingsUpdate
 
 // UpdateUnitJSONRequestBody defines body for UpdateUnit for application/json ContentType.
 type UpdateUnitJSONRequestBody = UnitUpdate
+
+// PresignUploadJSONRequestBody defines body for PresignUpload for application/json ContentType.
+type PresignUploadJSONRequestBody = PresignRequest
 
 // InviteUserJSONRequestBody defines body for InviteUser for application/json ContentType.
 type InviteUserJSONRequestBody = InviteUserRequest
@@ -1868,6 +2234,18 @@ type ServerInterface interface {
 	// ConfirmBooking Konfirmasi draft jadi reserved
 	// (POST /bookings/{id}/confirm)
 	ConfirmBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// ListHandovers Bukti kondisi satu booking
+	// (GET /bookings/{id}/handovers)
+	ListHandovers(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// PickupBooking Serah-terima ambil
+	// (POST /bookings/{id}/pickup)
+	PickupBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params PickupBookingParams)
+	// ReturnBooking Serah-terima kembali
+	// (POST /bookings/{id}/return)
+	ReturnBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ReturnBookingParams)
+	// PreviewReturn Pratinjau denda telat
+	// (GET /bookings/{id}/return-preview)
+	PreviewReturn(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// GetCalendar Lajur per unit untuk layar kalender
 	// (GET /calendar)
 	GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams)
@@ -1889,6 +2267,24 @@ type ServerInterface interface {
 	// BlacklistCustomer Blokir penyewa
 	// (POST /customers/{id}/blacklist)
 	BlacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// ViewCustomerIdentityPhoto Buka foto identitas (tercatat di audit log)
+	// (GET /customers/{id}/identity)
+	ViewCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// SetCustomerIdentityPhoto Simpan foto identitas penyewa
+	// (POST /customers/{id}/identity)
+	SetCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// DeleteHandover Tidak ada — bukti kondisi tidak bisa dihapus
+	// (DELETE /handovers/{id})
+	DeleteHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// PatchHandover Tidak ada — bukti kondisi tidak bisa diubah
+	// (PATCH /handovers/{id})
+	PatchHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// ListInvoices Invoice satu booking
+	// (GET /invoices)
+	ListInvoices(w http.ResponseWriter, r *http.Request, params ListInvoicesParams)
+	// GetInvoice Satu invoice beserta barisnya
+	// (GET /invoices/{id})
+	GetInvoice(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -1925,6 +2321,9 @@ type ServerInterface interface {
 	// UpdateUnit Ubah unit, termasuk statusnya
 	// (PATCH /units/{id})
 	UpdateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// PresignUpload Minta URL unggah langsung ke object storage
+	// (POST /uploads/presign)
+	PresignUpload(w http.ResponseWriter, r *http.Request)
 	// ListUsers Akun di usaha ini
 	// (GET /users)
 	ListUsers(w http.ResponseWriter, r *http.Request)
@@ -2027,6 +2426,30 @@ func (_ Unimplemented) ConfirmBooking(w http.ResponseWriter, r *http.Request, id
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListHandovers Bukti kondisi satu booking
+// (GET /bookings/{id}/handovers)
+func (_ Unimplemented) ListHandovers(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PickupBooking Serah-terima ambil
+// (POST /bookings/{id}/pickup)
+func (_ Unimplemented) PickupBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params PickupBookingParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ReturnBooking Serah-terima kembali
+// (POST /bookings/{id}/return)
+func (_ Unimplemented) ReturnBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ReturnBookingParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PreviewReturn Pratinjau denda telat
+// (GET /bookings/{id}/return-preview)
+func (_ Unimplemented) PreviewReturn(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetCalendar Lajur per unit untuk layar kalender
 // (GET /calendar)
 func (_ Unimplemented) GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams) {
@@ -2066,6 +2489,42 @@ func (_ Unimplemented) UnblacklistCustomer(w http.ResponseWriter, r *http.Reques
 // BlacklistCustomer Blokir penyewa
 // (POST /customers/{id}/blacklist)
 func (_ Unimplemented) BlacklistCustomer(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ViewCustomerIdentityPhoto Buka foto identitas (tercatat di audit log)
+// (GET /customers/{id}/identity)
+func (_ Unimplemented) ViewCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetCustomerIdentityPhoto Simpan foto identitas penyewa
+// (POST /customers/{id}/identity)
+func (_ Unimplemented) SetCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteHandover Tidak ada — bukti kondisi tidak bisa dihapus
+// (DELETE /handovers/{id})
+func (_ Unimplemented) DeleteHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PatchHandover Tidak ada — bukti kondisi tidak bisa diubah
+// (PATCH /handovers/{id})
+func (_ Unimplemented) PatchHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListInvoices Invoice satu booking
+// (GET /invoices)
+func (_ Unimplemented) ListInvoices(w http.ResponseWriter, r *http.Request, params ListInvoicesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetInvoice Satu invoice beserta barisnya
+// (GET /invoices/{id})
+func (_ Unimplemented) GetInvoice(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2138,6 +2597,12 @@ func (_ Unimplemented) DeleteUnit(w http.ResponseWriter, r *http.Request, id ope
 // UpdateUnit Ubah unit, termasuk statusnya
 // (PATCH /units/{id})
 func (_ Unimplemented) UpdateUnit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PresignUpload Minta URL unggah langsung ke object storage
+// (POST /uploads/presign)
+func (_ Unimplemented) PresignUpload(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2630,6 +3095,166 @@ func (siw *ServerInterfaceWrapper) ConfirmBooking(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListHandovers operation middleware
+func (siw *ServerInterfaceWrapper) ListHandovers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListHandovers(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PickupBooking operation middleware
+func (siw *ServerInterfaceWrapper) PickupBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PickupBookingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PickupBooking(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReturnBooking operation middleware
+func (siw *ServerInterfaceWrapper) ReturnBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReturnBookingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReturnBooking(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewReturn operation middleware
+func (siw *ServerInterfaceWrapper) PreviewReturn(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewReturn(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCalendar operation middleware
 func (siw *ServerInterfaceWrapper) GetCalendar(w http.ResponseWriter, r *http.Request) {
 
@@ -2857,6 +3482,169 @@ func (siw *ServerInterfaceWrapper) BlacklistCustomer(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.BlacklistCustomer(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ViewCustomerIdentityPhoto operation middleware
+func (siw *ServerInterfaceWrapper) ViewCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ViewCustomerIdentityPhoto(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetCustomerIdentityPhoto operation middleware
+func (siw *ServerInterfaceWrapper) SetCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetCustomerIdentityPhoto(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteHandover operation middleware
+func (siw *ServerInterfaceWrapper) DeleteHandover(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteHandover(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchHandover operation middleware
+func (siw *ServerInterfaceWrapper) PatchHandover(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchHandover(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListInvoices operation middleware
+func (siw *ServerInterfaceWrapper) ListInvoices(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListInvoicesParams
+
+	// ------------- Required query parameter "booking_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "booking_id", r.URL.Query(), &params.BookingId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "booking_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "booking_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInvoices(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInvoice operation middleware
+func (siw *ServerInterfaceWrapper) GetInvoice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInvoice(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3109,6 +3897,20 @@ func (siw *ServerInterfaceWrapper) UpdateUnit(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateUnit(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PresignUpload operation middleware
+func (siw *ServerInterfaceWrapper) PresignUpload(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PresignUpload(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3422,6 +4224,39 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/bookings/{id}/cancel", wrapper.CancelBooking)
 	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/uploads/presign", wrapper.PresignUpload)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/customers/{id}/identity", wrapper.ViewCustomerIdentityPhoto)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/customers/{id}/identity", wrapper.SetCustomerIdentityPhoto)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings/{id}/pickup", wrapper.PickupBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/bookings/{id}/return-preview", wrapper.PreviewReturn)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/bookings/{id}/return", wrapper.ReturnBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/bookings/{id}/handovers", wrapper.ListHandovers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/handovers/{id}", wrapper.DeleteHandover)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/handovers/{id}", wrapper.PatchHandover)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/invoices", wrapper.ListInvoices)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/invoices/{id}", wrapper.GetInvoice)
+	})
 
 	return r
 }
@@ -3431,6 +4266,8 @@ type BadRequestApplicationProblemPlusJSONResponse Problem
 type ConflictApplicationProblemPlusJSONResponse Problem
 
 type ForbiddenApplicationProblemPlusJSONResponse Problem
+
+type MethodNotAllowedApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
@@ -4439,6 +5276,370 @@ func (response ConfirmBooking422ApplicationProblemPlusJSONResponse) VisitConfirm
 	return err
 }
 
+type ListHandoversRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListHandoversResponseObject interface {
+	VisitListHandoversResponse(w http.ResponseWriter) error
+}
+
+type ListHandovers200JSONResponse []Handover
+
+func (response ListHandovers200JSONResponse) VisitListHandoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListHandovers401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListHandovers401ApplicationProblemPlusJSONResponse) VisitListHandoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListHandovers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListHandovers403ApplicationProblemPlusJSONResponse) VisitListHandoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListHandovers404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListHandovers404ApplicationProblemPlusJSONResponse) VisitListHandoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupBookingRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params PickupBookingParams
+	Body   *PickupBookingJSONRequestBody
+}
+
+type PickupBookingResponseObject interface {
+	VisitPickupBookingResponse(w http.ResponseWriter) error
+}
+
+type PickupBooking200JSONResponse Booking
+
+func (response PickupBooking200JSONResponse) VisitPickupBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PickupBooking401ApplicationProblemPlusJSONResponse) VisitPickupBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PickupBooking403ApplicationProblemPlusJSONResponse) VisitPickupBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PickupBooking404ApplicationProblemPlusJSONResponse) VisitPickupBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupBooking409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PickupBooking409ApplicationProblemPlusJSONResponse) VisitPickupBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PickupBooking422ApplicationProblemPlusJSONResponse) VisitPickupBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReturnBookingRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params ReturnBookingParams
+	Body   *ReturnBookingJSONRequestBody
+}
+
+type ReturnBookingResponseObject interface {
+	VisitReturnBookingResponse(w http.ResponseWriter) error
+}
+
+type ReturnBooking200JSONResponse Booking
+
+func (response ReturnBooking200JSONResponse) VisitReturnBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReturnBooking401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ReturnBooking401ApplicationProblemPlusJSONResponse) VisitReturnBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReturnBooking403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReturnBooking403ApplicationProblemPlusJSONResponse) VisitReturnBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReturnBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReturnBooking404ApplicationProblemPlusJSONResponse) VisitReturnBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReturnBooking409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ReturnBooking409ApplicationProblemPlusJSONResponse) VisitReturnBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReturnBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ReturnBooking422ApplicationProblemPlusJSONResponse) VisitReturnBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewReturnRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type PreviewReturnResponseObject interface {
+	VisitPreviewReturnResponse(w http.ResponseWriter) error
+}
+
+type PreviewReturn200JSONResponse ReturnPreview
+
+func (response PreviewReturn200JSONResponse) VisitPreviewReturnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewReturn401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewReturn401ApplicationProblemPlusJSONResponse) VisitPreviewReturnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewReturn403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewReturn403ApplicationProblemPlusJSONResponse) VisitPreviewReturnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewReturn404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewReturn404ApplicationProblemPlusJSONResponse) VisitPreviewReturnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewReturn422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewReturn422ApplicationProblemPlusJSONResponse) VisitPreviewReturnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetCalendarRequestObject struct {
 	Params GetCalendarParams
 }
@@ -4961,6 +6162,335 @@ func (response BlacklistCustomer422ApplicationProblemPlusJSONResponse) VisitBlac
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewCustomerIdentityPhotoRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ViewCustomerIdentityPhotoResponseObject interface {
+	VisitViewCustomerIdentityPhotoResponse(w http.ResponseWriter) error
+}
+
+type ViewCustomerIdentityPhoto200JSONResponse SignedURL
+
+func (response ViewCustomerIdentityPhoto200JSONResponse) VisitViewCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewCustomerIdentityPhoto401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ViewCustomerIdentityPhoto401ApplicationProblemPlusJSONResponse) VisitViewCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewCustomerIdentityPhoto403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ViewCustomerIdentityPhoto403ApplicationProblemPlusJSONResponse) VisitViewCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ViewCustomerIdentityPhoto404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ViewCustomerIdentityPhoto404ApplicationProblemPlusJSONResponse) VisitViewCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerIdentityPhotoRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *SetCustomerIdentityPhotoJSONRequestBody
+}
+
+type SetCustomerIdentityPhotoResponseObject interface {
+	VisitSetCustomerIdentityPhotoResponse(w http.ResponseWriter) error
+}
+
+type SetCustomerIdentityPhoto200JSONResponse Customer
+
+func (response SetCustomerIdentityPhoto200JSONResponse) VisitSetCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerIdentityPhoto401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SetCustomerIdentityPhoto401ApplicationProblemPlusJSONResponse) VisitSetCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerIdentityPhoto403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SetCustomerIdentityPhoto403ApplicationProblemPlusJSONResponse) VisitSetCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerIdentityPhoto404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SetCustomerIdentityPhoto404ApplicationProblemPlusJSONResponse) VisitSetCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerIdentityPhoto422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response SetCustomerIdentityPhoto422ApplicationProblemPlusJSONResponse) VisitSetCustomerIdentityPhotoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteHandoverRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteHandoverResponseObject interface {
+	VisitDeleteHandoverResponse(w http.ResponseWriter) error
+}
+
+type DeleteHandover405ApplicationProblemPlusJSONResponse struct {
+	MethodNotAllowedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteHandover405ApplicationProblemPlusJSONResponse) VisitDeleteHandoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchHandoverRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type PatchHandoverResponseObject interface {
+	VisitPatchHandoverResponse(w http.ResponseWriter) error
+}
+
+type PatchHandover405ApplicationProblemPlusJSONResponse struct {
+	MethodNotAllowedApplicationProblemPlusJSONResponse
+}
+
+func (response PatchHandover405ApplicationProblemPlusJSONResponse) VisitPatchHandoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInvoicesRequestObject struct {
+	Params ListInvoicesParams
+}
+
+type ListInvoicesResponseObject interface {
+	VisitListInvoicesResponse(w http.ResponseWriter) error
+}
+
+type ListInvoices200JSONResponse []Invoice
+
+func (response ListInvoices200JSONResponse) VisitListInvoicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInvoices401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListInvoices401ApplicationProblemPlusJSONResponse) VisitListInvoicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInvoices403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListInvoices403ApplicationProblemPlusJSONResponse) VisitListInvoicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInvoiceRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetInvoiceResponseObject interface {
+	VisitGetInvoiceResponse(w http.ResponseWriter) error
+}
+
+type GetInvoice200JSONResponse Invoice
+
+func (response GetInvoice200JSONResponse) VisitGetInvoiceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInvoice401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetInvoice401ApplicationProblemPlusJSONResponse) VisitGetInvoiceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInvoice403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetInvoice403ApplicationProblemPlusJSONResponse) VisitGetInvoiceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInvoice404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetInvoice404ApplicationProblemPlusJSONResponse) VisitGetInvoiceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -5777,6 +7307,101 @@ func (response UpdateUnit422ApplicationProblemPlusJSONResponse) VisitUpdateUnitR
 	return err
 }
 
+type PresignUploadRequestObject struct {
+	Body *PresignUploadJSONRequestBody
+}
+
+type PresignUploadResponseObject interface {
+	VisitPresignUploadResponse(w http.ResponseWriter) error
+}
+
+type PresignUpload201JSONResponse PresignedUpload
+
+func (response PresignUpload201JSONResponse) VisitPresignUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignUpload401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PresignUpload401ApplicationProblemPlusJSONResponse) VisitPresignUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignUpload403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PresignUpload403ApplicationProblemPlusJSONResponse) VisitPresignUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignUpload422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PresignUpload422ApplicationProblemPlusJSONResponse) VisitPresignUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignUpload429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response PresignUpload429ApplicationProblemPlusJSONResponse) VisitPresignUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListUsersRequestObject struct {
 }
 
@@ -6095,6 +7720,18 @@ type StrictServerInterface interface {
 	// ConfirmBooking Konfirmasi draft jadi reserved
 	// (POST /bookings/{id}/confirm)
 	ConfirmBooking(ctx context.Context, request ConfirmBookingRequestObject) (ConfirmBookingResponseObject, error)
+	// ListHandovers Bukti kondisi satu booking
+	// (GET /bookings/{id}/handovers)
+	ListHandovers(ctx context.Context, request ListHandoversRequestObject) (ListHandoversResponseObject, error)
+	// PickupBooking Serah-terima ambil
+	// (POST /bookings/{id}/pickup)
+	PickupBooking(ctx context.Context, request PickupBookingRequestObject) (PickupBookingResponseObject, error)
+	// ReturnBooking Serah-terima kembali
+	// (POST /bookings/{id}/return)
+	ReturnBooking(ctx context.Context, request ReturnBookingRequestObject) (ReturnBookingResponseObject, error)
+	// PreviewReturn Pratinjau denda telat
+	// (GET /bookings/{id}/return-preview)
+	PreviewReturn(ctx context.Context, request PreviewReturnRequestObject) (PreviewReturnResponseObject, error)
 	// GetCalendar Lajur per unit untuk layar kalender
 	// (GET /calendar)
 	GetCalendar(ctx context.Context, request GetCalendarRequestObject) (GetCalendarResponseObject, error)
@@ -6116,6 +7753,24 @@ type StrictServerInterface interface {
 	// BlacklistCustomer Blokir penyewa
 	// (POST /customers/{id}/blacklist)
 	BlacklistCustomer(ctx context.Context, request BlacklistCustomerRequestObject) (BlacklistCustomerResponseObject, error)
+	// ViewCustomerIdentityPhoto Buka foto identitas (tercatat di audit log)
+	// (GET /customers/{id}/identity)
+	ViewCustomerIdentityPhoto(ctx context.Context, request ViewCustomerIdentityPhotoRequestObject) (ViewCustomerIdentityPhotoResponseObject, error)
+	// SetCustomerIdentityPhoto Simpan foto identitas penyewa
+	// (POST /customers/{id}/identity)
+	SetCustomerIdentityPhoto(ctx context.Context, request SetCustomerIdentityPhotoRequestObject) (SetCustomerIdentityPhotoResponseObject, error)
+	// DeleteHandover Tidak ada — bukti kondisi tidak bisa dihapus
+	// (DELETE /handovers/{id})
+	DeleteHandover(ctx context.Context, request DeleteHandoverRequestObject) (DeleteHandoverResponseObject, error)
+	// PatchHandover Tidak ada — bukti kondisi tidak bisa diubah
+	// (PATCH /handovers/{id})
+	PatchHandover(ctx context.Context, request PatchHandoverRequestObject) (PatchHandoverResponseObject, error)
+	// ListInvoices Invoice satu booking
+	// (GET /invoices)
+	ListInvoices(ctx context.Context, request ListInvoicesRequestObject) (ListInvoicesResponseObject, error)
+	// GetInvoice Satu invoice beserta barisnya
+	// (GET /invoices/{id})
+	GetInvoice(ctx context.Context, request GetInvoiceRequestObject) (GetInvoiceResponseObject, error)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -6152,6 +7807,9 @@ type StrictServerInterface interface {
 	// UpdateUnit Ubah unit, termasuk statusnya
 	// (PATCH /units/{id})
 	UpdateUnit(ctx context.Context, request UpdateUnitRequestObject) (UpdateUnitResponseObject, error)
+	// PresignUpload Minta URL unggah langsung ke object storage
+	// (POST /uploads/presign)
+	PresignUpload(ctx context.Context, request PresignUploadRequestObject) (PresignUploadResponseObject, error)
 	// ListUsers Akun di usaha ini
 	// (GET /users)
 	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
@@ -6597,6 +8255,126 @@ func (sh *strictHandler) ConfirmBooking(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// ListHandovers operation middleware
+func (sh *strictHandler) ListHandovers(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListHandoversRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListHandovers(ctx, request.(ListHandoversRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListHandovers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListHandoversResponseObject); ok {
+		if err := validResponse.VisitListHandoversResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PickupBooking operation middleware
+func (sh *strictHandler) PickupBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params PickupBookingParams) {
+	var request PickupBookingRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body PickupBookingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PickupBooking(ctx, request.(PickupBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PickupBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PickupBookingResponseObject); ok {
+		if err := validResponse.VisitPickupBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReturnBooking operation middleware
+func (sh *strictHandler) ReturnBooking(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ReturnBookingParams) {
+	var request ReturnBookingRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body ReturnBookingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReturnBooking(ctx, request.(ReturnBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReturnBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReturnBookingResponseObject); ok {
+		if err := validResponse.VisitReturnBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PreviewReturn operation middleware
+func (sh *strictHandler) PreviewReturn(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request PreviewReturnRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewReturn(ctx, request.(PreviewReturnRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewReturn")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PreviewReturnResponseObject); ok {
+		if err := validResponse.VisitPreviewReturnResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetCalendar operation middleware
 func (sh *strictHandler) GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams) {
 	var request GetCalendarRequestObject
@@ -6791,6 +8569,169 @@ func (sh *strictHandler) BlacklistCustomer(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(BlacklistCustomerResponseObject); ok {
 		if err := validResponse.VisitBlacklistCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ViewCustomerIdentityPhoto operation middleware
+func (sh *strictHandler) ViewCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ViewCustomerIdentityPhotoRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ViewCustomerIdentityPhoto(ctx, request.(ViewCustomerIdentityPhotoRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ViewCustomerIdentityPhoto")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ViewCustomerIdentityPhotoResponseObject); ok {
+		if err := validResponse.VisitViewCustomerIdentityPhotoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetCustomerIdentityPhoto operation middleware
+func (sh *strictHandler) SetCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request SetCustomerIdentityPhotoRequestObject
+
+	request.Id = id
+
+	var body SetCustomerIdentityPhotoJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetCustomerIdentityPhoto(ctx, request.(SetCustomerIdentityPhotoRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetCustomerIdentityPhoto")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetCustomerIdentityPhotoResponseObject); ok {
+		if err := validResponse.VisitSetCustomerIdentityPhotoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteHandover operation middleware
+func (sh *strictHandler) DeleteHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DeleteHandoverRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteHandover(ctx, request.(DeleteHandoverRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteHandover")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteHandoverResponseObject); ok {
+		if err := validResponse.VisitDeleteHandoverResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchHandover operation middleware
+func (sh *strictHandler) PatchHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request PatchHandoverRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchHandover(ctx, request.(PatchHandoverRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchHandover")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchHandoverResponseObject); ok {
+		if err := validResponse.VisitPatchHandoverResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListInvoices operation middleware
+func (sh *strictHandler) ListInvoices(w http.ResponseWriter, r *http.Request, params ListInvoicesParams) {
+	var request ListInvoicesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListInvoices(ctx, request.(ListInvoicesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListInvoices")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListInvoicesResponseObject); ok {
+		if err := validResponse.VisitListInvoicesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInvoice operation middleware
+func (sh *strictHandler) GetInvoice(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetInvoiceRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInvoice(ctx, request.(GetInvoiceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInvoice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInvoiceResponseObject); ok {
+		if err := validResponse.VisitGetInvoiceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7128,6 +9069,37 @@ func (sh *strictHandler) UpdateUnit(w http.ResponseWriter, r *http.Request, id o
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateUnitResponseObject); ok {
 		if err := validResponse.VisitUpdateUnitResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PresignUpload operation middleware
+func (sh *strictHandler) PresignUpload(w http.ResponseWriter, r *http.Request) {
+	var request PresignUploadRequestObject
+
+	var body PresignUploadJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PresignUpload(ctx, request.(PresignUploadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PresignUpload")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PresignUploadResponseObject); ok {
+		if err := validResponse.VisitPresignUploadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

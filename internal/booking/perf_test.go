@@ -43,7 +43,7 @@ func TestAvailabilityAndCalendarP95(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(f.store)
+	s := New(f.store, nil)
 	p95 := func(name string, run func() error) {
 		var took []time.Duration
 		for range 20 {
