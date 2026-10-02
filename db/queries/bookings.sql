@@ -81,6 +81,8 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
 -- name: ListBookings :many
 -- from/to select bookings that OVERLAP the window, not ones that start in it.
 -- overdue is derived, never stored (BR-041). Keyset on (start_at, id).
+-- ponytail: code is a substring scan with no index -- fine inside one
+-- owner's RLS slice; add pg_trgm if a fleet ever makes this slow.
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
        b.unit_price, b.pricing_unit, b.buffer_minutes, b.duration_qty, b.subtotal,
        b.deposit_amount, b.late_fee_per_unit, b.cancelled_reason, b.expires_at,
@@ -98,8 +100,11 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
    AND (sqlc.narg(status)::text IS NULL OR b.status = sqlc.narg(status)::text)
    AND (sqlc.narg(from_at)::timestamptz IS NULL OR b.end_at > sqlc.narg(from_at)::timestamptz)
    AND (sqlc.narg(to_at)::timestamptz IS NULL OR b.start_at < sqlc.narg(to_at)::timestamptz)
-   AND (sqlc.narg(unit_id)::uuid IS NULL OR b.resource_unit_id = sqlc.narg(unit_id)::uuid)
-   AND (sqlc.narg(customer_id)::uuid IS NULL OR b.customer_id = sqlc.narg(customer_id)::uuid)
+   AND (sqlc.narg(unit_ids)::uuid[] IS NULL OR b.resource_unit_id = ANY(sqlc.narg(unit_ids)::uuid[]))
+   AND (sqlc.narg(customer_ids)::uuid[] IS NULL OR b.customer_id = ANY(sqlc.narg(customer_ids)::uuid[]))
+   AND (sqlc.narg(resource_ids)::uuid[] IS NULL OR b.resource_id = ANY(sqlc.narg(resource_ids)::uuid[]))
+   -- strpos, not ILIKE: a '%' or '_' the user typed is a character, not a wildcard.
+   AND (sqlc.narg(code)::text IS NULL OR strpos(lower(b.code), lower(sqlc.narg(code)::text)) > 0)
    AND (NOT sqlc.arg(overdue_only)::boolean
         OR (b.status = 'picked_up' AND b.end_at < now()))
    AND (sqlc.narg(cursor_start)::timestamptz IS NULL

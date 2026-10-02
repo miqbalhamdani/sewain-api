@@ -31,7 +31,8 @@ func (s *Server) ListBookings(w http.ResponseWriter, r *http.Request, params Lis
 		}
 		rows, next, err := s.bookings.List(r.Context(), booking.Filter{
 			Status: stringPtr(params.Status), From: params.From, To: params.To,
-			UnitID: params.UnitId, CustomerID: params.CustomerId,
+			UnitIDs: uuids(params.UnitId), CustomerIDs: uuids(params.CustomerId), ResourceIDs: uuids(params.ResourceId),
+			Code:    nonBlank(params.Code),
 			Overdue: params.Overdue != nil && *params.Overdue,
 		}, after, pageLimit(params.Limit))
 		if err != nil {
@@ -255,4 +256,25 @@ func decodeBookingCursor(s string) (booking.Cursor, bool) {
 		return booking.Cursor{}, false
 	}
 	return booking.Cursor{StartAt: t, ID: u}, true
+}
+
+// uuids turns an absent or empty repeated query param into nil, which the
+// query reads as "any" -- an empty array would match nothing.
+func uuids(p *[]uuid.UUID) []uuid.UUID {
+	if p == nil || len(*p) == 0 {
+		return nil
+	}
+	return *p
+}
+
+// nonBlank drops a text filter that is only whitespace.
+func nonBlank(p *string) *string {
+	if p == nil {
+		return nil
+	}
+	t := strings.TrimSpace(*p)
+	if t == "" {
+		return nil
+	}
+	return &t
 }

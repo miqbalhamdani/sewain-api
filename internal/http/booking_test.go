@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -422,5 +423,77 @@ func TestUnitMaintenanceListsAffectedBookings(t *testing.T) {
 	affected := m["warning"].(map[string]any)["affected_bookings"].([]any)
 	if len(affected) != 1 || affected[0].(map[string]any)["code"] != "ISO-0001" {
 		t.Fatalf("affected_bookings = %v", affected)
+	}
+}
+
+// GET /bookings: repeated unit_id/customer_id/resource_id are "any of these";
+// code is a case-insensitive substring, and a typed '%' is a character, not a
+// wildcard.
+func TestListBookingFilters(t *testing.T) {
+	c := newBookingClient(t)
+	cust, res, unit, bk := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	c.exec(`INSERT INTO customers (id, owner_id, name, phone) VALUES ($1, $2, 'Andi', '081200000000')`, cust, c.ownerID)
+	c.exec(`INSERT INTO resources (id, owner_id, name, pricing_unit, base_price) VALUES ($1, $2, 'BYD M6', 'day', 1)`, res, c.ownerID)
+	c.exec(`INSERT INTO resource_units (id, owner_id, resource_id, code) VALUES ($1, $2, $3, 'B1122KZX')`, unit, c.ownerID, res)
+	c.exec(`INSERT INTO bookings (id, owner_id, code, customer_id, resource_id, resource_unit_id,
+	         start_at, end_at, status, unit_price, pricing_unit, duration_qty, subtotal)
+	        VALUES ($1, $2, 'ISO-0777', $3, $4, $5, '2026-09-20 09:00+07', '2026-09-21 09:00+07',
+	                'reserved', 1, 'day', 1, 1)`, bk, c.ownerID, cust, res, unit)
+
+	codes := func(query string) string {
+		t.Helper()
+		page := expect(t, c.do(http.MethodGet, "/api/v1/bookings?"+query, ""), http.StatusOK, "")
+		var out []string
+		for _, b := range page["data"].([]any) {
+			out = append(out, b.(map[string]any)["code"].(string))
+		}
+		sort.Strings(out)
+		return strings.Join(out, ",")
+	}
+	for _, tc := range []struct{ query, want string }{
+		{"code=0777", "ISO-0777"},
+		{"code=iso-0001", "ISO-0001"},
+		{"code=%25", ""},
+		{"code=%20%20", "ISO-0001,ISO-0777"}, // blank is "any", not "match nothing"
+		{"unit_id=" + unit.String(), "ISO-0777"},
+		{"unit_id=" + unit.String() + "&unit_id=" + c.s.unitID, "ISO-0001,ISO-0777"},
+		{"customer_id=" + cust.String(), "ISO-0777"},
+		{"customer_id=" + cust.String() + "&customer_id=" + c.s.customerID, "ISO-0001,ISO-0777"},
+		{"resource_id=" + res.String(), "ISO-0777"},
+		{"resource_id=" + c.s.resourceID + "&code=0777", ""},
+	} {
+		if got := codes(tc.query); got != tc.want {
+			t.Errorf("?%s = %q, want %q", tc.query, got, tc.want)
+		}
+	}
+}
+
+// GET /customers?blacklisted= narrows to one side; absent means both.
+func TestListCustomersBlacklisted(t *testing.T) {
+	c := newBookingClient(t)
+	blocked := uuid.Must(uuid.NewV7())
+	c.exec(`INSERT INTO customers (id, owner_id, name, phone, is_blacklisted, blacklist_reason)
+	        VALUES ($1, $2, 'Diblokir', '081299999999', true, 'tidak membayar')`, blocked, c.ownerID)
+
+	ids := func(query string) string {
+		t.Helper()
+		page := expect(t, c.do(http.MethodGet, "/api/v1/customers"+query, ""), http.StatusOK, "")
+		var out []string
+		for _, x := range page["data"].([]any) {
+			out = append(out, x.(map[string]any)["id"].(string))
+		}
+		sort.Strings(out)
+		return strings.Join(out, ",")
+	}
+	both := []string{blocked.String(), c.s.customerID}
+	sort.Strings(both)
+	for _, tc := range []struct{ query, want string }{
+		{"?blacklisted=true", blocked.String()},
+		{"?blacklisted=false", c.s.customerID},
+		{"", strings.Join(both, ",")},
+	} {
+		if got := ids(tc.query); got != tc.want {
+			t.Errorf("%q = %s, want %s", tc.query, got, tc.want)
+		}
 	}
 }

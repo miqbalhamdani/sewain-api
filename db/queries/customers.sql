@@ -25,6 +25,7 @@ SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
    AND (sqlc.narg(q)::text IS NULL
         OR name ILIKE '%' || sqlc.narg(q)::text || '%'
         OR phone ILIKE '%' || sqlc.narg(q)::text || '%')
+   AND (sqlc.narg(blacklisted)::boolean IS NULL OR is_blacklisted = sqlc.narg(blacklisted)::boolean)
    AND (sqlc.narg(cursor)::uuid IS NULL OR id < sqlc.narg(cursor)::uuid)
  ORDER BY id DESC
  LIMIT sqlc.arg(lim);

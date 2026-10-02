@@ -30,7 +30,7 @@ func (s *Server) ListCustomers(w http.ResponseWriter, r *http.Request, params Li
 		if params.Q != nil && strings.TrimSpace(*params.Q) != "" {
 			q = ptr(strings.TrimSpace(*params.Q))
 		}
-		rows, next, err := s.customers.List(r.Context(), q, cursor, pageLimit(params.Limit))
+		rows, next, err := s.customers.List(r.Context(), q, params.Blacklisted, cursor, pageLimit(params.Limit))
 		if err != nil {
 			writeError(w, r, err)
 			return

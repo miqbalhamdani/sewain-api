@@ -112,12 +112,13 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Customer, error) {
 
 // List returns one page, newest first, and the cursor for the next page (nil
 // on the last one).
-func (s *Service) List(ctx context.Context, q *string, cursor *uuid.UUID, limit int) ([]Customer, *uuid.UUID, error) {
+// blacklisted nil means both.
+func (s *Service) List(ctx context.Context, q *string, blacklisted *bool, cursor *uuid.UUID, limit int) ([]Customer, *uuid.UUID, error) {
 	var rows []sqlcgen.ListCustomersRow
 	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
 		var err error
 		rows, err = sqlcgen.New(tx).ListCustomers(ctx, sqlcgen.ListCustomersParams{
-			Q: q, Cursor: cursor, Lim: int32(limit + 1), //nolint:gosec // bounded by the schema's maximum
+			Q: q, Blacklisted: blacklisted, Cursor: cursor, Lim: int32(limit + 1), //nolint:gosec // bounded by the schema's maximum
 		})
 		return err
 	})

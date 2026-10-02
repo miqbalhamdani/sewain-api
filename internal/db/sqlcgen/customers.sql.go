@@ -120,15 +120,17 @@ SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
    AND ($1::text IS NULL
         OR name ILIKE '%' || $1::text || '%'
         OR phone ILIKE '%' || $1::text || '%')
-   AND ($2::uuid IS NULL OR id < $2::uuid)
+   AND ($2::boolean IS NULL OR is_blacklisted = $2::boolean)
+   AND ($3::uuid IS NULL OR id < $3::uuid)
  ORDER BY id DESC
- LIMIT $3
+ LIMIT $4
 `
 
 type ListCustomersParams struct {
-	Q      *string
-	Cursor *uuid.UUID
-	Lim    int32
+	Q           *string
+	Blacklisted *bool
+	Cursor      *uuid.UUID
+	Lim         int32
 }
 
 type ListCustomersRow struct {
@@ -146,7 +148,12 @@ type ListCustomersRow struct {
 // the same column. q matches name or phone, case-insensitively -- the booking
 // form searches while the operator types.
 func (q *Queries) ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error) {
-	rows, err := q.db.Query(ctx, listCustomers, arg.Q, arg.Cursor, arg.Lim)
+	rows, err := q.db.Query(ctx, listCustomers,
+		arg.Q,
+		arg.Blacklisted,
+		arg.Cursor,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}

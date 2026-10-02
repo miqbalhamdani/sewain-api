@@ -1649,12 +1649,14 @@ type GetAvailabilityParams struct {
 
 // ListBookingsParams defines parameters for ListBookings.
 type ListBookingsParams struct {
-	Status     *BookingStatus      `form:"status,omitempty" json:"status,omitempty"`
-	From       *time.Time          `form:"from,omitempty" json:"from,omitempty"`
-	To         *time.Time          `form:"to,omitempty" json:"to,omitempty"`
-	UnitId     *openapi_types.UUID `form:"unit_id,omitempty" json:"unit_id,omitempty"`
-	CustomerId *openapi_types.UUID `form:"customer_id,omitempty" json:"customer_id,omitempty"`
-	Overdue    *bool               `form:"overdue,omitempty" json:"overdue,omitempty"`
+	Status     *BookingStatus        `form:"status,omitempty" json:"status,omitempty"`
+	From       *time.Time            `form:"from,omitempty" json:"from,omitempty"`
+	To         *time.Time            `form:"to,omitempty" json:"to,omitempty"`
+	UnitId     *[]openapi_types.UUID `form:"unit_id,omitempty" json:"unit_id,omitempty"`
+	CustomerId *[]openapi_types.UUID `form:"customer_id,omitempty" json:"customer_id,omitempty"`
+	ResourceId *[]openapi_types.UUID `form:"resource_id,omitempty" json:"resource_id,omitempty"`
+	Code       *string               `form:"code,omitempty" json:"code,omitempty"`
+	Overdue    *bool                 `form:"overdue,omitempty" json:"overdue,omitempty"`
 
 	// Limit Ukuran halaman. Berpasangan dengan `cursor`; tidak ada `offset` di API ini.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -1682,7 +1684,8 @@ type GetCalendarParams struct {
 
 // ListCustomersParams defines parameters for ListCustomers.
 type ListCustomersParams struct {
-	Q *string `form:"q,omitempty" json:"q,omitempty"`
+	Q           *string `form:"q,omitempty" json:"q,omitempty"`
+	Blacklisted *bool   `form:"blacklisted,omitempty" json:"blacklisted,omitempty"`
 
 	// Limit Ukuran halaman. Berpasangan dengan `cursor`; tidak ada `offset` di API ini.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -2378,7 +2381,7 @@ func (siw *ServerInterfaceWrapper) ListBookings(w http.ResponseWriter, r *http.R
 
 	// ------------- Optional query parameter "unit_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "unit_id", r.URL.Query(), &params.UnitId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "unit_id", r.URL.Query(), &params.UnitId, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -2391,13 +2394,39 @@ func (siw *ServerInterfaceWrapper) ListBookings(w http.ResponseWriter, r *http.R
 
 	// ------------- Optional query parameter "customer_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "customer_id", r.URL.Query(), &params.CustomerId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "customer_id", r.URL.Query(), &params.CustomerId, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "customer_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customer_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resource_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource_id", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
 		}
 		return
 	}
@@ -2665,6 +2694,19 @@ func (siw *ServerInterfaceWrapper) ListCustomers(w http.ResponseWriter, r *http.
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "blacklisted" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "blacklisted", r.URL.Query(), &params.Blacklisted, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "blacklisted"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "blacklisted", Err: err})
 		}
 		return
 	}

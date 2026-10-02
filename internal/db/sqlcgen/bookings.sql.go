@@ -425,22 +425,27 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
    AND ($1::text IS NULL OR b.status = $1::text)
    AND ($2::timestamptz IS NULL OR b.end_at > $2::timestamptz)
    AND ($3::timestamptz IS NULL OR b.start_at < $3::timestamptz)
-   AND ($4::uuid IS NULL OR b.resource_unit_id = $4::uuid)
-   AND ($5::uuid IS NULL OR b.customer_id = $5::uuid)
-   AND (NOT $6::boolean
+   AND ($4::uuid[] IS NULL OR b.resource_unit_id = ANY($4::uuid[]))
+   AND ($5::uuid[] IS NULL OR b.customer_id = ANY($5::uuid[]))
+   AND ($6::uuid[] IS NULL OR b.resource_id = ANY($6::uuid[]))
+   -- strpos, not ILIKE: a '%' or '_' the user typed is a character, not a wildcard.
+   AND ($7::text IS NULL OR strpos(lower(b.code), lower($7::text)) > 0)
+   AND (NOT $8::boolean
         OR (b.status = 'picked_up' AND b.end_at < now()))
-   AND ($7::timestamptz IS NULL
-        OR (b.start_at, b.id) < ($7::timestamptz, $8::uuid))
+   AND ($9::timestamptz IS NULL
+        OR (b.start_at, b.id) < ($9::timestamptz, $10::uuid))
  ORDER BY b.start_at DESC, b.id DESC
- LIMIT $9
+ LIMIT $11
 `
 
 type ListBookingsParams struct {
 	Status      *string
 	FromAt      *time.Time
 	ToAt        *time.Time
-	UnitID      *uuid.UUID
-	CustomerID  *uuid.UUID
+	UnitIds     []uuid.UUID
+	CustomerIds []uuid.UUID
+	ResourceIds []uuid.UUID
+	Code        *string
 	OverdueOnly bool
 	CursorStart *time.Time
 	CursorID    *uuid.UUID
@@ -479,13 +484,17 @@ type ListBookingsRow struct {
 
 // from/to select bookings that OVERLAP the window, not ones that start in it.
 // overdue is derived, never stored (BR-041). Keyset on (start_at, id).
+// ponytail: code is a substring scan with no index -- fine inside one
+// owner's RLS slice; add pg_trgm if a fleet ever makes this slow.
 func (q *Queries) ListBookings(ctx context.Context, arg ListBookingsParams) ([]ListBookingsRow, error) {
 	rows, err := q.db.Query(ctx, listBookings,
 		arg.Status,
 		arg.FromAt,
 		arg.ToAt,
-		arg.UnitID,
-		arg.CustomerID,
+		arg.UnitIds,
+		arg.CustomerIds,
+		arg.ResourceIds,
+		arg.Code,
 		arg.OverdueOnly,
 		arg.CursorStart,
 		arg.CursorID,

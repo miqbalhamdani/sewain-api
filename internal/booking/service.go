@@ -77,11 +77,15 @@ type NewBooking struct {
 
 // Filter narrows a list. Overdue is a derived condition (BR-041), not a status.
 type Filter struct {
-	Status     *string
-	From, To   *time.Time
-	UnitID     *uuid.UUID
-	CustomerID *uuid.UUID
-	Overdue    bool
+	Status   *string
+	From, To *time.Time
+	// Empty means "any". A nil slice reaches the query as NULL.
+	UnitIDs     []uuid.UUID
+	CustomerIDs []uuid.UUID
+	ResourceIDs []uuid.UUID
+	// Substring match; nil or blank means "any".
+	Code    *string
+	Overdue bool
 }
 
 // Cursor is the keyset position after the last row of a page.
@@ -209,8 +213,9 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Booking, error) {
 // the last page).
 func (s *Service) List(ctx context.Context, f Filter, after *Cursor, limit int) ([]Booking, *Cursor, error) {
 	params := sqlcgen.ListBookingsParams{
-		Status: f.Status, FromAt: f.From, ToAt: f.To, UnitID: f.UnitID,
-		CustomerID: f.CustomerID, OverdueOnly: f.Overdue,
+		Status: f.Status, FromAt: f.From, ToAt: f.To, UnitIds: f.UnitIDs,
+		CustomerIds: f.CustomerIDs, ResourceIds: f.ResourceIDs,
+		Code: f.Code, OverdueOnly: f.Overdue,
 		Lim: int32(limit + 1), //nolint:gosec // bounded by the schema's maximum
 	}
 	if after != nil {
