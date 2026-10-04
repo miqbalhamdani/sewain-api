@@ -58,8 +58,11 @@ UPDATE payment_proofs SET match_status = $2, ai_amount = $3, ai_paid_at = $4
 -- name: ListOwnerInvoices :many
 -- The owner's full list (S1-047), newest first, keyset on (created_at, id).
 SELECT i.id, i.booking_id, i.number, i.status, i.due_at, i.paid_at, i.created_at,
+       c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
+       c.is_blacklisted AS customer_blacklisted,
        COALESCE((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id), 0)::bigint AS total
   FROM invoices i
+  LEFT JOIN customers c ON c.id = i.customer_id
  WHERE i.deleted_at IS NULL
    AND (sqlc.narg(status)::text IS NULL OR i.status = sqlc.narg(status)::text)
    AND (sqlc.narg(cursor_at)::timestamptz IS NULL

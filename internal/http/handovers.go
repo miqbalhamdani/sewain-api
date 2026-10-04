@@ -255,8 +255,14 @@ func invoiceBody(inv booking.Invoice) Invoice {
 		lines = append(lines, InvoiceLine{Id: l.ID, Kind: InvoiceLineKind(l.Kind), Description: l.Description,
 			Amount: l.Amount, HandoverPhotoId: l.HandoverPhotoID, WaiverReason: l.WaiverReason})
 	}
+	var cust *BookingCustomer
+	if inv.Customer != nil {
+		cust = &BookingCustomer{Id: inv.Customer.ID, Name: inv.Customer.Name,
+			Phone: inv.Customer.Phone, IsBlacklisted: inv.Customer.Blacklisted}
+	}
 	return Invoice{Id: inv.ID, BookingId: inv.BookingID, Number: inv.Number, Status: InvoiceStatus(inv.Status),
-		DueAt: inv.DueAt, PaidAt: inv.PaidAt, CreatedAt: inv.CreatedAt, Total: inv.Total, Lines: lines}
+		DueAt: inv.DueAt, PaidAt: inv.PaidAt, CreatedAt: inv.CreatedAt, Total: inv.Total, Lines: lines,
+		Customer: cust}
 }
 
 func handoverInput(keys []string, meter *int64, checklist *map[string]any, notes *string) booking.HandoverInput {

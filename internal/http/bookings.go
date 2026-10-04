@@ -216,6 +216,7 @@ func bookingBody(b booking.Booking) Booking {
 		Resource: BookingResource{Id: b.ResourceID, Name: b.ResourceName},
 		Unit:     UnitRef{Id: b.UnitID, Code: b.UnitCode, Label: b.UnitLabel},
 		StartAt:  b.StartAt, EndAt: b.EndAt, EndAtWithBuffer: b.EndAtWithBuffer, Overdue: b.Overdue,
+		Payment:   BookingPayment{Status: BookingPaymentStatus(b.PaymentStatus), Outstanding: b.Outstanding},
 		UnitPrice: b.UnitPrice, PricingUnit: PricingUnit(b.PricingUnit),
 		BufferMinutes: int(b.BufferMinutes), DurationQty: int(b.DurationQty), Subtotal: b.Subtotal,
 		DepositAmount: b.DepositAmount, LateFeePerUnit: b.LateFeePerUnit,

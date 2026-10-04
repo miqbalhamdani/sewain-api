@@ -29,6 +29,15 @@ type Invoice struct {
 	CreatedAt time.Time
 	Total     int64
 	Lines     []InvoiceLine
+	// Penyewa yang ditagih; nil hanya untuk invoice langganan (BR-082), belum ada di fase 1.
+	Customer *InvoiceCustomer
+}
+
+type InvoiceCustomer struct {
+	ID          uuid.UUID
+	Name        string
+	Phone       string
+	Blacklisted bool
 }
 
 type InvoiceLine struct {
@@ -151,6 +160,11 @@ func invoiceOf(r sqlcgen.GetInvoiceRow) Invoice {
 	if r.BookingID != nil {
 		booking = *r.BookingID
 	}
-	return Invoice{ID: r.ID, BookingID: booking, Number: r.Number, Status: r.Status,
+	inv := Invoice{ID: r.ID, BookingID: booking, Number: r.Number, Status: r.Status,
 		DueAt: r.DueAt, PaidAt: r.PaidAt, CreatedAt: r.CreatedAt, Total: r.Total}
+	if r.CustomerID != nil && r.CustomerName != nil && r.CustomerPhone != nil && r.CustomerBlacklisted != nil {
+		inv.Customer = &InvoiceCustomer{ID: *r.CustomerID, Name: *r.CustomerName,
+			Phone: *r.CustomerPhone, Blacklisted: *r.CustomerBlacklisted}
+	}
+	return inv
 }

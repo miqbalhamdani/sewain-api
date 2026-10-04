@@ -72,11 +72,25 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
-       u.id AS unit_id, u.code AS unit_code, u.label AS unit_label
+       u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
   FROM bookings b
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id
+  -- Ringkasan bayar, dihitung saat dibaca seperti kolom overdue (ide
+  -- booking-invoice-lists): cancelled diabaikan, gateway_pending = belum bayar.
+  -- ponytail: sum baris per invoice di dalam lateral tanpa index baru --
+  -- invoices_owner_booking menjangkarnya; ANALYZE kalau perf test protes.
+  CROSS JOIN LATERAL (
+    SELECT count(*)::int AS n_active,
+           (count(*) FILTER (WHERE i.status = 'overdue'))::int AS n_overdue,
+           (count(*) FILTER (WHERE i.status IN ('unpaid', 'gateway_pending')))::int AS n_unpaid,
+           COALESCE(sum((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id))
+                      FILTER (WHERE i.status IN ('unpaid', 'gateway_pending', 'overdue')), 0)::bigint AS outstanding
+      FROM invoices i
+     WHERE i.booking_id = b.id AND i.status <> 'cancelled' AND i.deleted_at IS NULL
+  ) pay
  WHERE b.id = $1 AND b.deleted_at IS NULL;
 
 -- name: ListBookings :many
@@ -93,11 +107,25 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
-       u.id AS unit_id, u.code AS unit_code, u.label AS unit_label
+       u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
   FROM bookings b
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id
+  -- Ringkasan bayar, dihitung saat dibaca seperti kolom overdue (ide
+  -- booking-invoice-lists): cancelled diabaikan, gateway_pending = belum bayar.
+  -- ponytail: sum baris per invoice di dalam lateral tanpa index baru --
+  -- invoices_owner_booking menjangkarnya; ANALYZE kalau perf test protes.
+  CROSS JOIN LATERAL (
+    SELECT count(*)::int AS n_active,
+           (count(*) FILTER (WHERE i.status = 'overdue'))::int AS n_overdue,
+           (count(*) FILTER (WHERE i.status IN ('unpaid', 'gateway_pending')))::int AS n_unpaid,
+           COALESCE(sum((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id))
+                      FILTER (WHERE i.status IN ('unpaid', 'gateway_pending', 'overdue')), 0)::bigint AS outstanding
+      FROM invoices i
+     WHERE i.booking_id = b.id AND i.status <> 'cancelled' AND i.deleted_at IS NULL
+  ) pay
  WHERE b.deleted_at IS NULL
    AND (sqlc.narg(status)::text IS NULL OR b.status = sqlc.narg(status)::text)
    AND (sqlc.narg(from_at)::timestamptz IS NULL OR b.end_at > sqlc.narg(from_at)::timestamptz)

@@ -35,6 +35,30 @@ func (e BookingSource) Valid() bool {
 	}
 }
 
+// Defines values for BookingPaymentStatus.
+const (
+	BookingPaymentStatusNone    BookingPaymentStatus = "none"
+	BookingPaymentStatusOverdue BookingPaymentStatus = "overdue"
+	BookingPaymentStatusPaid    BookingPaymentStatus = "paid"
+	BookingPaymentStatusUnpaid  BookingPaymentStatus = "unpaid"
+)
+
+// Valid indicates whether the value is a known member of the BookingPaymentStatus enum.
+func (e BookingPaymentStatus) Valid() bool {
+	switch e {
+	case BookingPaymentStatusNone:
+		return true
+	case BookingPaymentStatusOverdue:
+		return true
+	case BookingPaymentStatusPaid:
+		return true
+	case BookingPaymentStatusUnpaid:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BookingStatus.
 const (
 	BookingStatusCancelled BookingStatus = "cancelled"
@@ -782,6 +806,13 @@ type Booking struct {
 	// Overdue `picked_up` dan `end_at < now()` (BR-041).
 	Overdue bool `json:"overdue"`
 
+	// Payment Ringkasan bayar booking ini, **dihitung saat dibaca** — seperti `overdue`
+	// (BR-041) dan total invoice (BR-055), tidak pernah disimpan. Invoice
+	// `cancelled` diabaikan; `gateway_pending` terhitung belum bayar — uang yang
+	// belum terkonfirmasi bukan uang. Booking `draft`/`cancelled`/`no_show`,
+	// atau tanpa invoice aktif → `none`.
+	Payment BookingPayment `json:"payment"`
+
 	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
 	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
 	// `ResourceCreate` maupun `ResourceUpdate`.
@@ -830,6 +861,20 @@ type BookingPage struct {
 	Data       []Booking `json:"data"`
 	NextCursor *string   `json:"next_cursor"`
 }
+
+// BookingPayment Ringkasan bayar booking ini, **dihitung saat dibaca** — seperti `overdue`
+// (BR-041) dan total invoice (BR-055), tidak pernah disimpan. Invoice
+// `cancelled` diabaikan; `gateway_pending` terhitung belum bayar — uang yang
+// belum terkonfirmasi bukan uang. Booking `draft`/`cancelled`/`no_show`,
+// atau tanpa invoice aktif → `none`.
+type BookingPayment struct {
+	// Outstanding SUM baris dari invoice berstatus belum lunas. 0 kalau tidak ada.
+	Outstanding int64                `json:"outstanding"`
+	Status      BookingPaymentStatus `json:"status"`
+}
+
+// BookingPaymentStatus defines model for BookingPayment.Status.
+type BookingPaymentStatus string
 
 // BookingResource defines model for BookingResource.
 type BookingResource struct {
@@ -1024,9 +1069,13 @@ type InviteUserRequestRole string
 type Invoice struct {
 	BookingId openapi_types.UUID `json:"booking_id"`
 	CreatedAt time.Time          `json:"created_at"`
-	DueAt     time.Time          `json:"due_at"`
-	Id        openapi_types.UUID `json:"id"`
-	Lines     []InvoiceLine      `json:"lines"`
+
+	// Customer Penyewa yang ditagih — supaya daftar Tagihan bisa menagih tanpa membuka
+	// booking-nya. `null` hanya untuk invoice langganan (BR-082), belum ada di fase 1.
+	Customer *BookingCustomer   `json:"customer"`
+	DueAt    time.Time          `json:"due_at"`
+	Id       openapi_types.UUID `json:"id"`
+	Lines    []InvoiceLine      `json:"lines"`
 
 	// Number Examples: SWN-0042/1
 	Number string     `json:"number"`

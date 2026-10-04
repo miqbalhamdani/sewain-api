@@ -12,6 +12,20 @@ import (
 	"github.com/google/uuid"
 )
 
+const cancelBookingInvoices = `-- name: CancelBookingInvoices :exec
+UPDATE invoices SET status = 'cancelled', updated_at = now()
+ WHERE booking_id = $1 AND status IN ('unpaid', 'gateway_pending', 'overdue')
+   AND deleted_at IS NULL
+`
+
+// Booking batal tidak menagih apa pun (BR-057 revisi): invoice yang belum
+// dibayar ikut batal; yang sudah paid tetap tercatat. Dipanggil Cancel manual,
+// dan nanti job payment_expired S1-052 lewat jalur yang sama.
+func (q *Queries) CancelBookingInvoices(ctx context.Context, bookingID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, cancelBookingInvoices, bookingID)
+	return err
+}
+
 const countBookingInvoices = `-- name: CountBookingInvoices :one
 SELECT count(*) FROM invoices WHERE booking_id = $1
 `
@@ -28,20 +42,27 @@ func (q *Queries) CountBookingInvoices(ctx context.Context, bookingID *uuid.UUID
 
 const getInvoice = `-- name: GetInvoice :one
 SELECT i.id, i.booking_id, i.number, i.status, i.due_at, i.paid_at, i.created_at,
+       c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
+       c.is_blacklisted AS customer_blacklisted,
        COALESCE((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id), 0)::bigint AS total
   FROM invoices i
+  LEFT JOIN customers c ON c.id = i.customer_id
  WHERE i.id = $1 AND i.deleted_at IS NULL
 `
 
 type GetInvoiceRow struct {
-	ID        uuid.UUID
-	BookingID *uuid.UUID
-	Number    string
-	Status    string
-	DueAt     time.Time
-	PaidAt    *time.Time
-	CreatedAt time.Time
-	Total     int64
+	ID                  uuid.UUID
+	BookingID           *uuid.UUID
+	Number              string
+	Status              string
+	DueAt               time.Time
+	PaidAt              *time.Time
+	CreatedAt           time.Time
+	CustomerID          *uuid.UUID
+	CustomerName        *string
+	CustomerPhone       *string
+	CustomerBlacklisted *bool
+	Total               int64
 }
 
 func (q *Queries) GetInvoice(ctx context.Context, id uuid.UUID) (GetInvoiceRow, error) {
@@ -55,6 +76,10 @@ func (q *Queries) GetInvoice(ctx context.Context, id uuid.UUID) (GetInvoiceRow, 
 		&i.DueAt,
 		&i.PaidAt,
 		&i.CreatedAt,
+		&i.CustomerID,
+		&i.CustomerName,
+		&i.CustomerPhone,
+		&i.CustomerBlacklisted,
 		&i.Total,
 	)
 	return i, err
@@ -136,21 +161,28 @@ func (q *Queries) InsertInvoiceLine(ctx context.Context, arg InsertInvoiceLinePa
 
 const listBookingInvoices = `-- name: ListBookingInvoices :many
 SELECT i.id, i.booking_id, i.number, i.status, i.due_at, i.paid_at, i.created_at,
+       c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
+       c.is_blacklisted AS customer_blacklisted,
        COALESCE((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id), 0)::bigint AS total
   FROM invoices i
+  LEFT JOIN customers c ON c.id = i.customer_id
  WHERE i.booking_id = $1 AND i.deleted_at IS NULL
  ORDER BY i.created_at, i.number
 `
 
 type ListBookingInvoicesRow struct {
-	ID        uuid.UUID
-	BookingID *uuid.UUID
-	Number    string
-	Status    string
-	DueAt     time.Time
-	PaidAt    *time.Time
-	CreatedAt time.Time
-	Total     int64
+	ID                  uuid.UUID
+	BookingID           *uuid.UUID
+	Number              string
+	Status              string
+	DueAt               time.Time
+	PaidAt              *time.Time
+	CreatedAt           time.Time
+	CustomerID          *uuid.UUID
+	CustomerName        *string
+	CustomerPhone       *string
+	CustomerBlacklisted *bool
+	Total               int64
 }
 
 func (q *Queries) ListBookingInvoices(ctx context.Context, bookingID *uuid.UUID) ([]ListBookingInvoicesRow, error) {
@@ -170,6 +202,10 @@ func (q *Queries) ListBookingInvoices(ctx context.Context, bookingID *uuid.UUID)
 			&i.DueAt,
 			&i.PaidAt,
 			&i.CreatedAt,
+			&i.CustomerID,
+			&i.CustomerName,
+			&i.CustomerPhone,
+			&i.CustomerBlacklisted,
 			&i.Total,
 		); err != nil {
 			return nil, err

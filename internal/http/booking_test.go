@@ -501,3 +501,74 @@ func TestListCustomersBlacklisted(t *testing.T) {
 }
 
 func jsonUnmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }
+
+// Ide booking-invoice-lists: payment dihitung saat dibaca; Invoice membawa
+// customer; cancel ikut membatalkan invoice yang belum dibayar (BR-057 revisi).
+func TestBookingPaymentAndInvoiceCustomer(t *testing.T) {
+	c := newBookingClient(t)
+
+	// Invoice cancelled diabaikan: reserved yang seluruh invoicenya batal
+	// adalah "none", bukan "unpaid" -- tidak ada lagi yang bisa ditagih.
+	c.exec(`UPDATE invoices SET status = 'cancelled' WHERE booking_id = $1`, c.s.bookingID)
+	seeded := expect(t, c.do(http.MethodGet, "/api/v1/bookings/"+c.s.bookingID, ""), http.StatusOK, "")
+	if p := seeded["payment"].(map[string]any); p["status"] != "none" || p["outstanding"].(float64) != 0 {
+		t.Fatalf("payment booking ber-invoice batal = %v, want none/0", p)
+	}
+
+	// Booking lewat API menerbitkan invoice /1 (sewa + deposit) -> unpaid,
+	// outstanding = totalnya.
+	made := expect(t, c.book("2026-11-02T09:00:00+07:00", "2026-11-04T09:00:00+07:00"), http.StatusCreated, "")
+	id := made["id"].(string)
+	pay := made["payment"].(map[string]any)
+	if pay["status"] != "unpaid" {
+		t.Fatalf("payment.status = %v, want unpaid", pay["status"])
+	}
+	outstanding := pay["outstanding"].(float64)
+	if outstanding <= 0 {
+		t.Fatalf("outstanding = %v, want > 0", outstanding)
+	}
+
+	// Daftar Tagihan membawa penyewanya, dan totalnya = outstanding booking.
+	invs := expect(t, c.do(http.MethodGet, "/api/v1/invoices", ""), http.StatusOK, "")
+	var inv map[string]any
+	for _, x := range invs["data"].([]any) {
+		if m := x.(map[string]any); m["booking_id"] == id {
+			inv = m
+		}
+	}
+	if inv == nil {
+		t.Fatalf("no invoice for booking %s in /invoices", id)
+	}
+	wantName := made["customer"].(map[string]any)["name"]
+	if cust, ok := inv["customer"].(map[string]any); !ok || cust["name"] != wantName {
+		t.Fatalf("invoice.customer = %v, want name %q", inv["customer"], wantName)
+	}
+	if inv["total"].(float64) != outstanding {
+		t.Fatalf("invoice total = %v, outstanding = %v -- harus sama", inv["total"], outstanding)
+	}
+
+	// Lunas -> paid, outstanding 0.
+	c.exec(`UPDATE invoices SET status = 'paid', paid_at = now() WHERE booking_id = $1`, id)
+	paid := expect(t, c.do(http.MethodGet, "/api/v1/bookings/"+id, ""), http.StatusOK, "")
+	if p := paid["payment"].(map[string]any); p["status"] != "paid" || p["outstanding"].(float64) != 0 {
+		t.Fatalf("after pay = %v, want paid/0", p)
+	}
+
+	// Batal: invoice belum-dibayar ikut cancelled, payment kembali none.
+	c.exec(`UPDATE invoices SET status = 'unpaid', paid_at = NULL WHERE booking_id = $1`, id)
+	expect(t, c.do(http.MethodPost, "/api/v1/bookings/"+id+"/cancel", ""), http.StatusOK, "")
+	after := expect(t, c.do(http.MethodGet, "/api/v1/bookings/"+id, ""), http.StatusOK, "")
+	if p := after["payment"].(map[string]any); p["status"] != "none" {
+		t.Fatalf("after cancel payment = %v, want none", p)
+	}
+	invs = expect(t, c.do(http.MethodGet, "/api/v1/invoices?status=cancelled", ""), http.StatusOK, "")
+	found := false
+	for _, x := range invs["data"].([]any) {
+		if m := x.(map[string]any); m["booking_id"] == id {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("cancelled booking's invoice is not cancelled")
+	}
+}

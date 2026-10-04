@@ -55,6 +55,10 @@ type Booking struct {
 	EndAtWithBuffer time.Time
 	Overdue         bool
 
+	// Ringkasan bayar, turunan baca seperti Overdue -- lihat BookingPayment di kontrak.
+	PaymentStatus string
+	Outstanding   int64
+
 	UnitPrice      int64
 	PricingUnit    string
 	BufferMinutes  int32
@@ -309,7 +313,12 @@ func (s *Service) Cancel(ctx context.Context, id uuid.UUID) (Booking, error) {
 		if locked.Status != "draft" && locked.Status != "reserved" {
 			return wrongStatus("Only a draft or reserved booking can be cancelled; this booking is " + locked.Status + ".")
 		}
-		return q.CancelBooking(ctx, id)
+		if err := q.CancelBooking(ctx, id); err != nil {
+			return err
+		}
+		// Booking batal tidak menagih apa pun (BR-057 revisi): invoice yang
+		// belum dibayar ikut batal. S1-052 memakai jalur yang sama nanti.
+		return q.CancelBookingInvoices(ctx, &id)
 	})
 }
 
@@ -447,10 +456,32 @@ func conflictsOf(rows []sqlcgen.FindConflictsRow) []apperrors.Conflict {
 	return out
 }
 
+// paymentOf menurunkan badge bayar satu booking (ide booking-invoice-lists).
+// Invoice cancelled sudah disingkirkan query-nya; gateway_pending terhitung
+// belum bayar -- uang yang belum terkonfirmasi bukan uang.
+func paymentOf(bookingStatus string, nActive, nOverdue, nUnpaid int32, outstanding int64) (string, int64) {
+	switch bookingStatus {
+	case "draft", "cancelled", "no_show":
+		return "none", 0
+	}
+	switch {
+	case nActive == 0:
+		return "none", 0
+	case nOverdue > 0:
+		return "overdue", outstanding
+	case nUnpaid > 0:
+		return "unpaid", outstanding
+	default:
+		return "paid", 0
+	}
+}
+
 func bookingOf(r sqlcgen.GetBookingRow) Booking {
+	pay, outstanding := paymentOf(r.Status, r.NActive, r.NOverdue, r.NUnpaid, r.Outstanding)
 	return Booking{
 		ID: r.ID, Code: r.Code, Status: r.Status, Source: r.Source,
 		StartAt: r.StartAt, EndAt: r.EndAt, EndAtWithBuffer: r.EndAtWithBuffer, Overdue: r.Overdue,
+		PaymentStatus: pay, Outstanding: outstanding,
 		UnitPrice: r.UnitPrice, PricingUnit: r.PricingUnit, BufferMinutes: r.BufferMinutes,
 		DurationQty: r.DurationQty, Subtotal: r.Subtotal,
 		DepositAmount: r.DepositAmount, LateFeePerUnit: r.LateFeePerUnit,

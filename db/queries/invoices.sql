@@ -33,15 +33,21 @@ SELECT EXISTS (SELECT 1 FROM invoices i
 
 -- name: ListBookingInvoices :many
 SELECT i.id, i.booking_id, i.number, i.status, i.due_at, i.paid_at, i.created_at,
+       c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
+       c.is_blacklisted AS customer_blacklisted,
        COALESCE((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id), 0)::bigint AS total
   FROM invoices i
+  LEFT JOIN customers c ON c.id = i.customer_id
  WHERE i.booking_id = $1 AND i.deleted_at IS NULL
  ORDER BY i.created_at, i.number;
 
 -- name: GetInvoice :one
 SELECT i.id, i.booking_id, i.number, i.status, i.due_at, i.paid_at, i.created_at,
+       c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
+       c.is_blacklisted AS customer_blacklisted,
        COALESCE((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id), 0)::bigint AS total
   FROM invoices i
+  LEFT JOIN customers c ON c.id = i.customer_id
  WHERE i.id = $1 AND i.deleted_at IS NULL;
 
 -- name: ListInvoiceLines :many
@@ -49,3 +55,11 @@ SELECT id, invoice_id, kind, description, amount, handover_photo_id, waiver_reas
   FROM invoice_lines
  WHERE invoice_id = ANY(sqlc.arg(invoice_ids)::uuid[])
  ORDER BY created_at, id;
+
+-- name: CancelBookingInvoices :exec
+-- Booking batal tidak menagih apa pun (BR-057 revisi): invoice yang belum
+-- dibayar ikut batal; yang sudah paid tetap tercatat. Dipanggil Cancel manual,
+-- dan nanti job payment_expired S1-052 lewat jalur yang sama.
+UPDATE invoices SET status = 'cancelled', updated_at = now()
+ WHERE booking_id = $1 AND status IN ('unpaid', 'gateway_pending', 'overdue')
+   AND deleted_at IS NULL;

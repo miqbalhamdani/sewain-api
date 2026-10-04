@@ -150,8 +150,11 @@ func (q *Queries) InsertProof(ctx context.Context, arg InsertProofParams) error 
 
 const listOwnerInvoices = `-- name: ListOwnerInvoices :many
 SELECT i.id, i.booking_id, i.number, i.status, i.due_at, i.paid_at, i.created_at,
+       c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
+       c.is_blacklisted AS customer_blacklisted,
        COALESCE((SELECT sum(l.amount) FROM invoice_lines l WHERE l.invoice_id = i.id), 0)::bigint AS total
   FROM invoices i
+  LEFT JOIN customers c ON c.id = i.customer_id
  WHERE i.deleted_at IS NULL
    AND ($1::text IS NULL OR i.status = $1::text)
    AND ($2::timestamptz IS NULL
@@ -168,14 +171,18 @@ type ListOwnerInvoicesParams struct {
 }
 
 type ListOwnerInvoicesRow struct {
-	ID        uuid.UUID
-	BookingID *uuid.UUID
-	Number    string
-	Status    string
-	DueAt     time.Time
-	PaidAt    *time.Time
-	CreatedAt time.Time
-	Total     int64
+	ID                  uuid.UUID
+	BookingID           *uuid.UUID
+	Number              string
+	Status              string
+	DueAt               time.Time
+	PaidAt              *time.Time
+	CreatedAt           time.Time
+	CustomerID          *uuid.UUID
+	CustomerName        *string
+	CustomerPhone       *string
+	CustomerBlacklisted *bool
+	Total               int64
 }
 
 // The owner's full list (S1-047), newest first, keyset on (created_at, id).
@@ -201,6 +208,10 @@ func (q *Queries) ListOwnerInvoices(ctx context.Context, arg ListOwnerInvoicesPa
 			&i.DueAt,
 			&i.PaidAt,
 			&i.CreatedAt,
+			&i.CustomerID,
+			&i.CustomerName,
+			&i.CustomerPhone,
+			&i.CustomerBlacklisted,
 			&i.Total,
 		); err != nil {
 			return nil, err
