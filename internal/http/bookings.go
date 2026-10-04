@@ -131,7 +131,13 @@ func (s *Server) UpdateBooking(w http.ResponseWriter, r *http.Request, id uuid.U
 // ConfirmBooking handles POST /bookings/{id}/confirm.
 func (s *Server) ConfirmBooking(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	requirePermission(auth.PermBookingsWrite, func(w http.ResponseWriter, r *http.Request) {
-		b, err := s.bookings.Confirm(r.Context(), id)
+		// The actor signs the first invoice (created_by), issued on confirm.
+		userID, ok := auth.UserFromContext(r.Context())
+		if !ok {
+			writeError(w, r, apperrors.Unauthenticated("A bearer token is required."))
+			return
+		}
+		b, err := s.bookings.Confirm(r.Context(), userID, id)
 		s.writeBooking(w, r, b, err)
 	})(w, r)
 }

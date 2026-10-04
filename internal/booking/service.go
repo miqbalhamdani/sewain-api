@@ -209,24 +209,9 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, n NewBooking) (B
 
 		// BR-045 + BR-057: the first invoice is issued with the booking, in the
 		// same transaction -- rent, plus the deposit when the resource takes one.
-		code := fmt.Sprintf("%s-%04d", prefix, number)
-		dueHours, err := q.GetPaymentDueHours(ctx, ownerID)
-		if err != nil {
-			return err
-		}
-		due := time.Now().Add(time.Duration(dueHours) * time.Hour)
-		if n.StartAt.Before(due) {
-			due = n.StartAt
-		}
-		var lines []line
-		if subtotal := int64(qty) * unit.BasePrice; subtotal > 0 {
-			lines = append(lines, line{kind: "rent", amount: subtotal,
-				description: fmt.Sprintf("Sewa %d %s", qty, unitName[unit.PricingUnit])})
-		}
-		if unit.DepositAmount != nil {
-			lines = append(lines, line{kind: "deposit", amount: *unit.DepositAmount, description: "Deposit"})
-		}
-		if err := issueInvoice(ctx, q, ownerID, userID, id, n.CustomerID, code, due, lines); err != nil {
+		if err := issueFirstInvoice(ctx, q, ownerID, userID, id, n.CustomerID,
+			fmt.Sprintf("%s-%04d", prefix, number), n.StartAt, unit.PricingUnit, qty,
+			int64(qty)*unit.BasePrice, unit.DepositAmount); err != nil {
 			return err
 		}
 		row, err = q.GetBooking(ctx, id)
@@ -236,6 +221,33 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, n NewBooking) (B
 		return Booking{}, s.answer(ctx, err, "create booking", n.UnitID, uuid.Nil, n.StartAt, n.EndAt, buffer)
 	}
 	return bookingOf(row), nil
+}
+
+// issueFirstInvoice is the invoice a booking is born with -- rent, plus the
+// deposit when the resource takes one -- due at min(now + payment_due_hours,
+// start_at) (BR-045, BR-057). Create calls it for staff bookings, which are
+// born reserved; Confirm calls it when a public draft becomes reserved, because
+// that is the moment the deadline starts ticking (PRD 7.5). A draft never has
+// an invoice.
+func issueFirstInvoice(ctx context.Context, q *sqlcgen.Queries, ownerID, userID, bookingID, customerID uuid.UUID,
+	code string, startAt time.Time, pricingUnit string, qty int32, subtotal int64, deposit *int64) error {
+	dueHours, err := q.GetPaymentDueHours(ctx, ownerID)
+	if err != nil {
+		return err
+	}
+	due := time.Now().Add(time.Duration(dueHours) * time.Hour)
+	if startAt.Before(due) {
+		due = startAt
+	}
+	var lines []line
+	if subtotal > 0 {
+		lines = append(lines, line{kind: "rent", amount: subtotal,
+			description: fmt.Sprintf("Sewa %d %s", qty, unitName[pricingUnit])})
+	}
+	if deposit != nil {
+		lines = append(lines, line{kind: "deposit", amount: *deposit, description: "Deposit"})
+	}
+	return issueInvoice(ctx, q, ownerID, userID, bookingID, customerID, code, due, lines)
 }
 
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (Booking, error) {
@@ -290,8 +302,13 @@ func (s *Service) List(ctx context.Context, f Filter, after *Cursor, limit int) 
 
 // Confirm turns a draft into reserved, re-running the conflict check at that
 // moment: a draft never held the unit, so this can fail, and that is correct
-// (BR-026).
-func (s *Service) Confirm(ctx context.Context, id uuid.UUID) (Booking, error) {
+// (BR-026). The first invoice is issued in the same transaction: reserved is
+// where due_at starts ticking (PRD 7.5, BR-057), and a draft never had one.
+func (s *Service) Confirm(ctx context.Context, userID, id uuid.UUID) (Booking, error) {
+	ownerID, ok := owner.FromContext(ctx)
+	if !ok {
+		return Booking{}, db.ErrNoOwnerContext
+	}
 	var locked sqlcgen.LockBookingRow
 	return s.transition(ctx, id, &locked, func(q *sqlcgen.Queries) error {
 		if locked.Status != "draft" {
@@ -300,7 +317,11 @@ func (s *Service) Confirm(ctx context.Context, id uuid.UUID) (Booking, error) {
 		if err := precheck(ctx, q, locked.ResourceUnitID, id, locked.StartAt, locked.EndAt, locked.BufferMinutes); err != nil {
 			return err
 		}
-		return q.ConfirmBooking(ctx, id)
+		if err := q.ConfirmBooking(ctx, id); err != nil {
+			return err
+		}
+		return issueFirstInvoice(ctx, q, ownerID, userID, id, locked.CustomerID, locked.Code,
+			locked.StartAt, locked.PricingUnit, locked.DurationQty, locked.Subtotal, locked.DepositAmount)
 	})
 }
 

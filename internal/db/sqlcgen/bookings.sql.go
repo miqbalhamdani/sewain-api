@@ -823,7 +823,9 @@ func (q *Queries) ListCalendarUnits(ctx context.Context) ([]ListCalendarUnitsRow
 }
 
 const lockBooking = `-- name: LockBooking :one
-SELECT status, resource_unit_id, start_at, end_at, buffer_minutes
+SELECT status, resource_unit_id, start_at, end_at, buffer_minutes,
+       -- The snapshot Confirm issues the first invoice from (BR-045, BR-057).
+       code, customer_id, pricing_unit, duration_qty, subtotal, deposit_amount
   FROM bookings
  WHERE id = $1 AND deleted_at IS NULL
    FOR UPDATE
@@ -835,6 +837,12 @@ type LockBookingRow struct {
 	StartAt        time.Time
 	EndAt          time.Time
 	BufferMinutes  int32
+	Code           string
+	CustomerID     uuid.UUID
+	PricingUnit    string
+	DurationQty    int32
+	Subtotal       int64
+	DepositAmount  *int64
 }
 
 // FOR UPDATE so a confirm, a cancel and a swap on the same booking serialise
@@ -848,6 +856,12 @@ func (q *Queries) LockBooking(ctx context.Context, id uuid.UUID) (LockBookingRow
 		&i.StartAt,
 		&i.EndAt,
 		&i.BufferMinutes,
+		&i.Code,
+		&i.CustomerID,
+		&i.PricingUnit,
+		&i.DurationQty,
+		&i.Subtotal,
+		&i.DepositAmount,
 	)
 	return i, err
 }

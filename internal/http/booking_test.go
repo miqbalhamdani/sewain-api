@@ -356,6 +356,17 @@ func TestConfirmAndCancel(t *testing.T) {
 	if confirmed["status"] != "reserved" {
 		t.Fatalf("draft after the blocker was cancelled: %v", confirmed["status"])
 	}
+	// PRD 7.5 + BR-057: the first invoice is born with reserved, not with
+	// draft -- confirming is where due_at starts ticking.
+	invoices := expect(t, c.do(http.MethodGet, "/api/v1/invoices?booking_id="+draft.String(), ""), http.StatusOK, "")
+	data, _ := invoices["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("a confirmed draft must have exactly one invoice, got %d", len(data))
+	}
+	inv, _ := data[0].(map[string]any)
+	if inv["status"] != "unpaid" || inv["total"] != float64(2) {
+		t.Fatalf("first invoice after confirm: status %v, total %v", inv["status"], inv["total"])
+	}
 	expect(t, c.do(http.MethodPost, "/api/v1/bookings/"+c.s.bookingID+"/cancel", ""),
 		http.StatusUnprocessableEntity, "validation-failed")
 }

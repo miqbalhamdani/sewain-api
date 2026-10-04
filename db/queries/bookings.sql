@@ -145,7 +145,9 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
 -- name: LockBooking :one
 -- FOR UPDATE so a confirm, a cancel and a swap on the same booking serialise
 -- instead of each deciding from a status the other is about to change.
-SELECT status, resource_unit_id, start_at, end_at, buffer_minutes
+SELECT status, resource_unit_id, start_at, end_at, buffer_minutes,
+       -- The snapshot Confirm issues the first invoice from (BR-045, BR-057).
+       code, customer_id, pricing_unit, duration_qty, subtotal, deposit_amount
   FROM bookings
  WHERE id = $1 AND deleted_at IS NULL
    FOR UPDATE;
