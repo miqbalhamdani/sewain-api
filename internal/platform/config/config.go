@@ -216,6 +216,9 @@ func PublicRateLimits() PublicLimits {
 	}
 }
 
+// RegisterPerHourIP is §7's 5 registrations an hour per IP.
+func RegisterPerHourIP() int64 { return intEnv("REGISTER_PER_HOUR_IP", 5) }
+
 func intEnv(key string, fallback int64) int64 {
 	if n, err := strconv.ParseInt(os.Getenv(key), 10, 64); err == nil && n > 0 {
 		return n

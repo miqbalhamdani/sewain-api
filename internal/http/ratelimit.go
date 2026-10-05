@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
 )
 
@@ -14,10 +15,13 @@ import (
 // ends with "Angka-angka ini konfigurasi, bukan konstanta di kode" -- they will
 // move to config, and having them in one file is what makes that a small
 // change rather than a hunt.
-const (
-	registerPerHour int64 = 5 // unauthenticated, and each success creates a business
-	resendPerHour   int64 = 3 // per user; it is a mail sender, not a data endpoint
-)
+// resendPerHour is per user; it is a mail sender, not a data endpoint.
+const resendPerHour int64 = 3
+
+// registerPerHour is per IP: unauthenticated, and each success creates a
+// business. Configuration (REGISTER_PER_HOUR_IP), because behind one proxy --
+// the end-to-end suite's Caddy -- every caller shares an address.
+var registerPerHour = config.RegisterPerHourIP()
 
 // allow reports whether the request fits under the limit, and writes the 429
 // itself when it does not.
