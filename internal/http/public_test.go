@@ -244,7 +244,9 @@ func TestPortal(t *testing.T) {
 	}
 
 	b := seedPortalOwner(ctx, t, store, uuid.Must(uuid.NewV7()))
-	tampered := s.portalToken[:42] + map[bool]string{true: "A", false: "B"}[s.portalToken[42] != 'A']
+	// A middle character: the last one's two low bits are padding, and flipping
+	// only those decodes to the same token (CI caught that).
+	tampered := s.portalToken[:30] + map[bool]string{true: "A", false: "B"}[s.portalToken[30] != 'A'] + s.portalToken[31:]
 	for name, r := range map[string]*http.Request{
 		"tampered token":        tenantRequest(t, http.MethodGet, "/api/v1/portal/bookings/"+tampered, s.host, ""),
 		"token on another host": tenantRequest(t, http.MethodGet, path, b.host, ""),
