@@ -53,3 +53,24 @@ SELECT EXISTS (SELECT 1 FROM refresh_tokens WHERE rotated_from = $1);
 -- everywhere. The chain is a subset of this.
 UPDATE refresh_tokens SET revoked_at = now()
  WHERE user_id = $1 AND revoked_at IS NULL;
+
+-- name: InsertApiKey :one
+-- S1-079. The secret never reaches this table: key_hash is argon2id.
+INSERT INTO api_keys (id, owner_id, name, key_prefix, key_hash, rate_limit_per_min, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, name, key_prefix, rate_limit_per_min, last_used_at, revoked_at, created_at;
+
+-- name: ListApiKeys :many
+SELECT id, name, key_prefix, rate_limit_per_min, last_used_at, revoked_at, created_at
+  FROM api_keys
+ ORDER BY created_at DESC;
+
+-- name: RevokeApiKey :execrows
+-- Revoked, never deleted (BR-031). Revoking twice is still revoked.
+UPDATE api_keys SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1;
+
+-- name: TouchApiKey :exec
+-- last_used_at, at most once a minute per key: a write per request would turn
+-- every public read into a row lock.
+UPDATE api_keys SET last_used_at = now()
+ WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute');

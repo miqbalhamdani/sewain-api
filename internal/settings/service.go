@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -118,6 +119,10 @@ func (s *Service) Update(ctx context.Context, p Patch) (Knobs, error) {
 	ownerID, ok := owner.FromContext(ctx)
 	if !ok {
 		return Knobs{}, db.ErrNoOwnerContext
+	}
+
+	if err := checkOrigins(p.AllowedOrigins); err != nil {
+		return Knobs{}, err
 	}
 
 	var row sqlcgen.UpdateSettingsRow
@@ -235,4 +240,23 @@ func translate(err error) error {
 				"unit is freed as soon as the booking starts.").WithCause(err)
 	}
 	return fmt.Errorf("update settings: %w", err)
+}
+
+var originPattern = regexp.MustCompile(`^https?://[^/?#\s]+$`)
+
+// checkOrigins is the allowlist's shape: scheme://host[:port], at most 20.
+// An origin with a path never matches what a browser sends, so it is refused
+// here rather than saved as a rule that silently never applies (BR-031).
+func checkOrigins(origins []string) error {
+	if len(origins) > 20 {
+		return apperrors.ValidationFailed("allowed_origins holds at most 20 origins.").
+			WithFields(apperrors.Field{Name: "allowed_origins"})
+	}
+	for _, o := range origins {
+		if !originPattern.MatchString(o) {
+			return apperrors.ValidationFailed("Each allowed origin is scheme://host[:port], for example https://rentalbudi.com, with no path.").
+				WithFields(apperrors.Field{Name: "allowed_origins"})
+		}
+	}
+	return nil
 }
