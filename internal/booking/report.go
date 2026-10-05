@@ -151,3 +151,79 @@ func (s *Service) IdleUnits(ctx context.Context, now time.Time) ([]IdleUnit, err
 	}
 	return out, nil
 }
+
+// Dashboard is what needs handling today (S1-063). Revenue is filled by the
+// caller only for an owner (BR-003).
+type Dashboard struct {
+	Overdue, UnsettledDeposits, TodayPickups, TodayReturns []BookingBrief
+	UnpaidCount, OverdueCount                              int
+	Outstanding                                            int64
+	HasResource, HasUnit, HasBooking                       bool
+}
+
+type BookingBrief struct {
+	ID                         uuid.UUID
+	Code, Status               string
+	CustomerName, ResourceName string
+	Unit                       UnitRef
+	StartAt, EndAt             time.Time
+}
+
+var jakarta = time.FixedZone("WIB", 7*3600)
+
+func (s *Service) Dashboard(ctx context.Context, now time.Time) (Dashboard, error) {
+	local := now.In(jakarta)
+	dayStart := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, jakarta)
+	dayEnd := dayStart.AddDate(0, 0, 1)
+	var d Dashboard
+	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
+		q := sqlcgen.New(tx)
+		list := func(p sqlcgen.DashboardBookingsParams) ([]BookingBrief, error) {
+			rows, err := q.DashboardBookings(ctx, p)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]BookingBrief, 0, len(rows))
+			for _, r := range rows {
+				out = append(out, BookingBrief{ID: r.ID, Code: r.Code, Status: r.Status, CustomerName: r.CustomerName,
+					ResourceName: r.ResourceName, Unit: UnitRef{ID: r.UnitID, Code: r.UnitCode, Label: r.UnitLabel},
+					StartAt: r.StartAt, EndAt: r.EndAt})
+			}
+			return out, nil
+		}
+		var err error
+		if d.Overdue, err = list(sqlcgen.DashboardBookingsParams{Status: "picked_up", EndTo: &now}); err != nil {
+			return err
+		}
+		if d.UnsettledDeposits, err = list(sqlcgen.DashboardBookingsParams{Status: "returned", UnsettledDeposit: true}); err != nil {
+			return err
+		}
+		if d.TodayPickups, err = list(sqlcgen.DashboardBookingsParams{Status: "reserved", StartFrom: &dayStart, StartTo: &dayEnd}); err != nil {
+			return err
+		}
+		if d.TodayReturns, err = list(sqlcgen.DashboardBookingsParams{Status: "picked_up", EndFrom: &now, EndTo: &dayEnd}); err != nil {
+			return err
+		}
+		inv, err := q.InvoiceSummary(ctx)
+		if err != nil {
+			return err
+		}
+		d.UnpaidCount, d.OverdueCount, d.Outstanding = int(inv.UnpaidCount), int(inv.OverdueCount), inv.Outstanding
+		ob, err := q.OnboardingState(ctx)
+		if err != nil {
+			return err
+		}
+		d.HasResource, d.HasUnit, d.HasBooking = ob.HasResource, ob.HasUnit, ob.HasBooking
+		return nil
+	})
+	if err != nil {
+		return Dashboard{}, fmt.Errorf("dashboard: %w", err)
+	}
+	return d, nil
+}
+
+// MonthStart is the first instant of now's month in WIB.
+func MonthStart(now time.Time) time.Time {
+	l := now.In(jakarta)
+	return time.Date(l.Year(), l.Month(), 1, 0, 0, 0, 0, jakarta)
+}

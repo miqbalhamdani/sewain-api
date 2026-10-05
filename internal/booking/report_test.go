@@ -144,3 +144,44 @@ func TestReports(t *testing.T) {
 		t.Errorf("xlsx rows = %v", rows)
 	}
 }
+
+// S1-063: the four lists and the onboarding checklist, from data.
+func TestDashboard(t *testing.T) {
+	f := newFixture(t, 3)
+	s := New(f.store, nil)
+	now := time.Now()
+	insert := func(code, status string, unit int, start, end time.Time, deposit *int64) {
+		t.Helper()
+		f.exec(t, `INSERT INTO bookings (id, owner_id, code, customer_id, resource_id, resource_unit_id,
+		             start_at, end_at, status, unit_price, pricing_unit, duration_qty, subtotal, deposit_amount)
+		           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, 1, 'day', 1, 1, $9)`,
+			f.ownerID, code, f.customer, f.resource, f.units[unit], start, end, status, deposit)
+	}
+
+	d, err := s.Dashboard(f.ctx, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.HasResource || !d.HasUnit || d.HasBooking {
+		t.Errorf("onboarding before any booking = %+v", d)
+	}
+
+	dep := int64(100000)
+	insert("LATE", "picked_up", 0, now.Add(-48*time.Hour), now.Add(-time.Hour), nil)
+	insert("BACK", "returned", 1, now.Add(-96*time.Hour), now.Add(-72*time.Hour), &dep)
+	insert("TODAY", "reserved", 2, now, now.Add(24*time.Hour), nil)
+
+	if d, err = s.Dashboard(f.ctx, now); err != nil {
+		t.Fatal(err)
+	}
+	code := func(bs []BookingBrief) string {
+		if len(bs) != 1 {
+			return "?"
+		}
+		return bs[0].Code
+	}
+	if code(d.Overdue) != "LATE" || code(d.UnsettledDeposits) != "BACK" || code(d.TodayPickups) != "TODAY" ||
+		len(d.TodayReturns) != 0 || !d.HasBooking {
+		t.Errorf("dashboard = %+v", d)
+	}
+}

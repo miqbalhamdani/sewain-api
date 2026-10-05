@@ -52,6 +52,37 @@ func seedUserIn(ctx context.Context, t *testing.T, store *db.Store, ownerID uuid
 	return seeded{userID: id.String(), accessToken: session.AccessToken}
 }
 
+// S1-063: both roles see the work; only the owner sees money and failed jobs
+// (BR-003), and an operator is refused the reports outright.
+func TestDashboardByRole(t *testing.T) {
+	c := newBookingClient(t)
+	c.exec(`UPDATE bookings SET status = 'picked_up' WHERE id = $1`, c.s.bookingID) // ended 5 Sep 2026: overdue
+
+	m := expect(t, c.do(http.MethodGet, "/api/v1/dashboard", ""), http.StatusOK, "")
+	overdue, _ := m["overdue"].([]any)
+	if len(overdue) != 1 || overdue[0].(map[string]any)["code"] != "ISO-0001" {
+		t.Errorf("owner overdue = %v", m["overdue"])
+	}
+	if _, ok := m["revenue_this_month"].(float64); !ok {
+		t.Errorf("owner revenue_this_month = %v, want a number", m["revenue_this_month"])
+	}
+	if _, ok := m["failed_jobs"].([]any); !ok {
+		t.Errorf("owner failed_jobs = %v, want a list", m["failed_jobs"])
+	}
+
+	op := c
+	op.token = seedUserIn(t.Context(), t, c.store, c.ownerID, "operator").accessToken
+	m = expect(t, op.do(http.MethodGet, "/api/v1/dashboard", ""), http.StatusOK, "")
+	if m["revenue_this_month"] != nil || m["failed_jobs"] != nil {
+		t.Errorf("operator sees revenue %v / failed jobs %v, want both null", m["revenue_this_month"], m["failed_jobs"])
+	}
+	if overdue, _ := m["overdue"].([]any); len(overdue) != 1 {
+		t.Errorf("operator overdue = %v, want the same work list", m["overdue"])
+	}
+	expect(t, op.do(http.MethodGet, "/api/v1/reports/revenue?from=2026-09-01T00:00:00Z&to=2026-10-01T00:00:00Z", ""),
+		http.StatusForbidden, "permission-denied")
+}
+
 // S1-057: an export is queued and answered at once; its job is readable, a
 // bad request is refused before anything is queued.
 func TestExportJob(t *testing.T) {

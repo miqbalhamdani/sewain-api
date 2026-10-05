@@ -78,3 +78,36 @@ HAVING COALESCE(max(COALESCE(b.actual_return_at, b.end_at)), u.created_at) < sql
    -- would quietly drop every never-rented unit from the list.
    AND NOT COALESCE(bool_or(b.status = 'picked_up'), false)
  ORDER BY idle_since, u.code;
+
+-- name: DashboardBookings :many
+-- One query for the four dashboard lists; the caller sets the conditions.
+SELECT b.id, b.code, b.status, b.start_at, b.end_at,
+       c.name AS customer_name, r.name AS resource_name,
+       u.id AS unit_id, u.code AS unit_code, u.label AS unit_label
+  FROM bookings b
+  JOIN customers c      ON c.id = b.customer_id
+  JOIN resources r      ON r.id = b.resource_id
+  JOIN resource_units u ON u.id = b.resource_unit_id
+ WHERE b.deleted_at IS NULL AND b.status = sqlc.arg(status)::text
+   AND (sqlc.narg(start_from)::timestamptz IS NULL OR b.start_at >= sqlc.narg(start_from)::timestamptz)
+   AND (sqlc.narg(start_to)::timestamptz IS NULL OR b.start_at < sqlc.narg(start_to)::timestamptz)
+   AND (sqlc.narg(end_from)::timestamptz IS NULL OR b.end_at >= sqlc.narg(end_from)::timestamptz)
+   AND (sqlc.narg(end_to)::timestamptz IS NULL OR b.end_at < sqlc.narg(end_to)::timestamptz)
+   AND (NOT sqlc.arg(unsettled_deposit)::boolean
+        OR (b.deposit_amount IS NOT NULL AND b.deposit_waived_at IS NULL AND b.deposit_settled_at IS NULL))
+ ORDER BY b.start_at
+ LIMIT 50;
+
+-- name: InvoiceSummary :one
+-- Receivables, not revenue: what is issued and not yet paid.
+SELECT count(*) FILTER (WHERE i.status IN ('unpaid', 'gateway_pending'))::int AS unpaid_count,
+       count(*) FILTER (WHERE i.status = 'overdue')::int AS overdue_count,
+       COALESCE(sum((SELECT COALESCE(sum(l.amount), 0) FROM invoice_lines l WHERE l.invoice_id = i.id)), 0)::bigint AS outstanding
+  FROM invoices i
+ WHERE i.status IN ('unpaid', 'gateway_pending', 'overdue') AND i.deleted_at IS NULL;
+
+-- name: OnboardingState :one
+-- BR-005: computed from data, never a progress column.
+SELECT EXISTS (SELECT 1 FROM resources WHERE deleted_at IS NULL)::boolean AS has_resource,
+       EXISTS (SELECT 1 FROM resource_units WHERE deleted_at IS NULL)::boolean AS has_unit,
+       EXISTS (SELECT 1 FROM bookings WHERE deleted_at IS NULL)::boolean AS has_booking;

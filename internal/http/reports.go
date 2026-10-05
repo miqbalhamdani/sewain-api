@@ -17,6 +17,57 @@ import (
 // Dashboard, reports, export and job status over HTTP.
 // (S1-056, S1-057, S1-063, 04-api-spec.md 3.9)
 
+// GetDashboard handles GET /dashboard. Both roles see the work; only a role
+// with reports:read sees money and failed jobs (BR-003).
+func (s *Server) GetDashboard(w http.ResponseWriter, r *http.Request) {
+	requirePermission(auth.PermBookingsRead, func(w http.ResponseWriter, r *http.Request) {
+		now := time.Now()
+		d, err := s.bookings.Dashboard(r.Context(), now)
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+		body := Dashboard{
+			Overdue: briefs(d.Overdue), UnsettledDeposits: briefs(d.UnsettledDeposits),
+			TodayPickups: briefs(d.TodayPickups), TodayReturns: briefs(d.TodayReturns),
+		}
+		body.Invoices.UnpaidCount, body.Invoices.OverdueCount, body.Invoices.Outstanding = d.UnpaidCount, d.OverdueCount, d.Outstanding
+		body.Onboarding.HasResource, body.Onboarding.HasUnit, body.Onboarding.HasBooking = d.HasResource, d.HasUnit, d.HasBooking
+
+		if role, _ := auth.RoleFromContext(r.Context()); auth.Can(role, auth.PermReportsRead) {
+			rev, err := s.bookings.Revenue(r.Context(), booking.MonthStart(now), now.Add(time.Second))
+			if err != nil {
+				writeError(w, r, err)
+				return
+			}
+			body.RevenueThisMonth = &rev.Total
+			id, _ := owner.FromContext(r.Context())
+			dead, err := s.jobs.DeadLetters(r.Context(), id, 20)
+			if err != nil {
+				writeError(w, r, err)
+				return
+			}
+			failed := make([]FailedJob, 0, len(dead))
+			for _, d := range dead {
+				failed = append(failed, FailedJob{Type: d.Type, Error: d.Error, Attempt: d.Attempt, FailedAt: d.FailedAt})
+			}
+			body.FailedJobs = &failed
+		}
+		writeJSON(w, r, http.StatusOK, body)
+	})(w, r)
+}
+
+func briefs(bs []booking.BookingBrief) []BookingBrief {
+	out := make([]BookingBrief, 0, len(bs))
+	for _, b := range bs {
+		out = append(out, BookingBrief{Id: b.ID, Code: b.Code, Status: BookingStatus(b.Status),
+			CustomerName: b.CustomerName, ResourceName: b.ResourceName,
+			Unit:    UnitRef{Id: b.Unit.ID, Code: b.Unit.Code, Label: b.Unit.Label},
+			StartAt: b.StartAt, EndAt: b.EndAt})
+	}
+	return out
+}
+
 // GetRevenueReport handles GET /reports/revenue.
 func (s *Server) GetRevenueReport(w http.ResponseWriter, r *http.Request, params GetRevenueReportParams) {
 	requirePermission(auth.PermReportsRead, func(w http.ResponseWriter, r *http.Request) {
