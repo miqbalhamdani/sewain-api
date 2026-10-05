@@ -48,6 +48,25 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 	return err
 }
 
+const findCustomerByPhone = `-- name: FindCustomerByPhone :one
+SELECT id FROM customers
+ WHERE deleted_at IS NULL
+   AND regexp_replace(regexp_replace(phone, '[^0-9+]', '', 'g'), '^0', '+62') = $1::text
+ ORDER BY created_at
+ LIMIT 1
+`
+
+// The public request form matches a renter by phone (04-api-spec.md §4). Staff
+// type phones however they like ("0812-3456 7890"), so both sides are reduced
+// to digits with a +62 prefix before comparing. Oldest first: a duplicate made
+// later never shadows the record the owner has been using.
+func (q *Queries) FindCustomerByPhone(ctx context.Context, phone string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findCustomerByPhone, phone)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getCustomer = `-- name: GetCustomer :one
 SELECT id, name, phone, id_type, id_number_last4, is_blacklisted,
        blacklist_reason, created_at, (id_photo_key IS NOT NULL)::boolean AS has_id_photo

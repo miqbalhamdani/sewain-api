@@ -193,12 +193,15 @@ const (
 	ErrorCodeEvidenceImmutable           ErrorCode = "evidence-immutable"
 	ErrorCodeHandoverPhotoRequired       ErrorCode = "handover-photo-required"
 	ErrorCodeInternal                    ErrorCode = "internal"
+	ErrorCodeInvalidApiKey               ErrorCode = "invalid-api-key"
 	ErrorCodeInvoiceAlreadyPaid          ErrorCode = "invoice-already-paid"
 	ErrorCodeMeterValueRequired          ErrorCode = "meter-value-required"
 	ErrorCodeNotFound                    ErrorCode = "not-found"
+	ErrorCodeOriginNotAllowed            ErrorCode = "origin-not-allowed"
 	ErrorCodePaymentRequiredBeforePickup ErrorCode = "payment-required-before-pickup"
 	ErrorCodePermissionDenied            ErrorCode = "permission-denied"
 	ErrorCodePhysicalConflictUnconfirmed ErrorCode = "physical-conflict-unconfirmed"
+	ErrorCodeQuotaExceeded               ErrorCode = "quota-exceeded"
 	ErrorCodeRateLimited                 ErrorCode = "rate-limited"
 	ErrorCodeRequestInFlight             ErrorCode = "request-in-flight"
 	ErrorCodeSlugInvalid                 ErrorCode = "slug-invalid"
@@ -239,17 +242,23 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeInternal:
 		return true
+	case ErrorCodeInvalidApiKey:
+		return true
 	case ErrorCodeInvoiceAlreadyPaid:
 		return true
 	case ErrorCodeMeterValueRequired:
 		return true
 	case ErrorCodeNotFound:
 		return true
+	case ErrorCodeOriginNotAllowed:
+		return true
 	case ErrorCodePaymentRequiredBeforePickup:
 		return true
 	case ErrorCodePermissionDenied:
 		return true
 	case ErrorCodePhysicalConflictUnconfirmed:
+		return true
+	case ErrorCodeQuotaExceeded:
 		return true
 	case ErrorCodeRateLimited:
 		return true
@@ -272,6 +281,48 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeVerificationTokenInvalid:
 		return true
 	case ErrorCodeWaiverReasonRequired:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportRequestFormat.
+const (
+	Csv  ExportRequestFormat = "csv"
+	Xlsx ExportRequestFormat = "xlsx"
+)
+
+// Valid indicates whether the value is a known member of the ExportRequestFormat enum.
+func (e ExportRequestFormat) Valid() bool {
+	switch e {
+	case Csv:
+		return true
+	case Xlsx:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportRequestReport.
+const (
+	Bookings    ExportRequestReport = "bookings"
+	IdleUnits   ExportRequestReport = "idle_units"
+	Revenue     ExportRequestReport = "revenue"
+	Utilization ExportRequestReport = "utilization"
+)
+
+// Valid indicates whether the value is a known member of the ExportRequestReport enum.
+func (e ExportRequestReport) Valid() bool {
+	switch e {
+	case Bookings:
+		return true
+	case IdleUnits:
+		return true
+	case Revenue:
+		return true
+	case Utilization:
 		return true
 	default:
 		return false
@@ -304,16 +355,16 @@ func (e Fuel) Valid() bool {
 
 // Defines values for HandoverDirection.
 const (
-	Pickup HandoverDirection = "pickup"
-	Return HandoverDirection = "return"
+	HandoverDirectionPickup HandoverDirection = "pickup"
+	HandoverDirectionReturn HandoverDirection = "return"
 )
 
 // Valid indicates whether the value is a known member of the HandoverDirection enum.
 func (e HandoverDirection) Valid() bool {
 	switch e {
-	case Pickup:
+	case HandoverDirectionPickup:
 		return true
-	case Return:
+	case HandoverDirectionReturn:
 		return true
 	default:
 		return false
@@ -413,6 +464,30 @@ func (e InvoiceStatus) Valid() bool {
 	}
 }
 
+// Defines values for JobStatus.
+const (
+	Done    JobStatus = "done"
+	Failed  JobStatus = "failed"
+	Queued  JobStatus = "queued"
+	Running JobStatus = "running"
+)
+
+// Valid indicates whether the value is a known member of the JobStatus enum.
+func (e JobStatus) Valid() bool {
+	switch e {
+	case Done:
+		return true
+	case Failed:
+		return true
+	case Queued:
+		return true
+	case Running:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PaymentProofMatchStatus.
 const (
 	Match      PaymentProofMatchStatus = "match"
@@ -473,24 +548,93 @@ func (e PaymentRequestMethod) Valid() bool {
 	}
 }
 
+// Defines values for PortalDepositState.
+const (
+	PortalDepositStateHeld    PortalDepositState = "held"
+	PortalDepositStateNone    PortalDepositState = "none"
+	PortalDepositStateSettled PortalDepositState = "settled"
+	PortalDepositStateUnpaid  PortalDepositState = "unpaid"
+	PortalDepositStateWaived  PortalDepositState = "waived"
+)
+
+// Valid indicates whether the value is a known member of the PortalDepositState enum.
+func (e PortalDepositState) Valid() bool {
+	switch e {
+	case PortalDepositStateHeld:
+		return true
+	case PortalDepositStateNone:
+		return true
+	case PortalDepositStateSettled:
+		return true
+	case PortalDepositStateUnpaid:
+		return true
+	case PortalDepositStateWaived:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PortalPhotoDirection.
+const (
+	PortalPhotoDirectionPickup PortalPhotoDirection = "pickup"
+	PortalPhotoDirectionReturn PortalPhotoDirection = "return"
+)
+
+// Valid indicates whether the value is a known member of the PortalPhotoDirection enum.
+func (e PortalPhotoDirection) Valid() bool {
+	switch e {
+	case PortalPhotoDirectionPickup:
+		return true
+	case PortalPhotoDirectionReturn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PortalUploadRequestContentType.
+const (
+	PortalUploadRequestContentTypeApplicationpdf PortalUploadRequestContentType = "application/pdf"
+	PortalUploadRequestContentTypeImagejpeg      PortalUploadRequestContentType = "image/jpeg"
+	PortalUploadRequestContentTypeImagepng       PortalUploadRequestContentType = "image/png"
+	PortalUploadRequestContentTypeImagewebp      PortalUploadRequestContentType = "image/webp"
+)
+
+// Valid indicates whether the value is a known member of the PortalUploadRequestContentType enum.
+func (e PortalUploadRequestContentType) Valid() bool {
+	switch e {
+	case PortalUploadRequestContentTypeApplicationpdf:
+		return true
+	case PortalUploadRequestContentTypeImagejpeg:
+		return true
+	case PortalUploadRequestContentTypeImagepng:
+		return true
+	case PortalUploadRequestContentTypeImagewebp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PresignRequestContentType.
 const (
-	Applicationpdf PresignRequestContentType = "application/pdf"
-	Imagejpeg      PresignRequestContentType = "image/jpeg"
-	Imagepng       PresignRequestContentType = "image/png"
-	Imagewebp      PresignRequestContentType = "image/webp"
+	PresignRequestContentTypeApplicationpdf PresignRequestContentType = "application/pdf"
+	PresignRequestContentTypeImagejpeg      PresignRequestContentType = "image/jpeg"
+	PresignRequestContentTypeImagepng       PresignRequestContentType = "image/png"
+	PresignRequestContentTypeImagewebp      PresignRequestContentType = "image/webp"
 )
 
 // Valid indicates whether the value is a known member of the PresignRequestContentType enum.
 func (e PresignRequestContentType) Valid() bool {
 	switch e {
-	case Applicationpdf:
+	case PresignRequestContentTypeApplicationpdf:
 		return true
-	case Imagejpeg:
+	case PresignRequestContentTypeImagejpeg:
 		return true
-	case Imagepng:
+	case PresignRequestContentTypeImagepng:
 		return true
-	case Imagewebp:
+	case PresignRequestContentTypeImagewebp:
 		return true
 	default:
 		return false
@@ -515,6 +659,21 @@ func (e PricingUnit) Valid() bool {
 	case Month:
 		return true
 	case Week:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PublicBookingCreatedStatus.
+const (
+	PublicBookingCreatedStatusDraft PublicBookingCreatedStatus = "draft"
+)
+
+// Valid indicates whether the value is a known member of the PublicBookingCreatedStatus enum.
+func (e PublicBookingCreatedStatus) Valid() bool {
+	switch e {
+	case PublicBookingCreatedStatusDraft:
 		return true
 	default:
 		return false
@@ -737,6 +896,51 @@ type AffectedBooking struct {
 	Status  string    `json:"status"`
 }
 
+// ApiKey Kunci API tanpa rahasianya (BR-031).
+type ApiKey struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// KeyPrefix 8 karakter pertama sesudah `swn_live_`, untuk mengenali kuncinya.
+	//
+	// Examples: a1b2c3d4
+	KeyPrefix  string     `json:"key_prefix"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// Name Examples: situs rentalbudi.com
+	Name            string     `json:"name"`
+	RateLimitPerMin int        `json:"rate_limit_per_min"`
+	RevokedAt       *time.Time `json:"revoked_at"`
+}
+
+// ApiKeyCreate defines model for ApiKeyCreate.
+type ApiKeyCreate struct {
+	Name            string `json:"name"`
+	RateLimitPerMin *int   `json:"rate_limit_per_min,omitempty"`
+}
+
+// ApiKeyCreated defines model for ApiKeyCreated.
+type ApiKeyCreated struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// KeyPrefix 8 karakter pertama sesudah `swn_live_`, untuk mengenali kuncinya.
+	//
+	// Examples: a1b2c3d4
+	KeyPrefix  string     `json:"key_prefix"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// Name Examples: situs rentalbudi.com
+	Name            string     `json:"name"`
+	RateLimitPerMin int        `json:"rate_limit_per_min"`
+	RevokedAt       *time.Time `json:"revoked_at"`
+
+	// Secret Kunci utuh. **Hanya di respons ini** — tidak pernah bisa dilihat lagi.
+	//
+	// Examples: swn_live_a1b2c3d4…
+	Secret string `json:"secret"`
+}
+
 // AvailabilityResult `duration_qty` = `ceil(durasi / satuan)`, dengan `month` = 30 hari tetap —
 // bulan kalender membuat Februari lebih murah per hari dari Maret, dan dua
 // penyewa dengan durasi sama membayar beda. `subtotal` = `duration_qty ×
@@ -813,6 +1017,10 @@ type Booking struct {
 	// atau tanpa invoice aktif → `none`.
 	Payment BookingPayment `json:"payment"`
 
+	// PortalUrl Tautan portal penyewa untuk booking ini (§5), untuk dikirim staf lewat WhatsApp.
+	// `null` selama usaha belum punya slug — portal hidup di host pemilik.
+	PortalUrl *string `json:"portal_url"`
+
 	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
 	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
 	// `ResourceCreate` maupun `ResourceUpdate`.
@@ -839,6 +1047,21 @@ type Booking struct {
 
 // BookingSource defines model for Booking.Source.
 type BookingSource string
+
+// BookingBrief defines model for BookingBrief.
+type BookingBrief struct {
+	Code         string             `json:"code"`
+	CustomerName string             `json:"customer_name"`
+	EndAt        time.Time          `json:"end_at"`
+	Id           openapi_types.UUID `json:"id"`
+	ResourceName string             `json:"resource_name"`
+	StartAt      time.Time          `json:"start_at"`
+
+	// Status Tujuh status tersimpan. `overdue` **bukan** salah satunya — ia kondisi turunan
+	// (BR-041).
+	Status BookingStatus `json:"status"`
+	Unit   UnitRef       `json:"unit"`
+}
 
 // BookingCreate defines model for BookingCreate.
 type BookingCreate struct {
@@ -995,6 +1218,40 @@ type DamageInput struct {
 	PhotoKey string `json:"photo_key"`
 }
 
+// Dashboard defines model for Dashboard.
+type Dashboard struct {
+	// FailedJobs Dead-letter job runner (BR-072, BR-091). `null` untuk operator.
+	FailedJobs *[]FailedJob `json:"failed_jobs"`
+	Invoices   struct {
+		// Outstanding Total tagihan yang belum dibayar — piutang, bukan pemasukan.
+		Outstanding  int64 `json:"outstanding"`
+		OverdueCount int   `json:"overdue_count"`
+		UnpaidCount  int   `json:"unpaid_count"`
+	} `json:"invoices"`
+
+	// Onboarding Dihitung dari data, bukan kolom progres (BR-005).
+	Onboarding struct {
+		HasBooking  bool `json:"has_booking"`
+		HasResource bool `json:"has_resource"`
+		HasUnit     bool `json:"has_unit"`
+	} `json:"onboarding"`
+
+	// Overdue Sedang disewa dan lewat `end_at` (BR-041).
+	Overdue []BookingBrief `json:"overdue"`
+
+	// RevenueThisMonth Basis kas, bulan berjalan (WIB). `null` untuk operator (BR-003).
+	RevenueThisMonth *int64 `json:"revenue_this_month"`
+
+	// TodayPickups Dipesan dan mulai hari ini (WIB).
+	TodayPickups []BookingBrief `json:"today_pickups"`
+
+	// TodayReturns Sedang disewa dan seharusnya kembali hari ini (WIB).
+	TodayReturns []BookingBrief `json:"today_returns"`
+
+	// UnsettledDeposits Sudah kembali, berdeposit, belum diselesaikan dan tidak dibebaskan (BR-049).
+	UnsettledDeposits []BookingBrief `json:"unsettled_deposits"`
+}
+
 // DepositPreview defines model for DepositPreview.
 type DepositPreview struct {
 	// Collected Invoice yang memuat deposit sudah lunas — uangnya di tangan pemilik.
@@ -1017,6 +1274,30 @@ type DepositPreview struct {
 // Kodenya juga jadi segmen terakhir URI `Problem.type`, dan memakai **hyphen**, bukan
 // underscore.
 type ErrorCode string
+
+// ExportRequest defines model for ExportRequest.
+type ExportRequest struct {
+	Format ExportRequestFormat `json:"format"`
+	From   time.Time           `json:"from"`
+	Report ExportRequestReport `json:"report"`
+	To     time.Time           `json:"to"`
+}
+
+// ExportRequestFormat defines model for ExportRequest.Format.
+type ExportRequestFormat string
+
+// ExportRequestReport defines model for ExportRequest.Report.
+type ExportRequestReport string
+
+// FailedJob defines model for FailedJob.
+type FailedJob struct {
+	Attempt  int       `json:"attempt"`
+	Error    string    `json:"error"`
+	FailedAt time.Time `json:"failed_at"`
+
+	// Type Examples: report.export
+	Type string `json:"type"`
+}
 
 // Fuel `diesel` **hanya ada di mobil**, ditegakkan database (BR-094).
 type Fuel string
@@ -1053,6 +1334,18 @@ type IdType string
 type IdentityPhotoInput struct {
 	IdType    IdType `json:"id_type"`
 	ObjectKey string `json:"object_key"`
+}
+
+// IdleUnitsReport defines model for IdleUnitsReport.
+type IdleUnitsReport struct {
+	Data []struct {
+		IdleDays int `json:"idle_days"`
+
+		// LastRentedAt `null` = belum pernah disewa.
+		LastRentedAt *time.Time `json:"last_rented_at"`
+		ResourceName string     `json:"resource_name"`
+		Unit         UnitRef    `json:"unit"`
+	} `json:"data"`
 }
 
 // InviteUserRequest defines model for InviteUserRequest.
@@ -1109,6 +1402,18 @@ type InvoicePage struct {
 
 // InvoiceStatus Lima nilai BR-056. `gateway_pending` tidak terjangkau di fase 1.
 type InvoiceStatus string
+
+// Job defines model for Job.
+type Job struct {
+	DownloadUrl *string    `json:"download_url"`
+	Error       *string    `json:"error"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+	Id          string     `json:"id"`
+	Status      JobStatus  `json:"status"`
+}
+
+// JobStatus defines model for Job.Status.
+type JobStatus string
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -1180,6 +1485,125 @@ type PickupRequest struct {
 	MeterValue              *int64                  `json:"meter_value,omitempty"`
 	PhotoKeys               []string                `json:"photo_keys"`
 }
+
+// PortalBooking Satu booking, dilihat penyewanya (BR-002). Tanpa kode unit, nama staf, dan catatan
+// internal.
+type PortalBooking struct {
+	ActualReturnAt *time.Time `json:"actual_return_at"`
+	Code           string     `json:"code"`
+	CustomerName   string     `json:"customer_name"`
+
+	// Deposit `none` tanpa deposit; `unpaid` belum dibayar; `held` sudah dibayar dan ditahan;
+	// `waived` dibebaskan pemilik; `settled` sudah diselesaikan (BR-048–BR-051).
+	Deposit     PortalDeposit   `json:"deposit"`
+	DurationQty int             `json:"duration_qty"`
+	EndAt       time.Time       `json:"end_at"`
+	Invoices    []PortalInvoice `json:"invoices"`
+	Overdue     bool            `json:"overdue"`
+	Owner       PortalOwner     `json:"owner"`
+	Photos      []PortalPhoto   `json:"photos"`
+
+	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+	// `ResourceCreate` maupun `ResourceUpdate`.
+	//
+	// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+	// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+	// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+	//
+	// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+	// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+	// melihat field satuan harga di layar mana pun.
+	PricingUnit  PricingUnit `json:"pricing_unit"`
+	ResourceName string      `json:"resource_name"`
+	StartAt      time.Time   `json:"start_at"`
+
+	// Status Tujuh status tersimpan. `overdue` **bukan** salah satunya — ia kondisi turunan
+	// (BR-041).
+	Status   BookingStatus `json:"status"`
+	Subtotal int64         `json:"subtotal"`
+}
+
+// PortalDeposit `none` tanpa deposit; `unpaid` belum dibayar; `held` sudah dibayar dan ditahan;
+// `waived` dibebaskan pemilik; `settled` sudah diselesaikan (BR-048–BR-051).
+type PortalDeposit struct {
+	Amount   *int64             `json:"amount"`
+	Deducted *int64             `json:"deducted"`
+	Refunded *int64             `json:"refunded"`
+	State    PortalDepositState `json:"state"`
+}
+
+// PortalDepositState defines model for PortalDeposit.State.
+type PortalDepositState string
+
+// PortalInvoice defines model for PortalInvoice.
+type PortalInvoice struct {
+	DueAt time.Time          `json:"due_at"`
+	Id    openapi_types.UUID `json:"id"`
+	Lines []struct {
+		Amount      int64  `json:"amount"`
+		Description string `json:"description"`
+		Kind        string `json:"kind"`
+	} `json:"lines"`
+	Number string     `json:"number"`
+	PaidAt *time.Time `json:"paid_at"`
+
+	// ProofPending Ada bukti yang sudah dikirim dan belum diputuskan staf.
+	ProofPending bool `json:"proof_pending"`
+
+	// Status Lima nilai BR-056. `gateway_pending` tidak terjangkau di fase 1.
+	Status InvoiceStatus `json:"status"`
+	Total  int64         `json:"total"`
+}
+
+// PortalOwner defines model for PortalOwner.
+type PortalOwner struct {
+	Address *string `json:"address"`
+
+	// Bank Rekening tujuan transfer; `null` sampai pemilik mengisinya.
+	Bank *struct {
+		AccountHolder string `json:"account_holder"`
+		AccountNumber string `json:"account_number"`
+
+		// Name Examples: BCA
+		Name string `json:"name"`
+	} `json:"bank"`
+	Name     string  `json:"name"`
+	Whatsapp *string `json:"whatsapp"`
+}
+
+// PortalPhoto defines model for PortalPhoto.
+type PortalPhoto struct {
+	Direction PortalPhotoDirection `json:"direction"`
+	TakenAt   time.Time            `json:"taken_at"`
+
+	// Url URL bertanda tangan, hidup 1 jam.
+	Url string `json:"url"`
+}
+
+// PortalPhotoDirection defines model for PortalPhoto.Direction.
+type PortalPhotoDirection string
+
+// PortalProofInput defines model for PortalProofInput.
+type PortalProofInput struct {
+	InvoiceId openapi_types.UUID `json:"invoice_id"`
+	ObjectKey string             `json:"object_key"`
+}
+
+// PortalProofReceived defines model for PortalProofReceived.
+type PortalProofReceived struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+}
+
+// PortalUploadRequest defines model for PortalUploadRequest.
+type PortalUploadRequest struct {
+	Bytes       int64                          `json:"bytes"`
+	ContentType PortalUploadRequestContentType `json:"content_type"`
+}
+
+// PortalUploadRequestContentType defines model for PortalUploadRequest.ContentType.
+type PortalUploadRequestContentType string
 
 // PresignRequest defines model for PresignRequest.
 type PresignRequest struct {
@@ -1264,6 +1688,124 @@ type ProblemError struct {
 // ProofInput defines model for ProofInput.
 type ProofInput struct {
 	ObjectKey string `json:"object_key"`
+}
+
+// PublicBookingCreated defines model for PublicBookingCreated.
+type PublicBookingCreated struct {
+	// Code Examples: SWN-0051
+	Code      string                     `json:"code"`
+	ExpiresAt time.Time                  `json:"expires_at"`
+	Status    PublicBookingCreatedStatus `json:"status"`
+
+	// TrackUrl Tautan portal penyewa untuk pengajuan ini (§5).
+	TrackUrl string `json:"track_url"`
+}
+
+// PublicBookingCreatedStatus defines model for PublicBookingCreated.Status.
+type PublicBookingCreatedStatus string
+
+// PublicBookingRequest defines model for PublicBookingRequest.
+type PublicBookingRequest struct {
+	Customer struct {
+		Name string `json:"name"`
+
+		// Phone `0812…` dan `+62812…` dibaca sama.
+		Phone string `json:"phone"`
+	} `json:"customer"`
+	EndAt      time.Time          `json:"end_at"`
+	ResourceId openapi_types.UUID `json:"resource_id"`
+	StartAt    time.Time          `json:"start_at"`
+}
+
+// PublicOwner Profil usaha untuk penyewa (BR-096). Tidak memuat `owner_id` maupun slug — host-nya
+// sudah slug itu.
+type PublicOwner struct {
+	Address string `json:"address"`
+
+	// Name Examples: Rental Budi
+	Name           string  `json:"name"`
+	OperatingHours *string `json:"operating_hours"`
+
+	// Whatsapp Examples: +628123456789
+	Whatsapp string `json:"whatsapp"`
+}
+
+// PublicResource Satu jenis barang di katalog publik. Ketersediaan di level resource; unit fisik
+// tidak pernah disebut (BR-025). Empat field ketersediaan `null` bila tidak ada
+// rentang di query.
+type PublicResource struct {
+	Available *bool `json:"available"`
+
+	// AvailableCount Unit yang kosong di rentang itu — jumlahnya saja, bukan unitnya.
+	AvailableCount *int               `json:"available_count"`
+	BasePrice      int64              `json:"base_price"`
+	Category       *string            `json:"category"`
+	DepositAmount  *int64             `json:"deposit_amount"`
+	DurationQty    *int               `json:"duration_qty"`
+	Id             openapi_types.UUID `json:"id"`
+	MaxDuration    *int               `json:"max_duration"`
+	MinDuration    *int               `json:"min_duration"`
+	Name           string             `json:"name"`
+
+	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+	// `ResourceCreate` maupun `ResourceUpdate`.
+	//
+	// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+	// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+	// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+	//
+	// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+	// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+	// melihat field satuan harga di layar mana pun.
+	PricingUnit PricingUnit  `json:"pricing_unit"`
+	Subtotal    *int64       `json:"subtotal"`
+	Vehicle     *VehicleSpec `json:"vehicle"`
+}
+
+// PublicResourceDetail `PublicResource` ditambah deskripsi, tiga teks syarat juragan (kosong = tidak
+// ditampilkan), dan `system_terms` yang dirakit server (BR-095).
+type PublicResourceDetail struct {
+	Available *bool `json:"available"`
+
+	// AvailableCount Unit yang kosong di rentang itu — jumlahnya saja, bukan unitnya.
+	AvailableCount *int               `json:"available_count"`
+	BasePrice      int64              `json:"base_price"`
+	Category       *string            `json:"category"`
+	DepositAmount  *int64             `json:"deposit_amount"`
+	Description    *string            `json:"description"`
+	DurationQty    *int               `json:"duration_qty"`
+	Id             openapi_types.UUID `json:"id"`
+	LateFeePerUnit *int64             `json:"late_fee_per_unit"`
+	MaxDuration    *int               `json:"max_duration"`
+	MinDuration    *int               `json:"min_duration"`
+	Name           string             `json:"name"`
+
+	// PricingUnit Satuan harga. **Diisi server dari `owners.business_type`, tidak pernah dikirim
+	// klien** (BR-012, BR-017) — karena itu ia ada di `Resource` tapi tidak di
+	// `ResourceCreate` maupun `ResourceUpdate`.
+	//
+	// Ia dipakai dua kali di perhitungan uang: `duration_qty`, dan rumus denda telat
+	// `ceil(kelebihan / pricing_unit)` (BR-046). Nilai asing bukan data kotor, ia
+	// tagihan yang salah — jadi keempatnya juga ditegakkan CHECK di database.
+	//
+	// Fase 1 selalu `day`: kedua preset yang dibuka (`vehicle_rental`,
+	// `equipment_rental`) cuma punya satu satuan, jadi juragan rental tidak pernah
+	// melihat field satuan harga di layar mana pun.
+	PricingUnit PricingUnit `json:"pricing_unit"`
+	Subtotal    *int64      `json:"subtotal"`
+
+	// SystemTerms Examples: ["1 hari = 24 jam","Telat kembali dikenakan Rp 100.000 per hari"]
+	SystemTerms       []string     `json:"system_terms"`
+	TermsCancellation *string      `json:"terms_cancellation"`
+	TermsExcludes     *string      `json:"terms_excludes"`
+	TermsRequirements *string      `json:"terms_requirements"`
+	Vehicle           *VehicleSpec `json:"vehicle"`
+}
+
+// PublicResourceList defines model for PublicResourceList.
+type PublicResourceList struct {
+	Data []PublicResource `json:"data"`
 }
 
 // RegisterRequest Empat field, dan tidak lebih. Tiap satu yang ditambahkan adalah tempat orang
@@ -1658,6 +2200,27 @@ type ReturnRequest struct {
 	WaiverReason  *string  `json:"waiver_reason,omitempty"`
 }
 
+// RevenueReport defines model for RevenueReport.
+type RevenueReport struct {
+	// DepositHeld Saldo titipan — bukan pemasukan (BR-050).
+	DepositHeld struct {
+		Balance  int64 `json:"balance"`
+		In       int64 `json:"in"`
+		Returned int64 `json:"returned"`
+	} `json:"deposit_held"`
+	From    time.Time `json:"from"`
+	Revenue struct {
+		Damage int64 `json:"damage"`
+
+		// Discount Negatif atau nol.
+		Discount int64 `json:"discount"`
+		LateFee  int64 `json:"late_fee"`
+		Rent     int64 `json:"rent"`
+		Total    int64 `json:"total"`
+	} `json:"revenue"`
+	To time.Time `json:"to"`
+}
+
 // Session Dikembalikan login dan refresh. Membawa semua yang dibutuhkan klien untuk merender
 // kerangka aplikasi tanpa request kedua.
 //
@@ -1754,6 +2317,26 @@ type Settings struct {
 	// Examples: Jl. Kaliurang KM 5 No. 12, Sleman
 	Address *string `json:"address"`
 
+	// AllowedOrigins Origin situs pemilik yang boleh memanggil `api.sewain.id` dari browser (BR-031).
+	// Kosong = tidak ada. **Kontrol browser, bukan kontrol keamanan.**
+	//
+	//
+	// Examples: ["https://rentalbudi.com"]
+	AllowedOrigins []string `json:"allowed_origins"`
+
+	// BankAccountHolder Examples: Budi Santoso
+	BankAccountHolder *string `json:"bank_account_holder"`
+
+	// BankAccountNumber Nomor rekening, angka saja. Ditegakkan database.
+	//
+	// Examples: 1234567890
+	BankAccountNumber *string `json:"bank_account_number"`
+
+	// BankName Bank tujuan transfer yang tampil di portal penyewa (§5).
+	//
+	// Examples: BCA
+	BankName *string `json:"bank_name"`
+
 	// BookingCodePrefix Awalan kode booking, `SWN-0001`. Mengubahnya **tidak** menyentuh kode yang sudah
 	// terbit dan **tidak** me-reset pencacahnya (BR-024).
 	//
@@ -1825,7 +2408,27 @@ type SettingsUpdate struct {
 	//
 	//
 	// Examples: Jl. Kaliurang KM 5 No. 12, Sleman
-	Address               *string `json:"address,omitempty"`
+	Address *string `json:"address,omitempty"`
+
+	// AllowedOrigins Origin situs pemilik yang boleh memanggil `api.sewain.id` dari browser (BR-031).
+	// Kosong = tidak ada. **Kontrol browser, bukan kontrol keamanan.**
+	//
+	//
+	// Examples: ["https://rentalbudi.com"]
+	AllowedOrigins *[]string `json:"allowed_origins,omitempty"`
+
+	// BankAccountHolder Examples: Budi Santoso
+	BankAccountHolder *string `json:"bank_account_holder,omitempty"`
+
+	// BankAccountNumber Nomor rekening, angka saja. Ditegakkan database.
+	//
+	// Examples: 1234567890
+	BankAccountNumber *string `json:"bank_account_number,omitempty"`
+
+	// BankName Bank tujuan transfer yang tampil di portal penyewa (§5).
+	//
+	// Examples: BCA
+	BankName              *string `json:"bank_name,omitempty"`
 	BookingCodePrefix     *string `json:"booking_code_prefix,omitempty"`
 	DraftExpiryHours      *int    `json:"draft_expiry_hours,omitempty"`
 	NoShowToleranceHours  *int    `json:"no_show_tolerance_hours,omitempty"`
@@ -2010,6 +2613,21 @@ type UserRole string
 // endpoint di API ini yang menghapus baris `users`.
 type UserStatus string
 
+// UtilizationReport defines model for UtilizationReport.
+type UtilizationReport struct {
+	Data []struct {
+		PeriodDays   float32 `json:"period_days"`
+		RentedDays   float32 `json:"rented_days"`
+		ResourceName string  `json:"resource_name"`
+		Unit         UnitRef `json:"unit"`
+
+		// Utilization 0..1.
+		Utilization float32 `json:"utilization"`
+	} `json:"data"`
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+}
+
 // VehicleSpec Spek kendaraan untuk satu jenis barang, satu-ke-satu dengan `Resource`
 // (BR-094). Hanya ada pada pemilik berpreset `vehicle_rental`; preset lain
 // membawa `vehicle: null`.
@@ -2124,6 +2742,21 @@ type IdempotencyKey = openapi_types.UUID
 
 // Limit defines model for Limit.
 type Limit = int
+
+// PortalToken defines model for PortalToken.
+type PortalToken = string
+
+// PublicEndAt defines model for PublicEndAt.
+type PublicEndAt = time.Time
+
+// PublicStartAt defines model for PublicStartAt.
+type PublicStartAt = time.Time
+
+// ReportFrom defines model for ReportFrom.
+type ReportFrom = time.Time
+
+// ReportTo defines model for ReportTo.
+type ReportTo = time.Time
 
 // BadRequest RFC 9457 `application/problem+json`. Setiap respons error di API ini memakainya.
 //
@@ -2330,6 +2963,51 @@ type ApproveProofParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// CreatePublicBookingParams defines parameters for CreatePublicBooking.
+type CreatePublicBookingParams struct {
+	// IdempotencyKey UUID yang dibuat klien, **satu per niat pengguna** — bukan satu per percobaan jaringan.
+	// Klien yang membuat kunci baru setiap retry sudah membatalkan seluruh gunanya.
+	//
+	// Kunci yang sama dijalankan sekali; panggilan berikutnya memutar ulang respons pertama
+	// bulat-bulat. Kunci yang masih berjalan dijawab `409 request-in-flight` (BR-090).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListPublicResourcesParams defines parameters for ListPublicResources.
+type ListPublicResourcesParams struct {
+	// StartAt Awal rentang sewa. Berpasangan dengan `end_at`; tanpa keduanya, tanpa ketersediaan.
+	StartAt *PublicStartAt `form:"start_at,omitempty" json:"start_at,omitempty"`
+	EndAt   *PublicEndAt   `form:"end_at,omitempty" json:"end_at,omitempty"`
+}
+
+// GetPublicResourceParams defines parameters for GetPublicResource.
+type GetPublicResourceParams struct {
+	// StartAt Awal rentang sewa. Berpasangan dengan `end_at`; tanpa keduanya, tanpa ketersediaan.
+	StartAt *PublicStartAt `form:"start_at,omitempty" json:"start_at,omitempty"`
+	EndAt   *PublicEndAt   `form:"end_at,omitempty" json:"end_at,omitempty"`
+}
+
+// GetRevenueReportParams defines parameters for GetRevenueReport.
+type GetRevenueReportParams struct {
+	// From Awal periode, inklusif. Rentang maksimal 366 hari.
+	From ReportFrom `form:"from" json:"from"`
+
+	// To Akhir periode, eksklusif.
+	To ReportTo `form:"to" json:"to"`
+}
+
+// GetUtilizationReportParams defines parameters for GetUtilizationReport.
+type GetUtilizationReportParams struct {
+	// From Awal periode, inklusif. Rentang maksimal 366 hari.
+	From ReportFrom `form:"from" json:"from"`
+
+	// To Akhir periode, eksklusif.
+	To ReportTo `form:"to" json:"to"`
+}
+
+// CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
+type CreateApiKeyJSONRequestBody = ApiKeyCreate
+
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
 type AcceptInvitationJSONRequestBody AcceptInvitationJSONBody
 
@@ -2378,8 +3056,20 @@ type RecordPaymentJSONRequestBody = PaymentRequest
 // UploadProofJSONRequestBody defines body for UploadProof for application/json ContentType.
 type UploadProofJSONRequestBody = ProofInput
 
+// UploadPortalProofJSONRequestBody defines body for UploadPortalProof for application/json ContentType.
+type UploadPortalProofJSONRequestBody = PortalProofInput
+
+// PresignPortalUploadJSONRequestBody defines body for PresignPortalUpload for application/json ContentType.
+type PresignPortalUploadJSONRequestBody = PortalUploadRequest
+
 // RejectProofJSONRequestBody defines body for RejectProof for application/json ContentType.
 type RejectProofJSONRequestBody = RejectRequest
+
+// CreatePublicBookingJSONRequestBody defines body for CreatePublicBooking for application/json ContentType.
+type CreatePublicBookingJSONRequestBody = PublicBookingRequest
+
+// ExportReportJSONRequestBody defines body for ExportReport for application/json ContentType.
+type ExportReportJSONRequestBody = ExportRequest
 
 // CreateResourceJSONRequestBody defines body for CreateResource for application/json ContentType.
 type CreateResourceJSONRequestBody = ResourceCreate
@@ -2488,6 +3178,15 @@ func (a ProblemError) MarshalJSON() ([]byte, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListApiKeys Kunci API usaha ini
+	// (GET /api-keys)
+	ListApiKeys(w http.ResponseWriter, r *http.Request)
+	// CreateApiKey Terbitkan kunci API
+	// (POST /api-keys)
+	CreateApiKey(w http.ResponseWriter, r *http.Request)
+	// RevokeApiKey Cabut kunci API
+	// (DELETE /api-keys/{id})
+	RevokeApiKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// AcceptInvitation Terima undangan dan pasang password
 	// (POST /auth/accept-invitation)
 	AcceptInvitation(w http.ResponseWriter, r *http.Request)
@@ -2581,6 +3280,9 @@ type ServerInterface interface {
 	// SetCustomerIdentityPhoto Simpan foto identitas penyewa
 	// (POST /customers/{id}/identity)
 	SetCustomerIdentityPhoto(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// GetDashboard Apa yang perlu ditangani hari ini
+	// (GET /dashboard)
+	GetDashboard(w http.ResponseWriter, r *http.Request)
 	// DeleteHandover Tidak ada — bukti kondisi tidak bisa dihapus
 	// (DELETE /handovers/{id})
 	DeleteHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -2602,15 +3304,51 @@ type ServerInterface interface {
 	// UploadProof Serahkan bukti transfer
 	// (POST /invoices/{id}/proofs)
 	UploadProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// GetJob Status pekerjaan asinkron
+	// (GET /jobs/{id})
+	GetJob(w http.ResponseWriter, r *http.Request, id string)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// GetPortalBooking Satu booking, dilihat penyewanya
+	// (GET /portal/bookings/{token})
+	GetPortalBooking(w http.ResponseWriter, r *http.Request, token PortalToken)
+	// UploadPortalProof Serahkan bukti transfer dari portal
+	// (POST /portal/bookings/{token}/proofs)
+	UploadPortalProof(w http.ResponseWriter, r *http.Request, token PortalToken)
+	// PresignPortalUpload Minta URL unggah bukti transfer
+	// (POST /portal/bookings/{token}/uploads)
+	PresignPortalUpload(w http.ResponseWriter, r *http.Request, token PortalToken)
 	// ApproveProof Setujui bukti — invoice lunas
 	// (POST /proofs/{id}/approve)
 	ApproveProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ApproveProofParams)
 	// RejectProof Tolak bukti transfer
 	// (POST /proofs/{id}/reject)
 	RejectProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// CreatePublicBooking Ajukan booking dari halaman publik
+	// (POST /public/bookings)
+	CreatePublicBooking(w http.ResponseWriter, r *http.Request, params CreatePublicBookingParams)
+	// GetPublicOwner Profil usaha pemilik host ini
+	// (GET /public/owner)
+	GetPublicOwner(w http.ResponseWriter, r *http.Request)
+	// ListPublicResources Katalog publik, dengan ketersediaan kalau rentang diberikan
+	// (GET /public/resources)
+	ListPublicResources(w http.ResponseWriter, r *http.Request, params ListPublicResourcesParams)
+	// GetPublicResource Satu resource, lengkap dengan spek dan syarat sewa
+	// (GET /public/resources/{id})
+	GetPublicResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetPublicResourceParams)
+	// ExportReport Ekspor laporan ke CSV atau XLSX
+	// (POST /reports/export)
+	ExportReport(w http.ResponseWriter, r *http.Request)
+	// GetIdleUnitsReport Unit menganggur lebih dari 30 hari
+	// (GET /reports/idle-units)
+	GetIdleUnitsReport(w http.ResponseWriter, r *http.Request)
+	// GetRevenueReport Pemasukan per jenis baris, deposit terpisah
+	// (GET /reports/revenue)
+	GetRevenueReport(w http.ResponseWriter, r *http.Request, params GetRevenueReportParams)
+	// GetUtilizationReport Tingkat pemakaian per unit
+	// (GET /reports/utilization)
+	GetUtilizationReport(w http.ResponseWriter, r *http.Request, params GetUtilizationReportParams)
 	// ListResources Jenis barang di usaha ini
 	// (GET /resources)
 	ListResources(w http.ResponseWriter, r *http.Request)
@@ -2664,6 +3402,24 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListApiKeys Kunci API usaha ini
+// (GET /api-keys)
+func (_ Unimplemented) ListApiKeys(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateApiKey Terbitkan kunci API
+// (POST /api-keys)
+func (_ Unimplemented) CreateApiKey(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RevokeApiKey Cabut kunci API
+// (DELETE /api-keys/{id})
+func (_ Unimplemented) RevokeApiKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // AcceptInvitation Terima undangan dan pasang password
 // (POST /auth/accept-invitation)
@@ -2851,6 +3607,12 @@ func (_ Unimplemented) SetCustomerIdentityPhoto(w http.ResponseWriter, r *http.R
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetDashboard Apa yang perlu ditangani hari ini
+// (GET /dashboard)
+func (_ Unimplemented) GetDashboard(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // DeleteHandover Tidak ada — bukti kondisi tidak bisa dihapus
 // (DELETE /handovers/{id})
 func (_ Unimplemented) DeleteHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
@@ -2893,9 +3655,33 @@ func (_ Unimplemented) UploadProof(w http.ResponseWriter, r *http.Request, id op
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetJob Status pekerjaan asinkron
+// (GET /jobs/{id})
+func (_ Unimplemented) GetJob(w http.ResponseWriter, r *http.Request, id string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 // (GET /me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetPortalBooking Satu booking, dilihat penyewanya
+// (GET /portal/bookings/{token})
+func (_ Unimplemented) GetPortalBooking(w http.ResponseWriter, r *http.Request, token PortalToken) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UploadPortalProof Serahkan bukti transfer dari portal
+// (POST /portal/bookings/{token}/proofs)
+func (_ Unimplemented) UploadPortalProof(w http.ResponseWriter, r *http.Request, token PortalToken) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PresignPortalUpload Minta URL unggah bukti transfer
+// (POST /portal/bookings/{token}/uploads)
+func (_ Unimplemented) PresignPortalUpload(w http.ResponseWriter, r *http.Request, token PortalToken) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2908,6 +3694,54 @@ func (_ Unimplemented) ApproveProof(w http.ResponseWriter, r *http.Request, id o
 // RejectProof Tolak bukti transfer
 // (POST /proofs/{id}/reject)
 func (_ Unimplemented) RejectProof(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreatePublicBooking Ajukan booking dari halaman publik
+// (POST /public/bookings)
+func (_ Unimplemented) CreatePublicBooking(w http.ResponseWriter, r *http.Request, params CreatePublicBookingParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetPublicOwner Profil usaha pemilik host ini
+// (GET /public/owner)
+func (_ Unimplemented) GetPublicOwner(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListPublicResources Katalog publik, dengan ketersediaan kalau rentang diberikan
+// (GET /public/resources)
+func (_ Unimplemented) ListPublicResources(w http.ResponseWriter, r *http.Request, params ListPublicResourcesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetPublicResource Satu resource, lengkap dengan spek dan syarat sewa
+// (GET /public/resources/{id})
+func (_ Unimplemented) GetPublicResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetPublicResourceParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ExportReport Ekspor laporan ke CSV atau XLSX
+// (POST /reports/export)
+func (_ Unimplemented) ExportReport(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetIdleUnitsReport Unit menganggur lebih dari 30 hari
+// (GET /reports/idle-units)
+func (_ Unimplemented) GetIdleUnitsReport(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetRevenueReport Pemasukan per jenis baris, deposit terpisah
+// (GET /reports/revenue)
+func (_ Unimplemented) GetRevenueReport(w http.ResponseWriter, r *http.Request, params GetRevenueReportParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetUtilizationReport Tingkat pemakaian per unit
+// (GET /reports/utilization)
+func (_ Unimplemented) GetUtilizationReport(w http.ResponseWriter, r *http.Request, params GetUtilizationReportParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3015,6 +3849,60 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListApiKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListApiKeys(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListApiKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateApiKey operation middleware
+func (siw *ServerInterfaceWrapper) CreateApiKey(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateApiKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeApiKey operation middleware
+func (siw *ServerInterfaceWrapper) RevokeApiKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeApiKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // AcceptInvitation operation middleware
 func (siw *ServerInterfaceWrapper) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
@@ -4108,6 +4996,20 @@ func (siw *ServerInterfaceWrapper) SetCustomerIdentityPhoto(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// GetDashboard operation middleware
+func (siw *ServerInterfaceWrapper) GetDashboard(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDashboard(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteHandover operation middleware
 func (siw *ServerInterfaceWrapper) DeleteHandover(w http.ResponseWriter, r *http.Request) {
 
@@ -4364,11 +5266,115 @@ func (siw *ServerInterfaceWrapper) UploadProof(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetJob operation middleware
+func (siw *ServerInterfaceWrapper) GetJob(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetJob(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPortalBooking operation middleware
+func (siw *ServerInterfaceWrapper) GetPortalBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token PortalToken
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", chi.URLParam(r, "token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPortalBooking(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadPortalProof operation middleware
+func (siw *ServerInterfaceWrapper) UploadPortalProof(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token PortalToken
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", chi.URLParam(r, "token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadPortalProof(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PresignPortalUpload operation middleware
+func (siw *ServerInterfaceWrapper) PresignPortalUpload(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token PortalToken
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", chi.URLParam(r, "token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PresignPortalUpload(w, r, token)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4449,6 +5455,286 @@ func (siw *ServerInterfaceWrapper) RejectProof(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RejectProof(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreatePublicBooking operation middleware
+func (siw *ServerInterfaceWrapper) CreatePublicBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePublicBookingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePublicBooking(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPublicOwner operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicOwner(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicOwner(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPublicResources operation middleware
+func (siw *ServerInterfaceWrapper) ListPublicResources(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPublicResourcesParams
+
+	// ------------- Optional query parameter "start_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start_at", r.URL.Query(), &params.StartAt, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start_at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end_at", r.URL.Query(), &params.EndAt, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end_at", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublicResources(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPublicResource operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicResource(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetPublicResourceParams
+
+	// ------------- Optional query parameter "start_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start_at", r.URL.Query(), &params.StartAt, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start_at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end_at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end_at", r.URL.Query(), &params.EndAt, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end_at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end_at", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicResource(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportReport operation middleware
+func (siw *ServerInterfaceWrapper) ExportReport(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportReport(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetIdleUnitsReport operation middleware
+func (siw *ServerInterfaceWrapper) GetIdleUnitsReport(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetIdleUnitsReport(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRevenueReport operation middleware
+func (siw *ServerInterfaceWrapper) GetRevenueReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRevenueReportParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRevenueReport(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUtilizationReport operation middleware
+func (siw *ServerInterfaceWrapper) GetUtilizationReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetUtilizationReportParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUtilizationReport(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5074,6 +6360,54 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/proofs/{id}/reject", wrapper.RejectProof)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dashboard", wrapper.GetDashboard)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/reports/revenue", wrapper.GetRevenueReport)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/reports/utilization", wrapper.GetUtilizationReport)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/reports/idle-units", wrapper.GetIdleUnitsReport)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/reports/export", wrapper.ExportReport)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/jobs/{id}", wrapper.GetJob)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/public/owner", wrapper.GetPublicOwner)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/public/resources", wrapper.ListPublicResources)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/public/resources/{id}", wrapper.GetPublicResource)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/public/bookings", wrapper.CreatePublicBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/portal/bookings/{token}", wrapper.GetPortalBooking)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/portal/bookings/{token}/uploads", wrapper.PresignPortalUpload)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/portal/bookings/{token}/proofs", wrapper.UploadPortalProof)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api-keys", wrapper.ListApiKeys)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api-keys", wrapper.CreateApiKey)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api-keys/{id}", wrapper.RevokeApiKey)
+	})
 
 	return r
 }
@@ -5102,6 +6436,193 @@ type TooManyRequestsApplicationProblemPlusJSONResponse struct {
 type UnauthorizedApplicationProblemPlusJSONResponse Problem
 
 type UnprocessableEntityApplicationProblemPlusJSONResponse Problem
+
+type ListApiKeysRequestObject struct {
+}
+
+type ListApiKeysResponseObject interface {
+	VisitListApiKeysResponse(w http.ResponseWriter) error
+}
+
+type ListApiKeys200JSONResponse []ApiKey
+
+func (response ListApiKeys200JSONResponse) VisitListApiKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListApiKeys401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListApiKeys401ApplicationProblemPlusJSONResponse) VisitListApiKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListApiKeys403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListApiKeys403ApplicationProblemPlusJSONResponse) VisitListApiKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApiKeyRequestObject struct {
+	Body *CreateApiKeyJSONRequestBody
+}
+
+type CreateApiKeyResponseObject interface {
+	VisitCreateApiKeyResponse(w http.ResponseWriter) error
+}
+
+type CreateApiKey201JSONResponse ApiKeyCreated
+
+func (response CreateApiKey201JSONResponse) VisitCreateApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApiKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateApiKey401ApplicationProblemPlusJSONResponse) VisitCreateApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApiKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateApiKey403ApplicationProblemPlusJSONResponse) VisitCreateApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApiKey422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateApiKey422ApplicationProblemPlusJSONResponse) VisitCreateApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeApiKeyRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type RevokeApiKeyResponseObject interface {
+	VisitRevokeApiKeyResponse(w http.ResponseWriter) error
+}
+
+type RevokeApiKey204Response struct {
+}
+
+func (response RevokeApiKey204Response) VisitRevokeApiKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeApiKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeApiKey401ApplicationProblemPlusJSONResponse) VisitRevokeApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeApiKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeApiKey403ApplicationProblemPlusJSONResponse) VisitRevokeApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeApiKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeApiKey404ApplicationProblemPlusJSONResponse) VisitRevokeApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type AcceptInvitationRequestObject struct {
 	Body *AcceptInvitationJSONRequestBody
@@ -7521,6 +9042,59 @@ func (response SetCustomerIdentityPhoto422ApplicationProblemPlusJSONResponse) Vi
 	return err
 }
 
+type GetDashboardRequestObject struct {
+}
+
+type GetDashboardResponseObject interface {
+	VisitGetDashboardResponse(w http.ResponseWriter) error
+}
+
+type GetDashboard200JSONResponse Dashboard
+
+func (response GetDashboard200JSONResponse) VisitGetDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDashboard401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetDashboard401ApplicationProblemPlusJSONResponse) VisitGetDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDashboard403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetDashboard403ApplicationProblemPlusJSONResponse) VisitGetDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteHandoverRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -7970,6 +9544,60 @@ func (response UploadProof422ApplicationProblemPlusJSONResponse) VisitUploadProo
 	return err
 }
 
+type GetJobRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetJobResponseObject interface {
+	VisitGetJobResponse(w http.ResponseWriter) error
+}
+
+type GetJob200JSONResponse Job
+
+func (response GetJob200JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJob401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetJob401ApplicationProblemPlusJSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJob404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetJob404ApplicationProblemPlusJSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -8003,6 +9631,245 @@ func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPortalBookingRequestObject struct {
+	Token PortalToken `json:"token"`
+}
+
+type GetPortalBookingResponseObject interface {
+	VisitGetPortalBookingResponse(w http.ResponseWriter) error
+}
+
+type GetPortalBooking200JSONResponse PortalBooking
+
+func (response GetPortalBooking200JSONResponse) VisitGetPortalBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPortalBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetPortalBooking404ApplicationProblemPlusJSONResponse) VisitGetPortalBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPortalBooking429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetPortalBooking429ApplicationProblemPlusJSONResponse) VisitGetPortalBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadPortalProofRequestObject struct {
+	Token PortalToken `json:"token"`
+	Body  *UploadPortalProofJSONRequestBody
+}
+
+type UploadPortalProofResponseObject interface {
+	VisitUploadPortalProofResponse(w http.ResponseWriter) error
+}
+
+type UploadPortalProof202JSONResponse PortalProofReceived
+
+func (response UploadPortalProof202JSONResponse) VisitUploadPortalProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadPortalProof404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UploadPortalProof404ApplicationProblemPlusJSONResponse) VisitUploadPortalProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadPortalProof409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UploadPortalProof409ApplicationProblemPlusJSONResponse) VisitUploadPortalProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadPortalProof422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UploadPortalProof422ApplicationProblemPlusJSONResponse) VisitUploadPortalProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadPortalProof429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response UploadPortalProof429ApplicationProblemPlusJSONResponse) VisitUploadPortalProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignPortalUploadRequestObject struct {
+	Token PortalToken `json:"token"`
+	Body  *PresignPortalUploadJSONRequestBody
+}
+
+type PresignPortalUploadResponseObject interface {
+	VisitPresignPortalUploadResponse(w http.ResponseWriter) error
+}
+
+type PresignPortalUpload201JSONResponse PresignedUpload
+
+func (response PresignPortalUpload201JSONResponse) VisitPresignPortalUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignPortalUpload404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PresignPortalUpload404ApplicationProblemPlusJSONResponse) VisitPresignPortalUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignPortalUpload422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PresignPortalUpload422ApplicationProblemPlusJSONResponse) VisitPresignPortalUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignPortalUpload429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response PresignPortalUpload429ApplicationProblemPlusJSONResponse) VisitPresignPortalUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -8186,6 +10053,588 @@ type RejectProof422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RejectProof422ApplicationProblemPlusJSONResponse) VisitRejectProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePublicBookingRequestObject struct {
+	Params CreatePublicBookingParams
+	Body   *CreatePublicBookingJSONRequestBody
+}
+
+type CreatePublicBookingResponseObject interface {
+	VisitCreatePublicBookingResponse(w http.ResponseWriter) error
+}
+
+type CreatePublicBooking201JSONResponse PublicBookingCreated
+
+func (response CreatePublicBooking201JSONResponse) VisitCreatePublicBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePublicBooking404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreatePublicBooking404ApplicationProblemPlusJSONResponse) VisitCreatePublicBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePublicBooking409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreatePublicBooking409ApplicationProblemPlusJSONResponse) VisitCreatePublicBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePublicBooking422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreatePublicBooking422ApplicationProblemPlusJSONResponse) VisitCreatePublicBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePublicBooking429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CreatePublicBooking429ApplicationProblemPlusJSONResponse) VisitCreatePublicBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicOwnerRequestObject struct {
+}
+
+type GetPublicOwnerResponseObject interface {
+	VisitGetPublicOwnerResponse(w http.ResponseWriter) error
+}
+
+type GetPublicOwner200JSONResponse PublicOwner
+
+func (response GetPublicOwner200JSONResponse) VisitGetPublicOwnerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicOwner404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicOwner404ApplicationProblemPlusJSONResponse) VisitGetPublicOwnerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicOwner429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicOwner429ApplicationProblemPlusJSONResponse) VisitGetPublicOwnerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicResourcesRequestObject struct {
+	Params ListPublicResourcesParams
+}
+
+type ListPublicResourcesResponseObject interface {
+	VisitListPublicResourcesResponse(w http.ResponseWriter) error
+}
+
+type ListPublicResources200JSONResponse PublicResourceList
+
+func (response ListPublicResources200JSONResponse) VisitListPublicResourcesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicResources404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListPublicResources404ApplicationProblemPlusJSONResponse) VisitListPublicResourcesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicResources422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ListPublicResources422ApplicationProblemPlusJSONResponse) VisitListPublicResourcesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicResources429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ListPublicResources429ApplicationProblemPlusJSONResponse) VisitListPublicResourcesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicResourceRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params GetPublicResourceParams
+}
+
+type GetPublicResourceResponseObject interface {
+	VisitGetPublicResourceResponse(w http.ResponseWriter) error
+}
+
+type GetPublicResource200JSONResponse PublicResourceDetail
+
+func (response GetPublicResource200JSONResponse) VisitGetPublicResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicResource404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicResource404ApplicationProblemPlusJSONResponse) VisitGetPublicResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicResource422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicResource422ApplicationProblemPlusJSONResponse) VisitGetPublicResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicResource429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetPublicResource429ApplicationProblemPlusJSONResponse) VisitGetPublicResourceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportReportRequestObject struct {
+	Body *ExportReportJSONRequestBody
+}
+
+type ExportReportResponseObject interface {
+	VisitExportReportResponse(w http.ResponseWriter) error
+}
+
+type ExportReport202JSONResponse struct {
+	JobId string `json:"job_id"`
+}
+
+func (response ExportReport202JSONResponse) VisitExportReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportReport401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ExportReport401ApplicationProblemPlusJSONResponse) VisitExportReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportReport403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExportReport403ApplicationProblemPlusJSONResponse) VisitExportReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportReport422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ExportReport422ApplicationProblemPlusJSONResponse) VisitExportReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdleUnitsReportRequestObject struct {
+}
+
+type GetIdleUnitsReportResponseObject interface {
+	VisitGetIdleUnitsReportResponse(w http.ResponseWriter) error
+}
+
+type GetIdleUnitsReport200JSONResponse IdleUnitsReport
+
+func (response GetIdleUnitsReport200JSONResponse) VisitGetIdleUnitsReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdleUnitsReport401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetIdleUnitsReport401ApplicationProblemPlusJSONResponse) VisitGetIdleUnitsReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdleUnitsReport403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetIdleUnitsReport403ApplicationProblemPlusJSONResponse) VisitGetIdleUnitsReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRevenueReportRequestObject struct {
+	Params GetRevenueReportParams
+}
+
+type GetRevenueReportResponseObject interface {
+	VisitGetRevenueReportResponse(w http.ResponseWriter) error
+}
+
+type GetRevenueReport200JSONResponse RevenueReport
+
+func (response GetRevenueReport200JSONResponse) VisitGetRevenueReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRevenueReport401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetRevenueReport401ApplicationProblemPlusJSONResponse) VisitGetRevenueReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRevenueReport403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetRevenueReport403ApplicationProblemPlusJSONResponse) VisitGetRevenueReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRevenueReport422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response GetRevenueReport422ApplicationProblemPlusJSONResponse) VisitGetRevenueReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUtilizationReportRequestObject struct {
+	Params GetUtilizationReportParams
+}
+
+type GetUtilizationReportResponseObject interface {
+	VisitGetUtilizationReportResponse(w http.ResponseWriter) error
+}
+
+type GetUtilizationReport200JSONResponse UtilizationReport
+
+func (response GetUtilizationReport200JSONResponse) VisitGetUtilizationReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUtilizationReport401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetUtilizationReport401ApplicationProblemPlusJSONResponse) VisitGetUtilizationReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUtilizationReport403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetUtilizationReport403ApplicationProblemPlusJSONResponse) VisitGetUtilizationReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUtilizationReport422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response GetUtilizationReport422ApplicationProblemPlusJSONResponse) VisitGetUtilizationReportResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -9254,6 +11703,22 @@ func (response DisableUser404ApplicationProblemPlusJSONResponse) VisitDisableUse
 	return err
 }
 
+type DisableUser422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser422ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateUserRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *UpdateUserJSONRequestBody
@@ -9343,6 +11808,15 @@ func (response UpdateUser422ApplicationProblemPlusJSONResponse) VisitUpdateUserR
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListApiKeys Kunci API usaha ini
+	// (GET /api-keys)
+	ListApiKeys(ctx context.Context, request ListApiKeysRequestObject) (ListApiKeysResponseObject, error)
+	// CreateApiKey Terbitkan kunci API
+	// (POST /api-keys)
+	CreateApiKey(ctx context.Context, request CreateApiKeyRequestObject) (CreateApiKeyResponseObject, error)
+	// RevokeApiKey Cabut kunci API
+	// (DELETE /api-keys/{id})
+	RevokeApiKey(ctx context.Context, request RevokeApiKeyRequestObject) (RevokeApiKeyResponseObject, error)
 	// AcceptInvitation Terima undangan dan pasang password
 	// (POST /auth/accept-invitation)
 	AcceptInvitation(ctx context.Context, request AcceptInvitationRequestObject) (AcceptInvitationResponseObject, error)
@@ -9436,6 +11910,9 @@ type StrictServerInterface interface {
 	// SetCustomerIdentityPhoto Simpan foto identitas penyewa
 	// (POST /customers/{id}/identity)
 	SetCustomerIdentityPhoto(ctx context.Context, request SetCustomerIdentityPhotoRequestObject) (SetCustomerIdentityPhotoResponseObject, error)
+	// GetDashboard Apa yang perlu ditangani hari ini
+	// (GET /dashboard)
+	GetDashboard(ctx context.Context, request GetDashboardRequestObject) (GetDashboardResponseObject, error)
 	// DeleteHandover Tidak ada — bukti kondisi tidak bisa dihapus
 	// (DELETE /handovers/{id})
 	DeleteHandover(ctx context.Context, request DeleteHandoverRequestObject) (DeleteHandoverResponseObject, error)
@@ -9457,15 +11934,51 @@ type StrictServerInterface interface {
 	// UploadProof Serahkan bukti transfer
 	// (POST /invoices/{id}/proofs)
 	UploadProof(ctx context.Context, request UploadProofRequestObject) (UploadProofResponseObject, error)
+	// GetJob Status pekerjaan asinkron
+	// (GET /jobs/{id})
+	GetJob(ctx context.Context, request GetJobRequestObject) (GetJobResponseObject, error)
 	// GetMe Usaha, peran, dan izin pengguna yang sedang masuk
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// GetPortalBooking Satu booking, dilihat penyewanya
+	// (GET /portal/bookings/{token})
+	GetPortalBooking(ctx context.Context, request GetPortalBookingRequestObject) (GetPortalBookingResponseObject, error)
+	// UploadPortalProof Serahkan bukti transfer dari portal
+	// (POST /portal/bookings/{token}/proofs)
+	UploadPortalProof(ctx context.Context, request UploadPortalProofRequestObject) (UploadPortalProofResponseObject, error)
+	// PresignPortalUpload Minta URL unggah bukti transfer
+	// (POST /portal/bookings/{token}/uploads)
+	PresignPortalUpload(ctx context.Context, request PresignPortalUploadRequestObject) (PresignPortalUploadResponseObject, error)
 	// ApproveProof Setujui bukti — invoice lunas
 	// (POST /proofs/{id}/approve)
 	ApproveProof(ctx context.Context, request ApproveProofRequestObject) (ApproveProofResponseObject, error)
 	// RejectProof Tolak bukti transfer
 	// (POST /proofs/{id}/reject)
 	RejectProof(ctx context.Context, request RejectProofRequestObject) (RejectProofResponseObject, error)
+	// CreatePublicBooking Ajukan booking dari halaman publik
+	// (POST /public/bookings)
+	CreatePublicBooking(ctx context.Context, request CreatePublicBookingRequestObject) (CreatePublicBookingResponseObject, error)
+	// GetPublicOwner Profil usaha pemilik host ini
+	// (GET /public/owner)
+	GetPublicOwner(ctx context.Context, request GetPublicOwnerRequestObject) (GetPublicOwnerResponseObject, error)
+	// ListPublicResources Katalog publik, dengan ketersediaan kalau rentang diberikan
+	// (GET /public/resources)
+	ListPublicResources(ctx context.Context, request ListPublicResourcesRequestObject) (ListPublicResourcesResponseObject, error)
+	// GetPublicResource Satu resource, lengkap dengan spek dan syarat sewa
+	// (GET /public/resources/{id})
+	GetPublicResource(ctx context.Context, request GetPublicResourceRequestObject) (GetPublicResourceResponseObject, error)
+	// ExportReport Ekspor laporan ke CSV atau XLSX
+	// (POST /reports/export)
+	ExportReport(ctx context.Context, request ExportReportRequestObject) (ExportReportResponseObject, error)
+	// GetIdleUnitsReport Unit menganggur lebih dari 30 hari
+	// (GET /reports/idle-units)
+	GetIdleUnitsReport(ctx context.Context, request GetIdleUnitsReportRequestObject) (GetIdleUnitsReportResponseObject, error)
+	// GetRevenueReport Pemasukan per jenis baris, deposit terpisah
+	// (GET /reports/revenue)
+	GetRevenueReport(ctx context.Context, request GetRevenueReportRequestObject) (GetRevenueReportResponseObject, error)
+	// GetUtilizationReport Tingkat pemakaian per unit
+	// (GET /reports/utilization)
+	GetUtilizationReport(ctx context.Context, request GetUtilizationReportRequestObject) (GetUtilizationReportResponseObject, error)
 	// ListResources Jenis barang di usaha ini
 	// (GET /resources)
 	ListResources(ctx context.Context, request ListResourcesRequestObject) (ListResourcesResponseObject, error)
@@ -9553,6 +12066,87 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListApiKeys operation middleware
+func (sh *strictHandler) ListApiKeys(w http.ResponseWriter, r *http.Request) {
+	var request ListApiKeysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListApiKeys(ctx, request.(ListApiKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListApiKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListApiKeysResponseObject); ok {
+		if err := validResponse.VisitListApiKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateApiKey operation middleware
+func (sh *strictHandler) CreateApiKey(w http.ResponseWriter, r *http.Request) {
+	var request CreateApiKeyRequestObject
+
+	var body CreateApiKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateApiKey(ctx, request.(CreateApiKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateApiKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateApiKeyResponseObject); ok {
+		if err := validResponse.VisitCreateApiKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeApiKey operation middleware
+func (sh *strictHandler) RevokeApiKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request RevokeApiKeyRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeApiKey(ctx, request.(RevokeApiKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeApiKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeApiKeyResponseObject); ok {
+		if err := validResponse.VisitRevokeApiKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // AcceptInvitation operation middleware
@@ -10448,6 +13042,30 @@ func (sh *strictHandler) SetCustomerIdentityPhoto(w http.ResponseWriter, r *http
 	}
 }
 
+// GetDashboard operation middleware
+func (sh *strictHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
+	var request GetDashboardRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDashboard(ctx, request.(GetDashboardRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDashboard")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDashboardResponseObject); ok {
+		if err := validResponse.VisitGetDashboardResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteHandover operation middleware
 func (sh *strictHandler) DeleteHandover(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request DeleteHandoverRequestObject
@@ -10645,6 +13263,32 @@ func (sh *strictHandler) UploadProof(w http.ResponseWriter, r *http.Request, id 
 	}
 }
 
+// GetJob operation middleware
+func (sh *strictHandler) GetJob(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetJobRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetJob(ctx, request.(GetJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetJobResponseObject); ok {
+		if err := validResponse.VisitGetJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -10662,6 +13306,98 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPortalBooking operation middleware
+func (sh *strictHandler) GetPortalBooking(w http.ResponseWriter, r *http.Request, token PortalToken) {
+	var request GetPortalBookingRequestObject
+
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPortalBooking(ctx, request.(GetPortalBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPortalBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPortalBookingResponseObject); ok {
+		if err := validResponse.VisitGetPortalBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadPortalProof operation middleware
+func (sh *strictHandler) UploadPortalProof(w http.ResponseWriter, r *http.Request, token PortalToken) {
+	var request UploadPortalProofRequestObject
+
+	request.Token = token
+
+	var body UploadPortalProofJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadPortalProof(ctx, request.(UploadPortalProofRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadPortalProof")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadPortalProofResponseObject); ok {
+		if err := validResponse.VisitUploadPortalProofResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PresignPortalUpload operation middleware
+func (sh *strictHandler) PresignPortalUpload(w http.ResponseWriter, r *http.Request, token PortalToken) {
+	var request PresignPortalUploadRequestObject
+
+	request.Token = token
+
+	var body PresignPortalUploadJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PresignPortalUpload(ctx, request.(PresignPortalUploadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PresignPortalUpload")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PresignPortalUploadResponseObject); ok {
+		if err := validResponse.VisitPresignPortalUploadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10722,6 +13458,223 @@ func (sh *strictHandler) RejectProof(w http.ResponseWriter, r *http.Request, id 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RejectProofResponseObject); ok {
 		if err := validResponse.VisitRejectProofResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreatePublicBooking operation middleware
+func (sh *strictHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Request, params CreatePublicBookingParams) {
+	var request CreatePublicBookingRequestObject
+
+	request.Params = params
+
+	var body CreatePublicBookingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePublicBooking(ctx, request.(CreatePublicBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePublicBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePublicBookingResponseObject); ok {
+		if err := validResponse.VisitCreatePublicBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPublicOwner operation middleware
+func (sh *strictHandler) GetPublicOwner(w http.ResponseWriter, r *http.Request) {
+	var request GetPublicOwnerRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPublicOwner(ctx, request.(GetPublicOwnerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPublicOwner")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPublicOwnerResponseObject); ok {
+		if err := validResponse.VisitGetPublicOwnerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPublicResources operation middleware
+func (sh *strictHandler) ListPublicResources(w http.ResponseWriter, r *http.Request, params ListPublicResourcesParams) {
+	var request ListPublicResourcesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPublicResources(ctx, request.(ListPublicResourcesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPublicResources")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPublicResourcesResponseObject); ok {
+		if err := validResponse.VisitListPublicResourcesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPublicResource operation middleware
+func (sh *strictHandler) GetPublicResource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetPublicResourceParams) {
+	var request GetPublicResourceRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPublicResource(ctx, request.(GetPublicResourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPublicResource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPublicResourceResponseObject); ok {
+		if err := validResponse.VisitGetPublicResourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExportReport operation middleware
+func (sh *strictHandler) ExportReport(w http.ResponseWriter, r *http.Request) {
+	var request ExportReportRequestObject
+
+	var body ExportReportJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExportReport(ctx, request.(ExportReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExportReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExportReportResponseObject); ok {
+		if err := validResponse.VisitExportReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetIdleUnitsReport operation middleware
+func (sh *strictHandler) GetIdleUnitsReport(w http.ResponseWriter, r *http.Request) {
+	var request GetIdleUnitsReportRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetIdleUnitsReport(ctx, request.(GetIdleUnitsReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetIdleUnitsReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetIdleUnitsReportResponseObject); ok {
+		if err := validResponse.VisitGetIdleUnitsReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRevenueReport operation middleware
+func (sh *strictHandler) GetRevenueReport(w http.ResponseWriter, r *http.Request, params GetRevenueReportParams) {
+	var request GetRevenueReportRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRevenueReport(ctx, request.(GetRevenueReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRevenueReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRevenueReportResponseObject); ok {
+		if err := validResponse.VisitGetRevenueReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetUtilizationReport operation middleware
+func (sh *strictHandler) GetUtilizationReport(w http.ResponseWriter, r *http.Request, params GetUtilizationReportParams) {
+	var request GetUtilizationReportRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUtilizationReport(ctx, request.(GetUtilizationReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUtilizationReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetUtilizationReportResponseObject); ok {
+		if err := validResponse.VisitGetUtilizationReportResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

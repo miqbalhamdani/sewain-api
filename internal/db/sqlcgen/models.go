@@ -10,6 +10,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type ApiKey struct {
+	ID              uuid.UUID
+	OwnerID         uuid.UUID
+	Name            string
+	KeyPrefix       string
+	KeyHash         string
+	RateLimitPerMin int32
+	LastUsedAt      *time.Time
+	RevokedAt       *time.Time
+	CreatedBy       *uuid.UUID
+	CreatedAt       time.Time
+}
+
 type AuditLog struct {
 	ID          uuid.UUID
 	OwnerID     uuid.UUID
@@ -150,6 +163,10 @@ type Owner struct {
 	Whatsapp                   *string
 	Address                    *string
 	OperatingHours             *string
+	BankName                   *string
+	BankAccountNumber          *string
+	BankAccountHolder          *string
+	AllowedOrigins             []string
 }
 
 type Payment struct {
