@@ -6,10 +6,16 @@
 // sanctioned timer in the system -- never a time.Ticker in cmd/api.
 //
 // WhatsApp reminders (S1-054) register here when they land.
+//
+// `scheduler -once` fires every schedule once, right now, and exits -- "run the
+// expiry sweep now" for an operator, and how the end-to-end suite expires a
+// draft without waiting a day (S1-071). It skips the lease and the slot on
+// purpose: it is a deliberate extra run, and every job is idempotent (BR-091).
 package main
 
 import (
 	"context"
+	"flag"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -33,6 +39,9 @@ var schedules = []jobs.Schedule{
 }
 
 func main() {
+	once := flag.Bool("once", false, "fire every schedule once and exit")
+	flag.Parse()
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -42,6 +51,18 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = redis.Close() }()
+
+	if *once {
+		q := jobs.NewQueue(redis.Raw(), jobs.Default)
+		for _, sc := range schedules {
+			if err := sc.Run(ctx, q); err != nil {
+				slog.Error("scheduler -once", "schedule", sc.Name, "error", err)
+				os.Exit(1)
+			}
+			slog.Info("fired", "schedule", sc.Name)
+		}
+		return
+	}
 
 	s := jobs.NewScheduler(redis.Raw(), jobs.Default, schedules)
 	slog.Info("scheduler running", "schedules", len(schedules))
