@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 )
 
@@ -28,8 +30,8 @@ func TestLintRLS(t *testing.T) {
 	t.Cleanup(func() { _ = conn.Close(ctx) })
 
 	t.Run("passes on a clean schema", func(t *testing.T) {
-		if err := run(ctx); err != nil {
-			t.Fatalf("run() = %v, want nil -- the schema should be clean before this test adds to it", err)
+		if ps := schemaProblems(ctx, t); len(ps) > 0 {
+			t.Fatalf("problems = %v, want none -- the schema should be clean before this test adds to it", ps)
 		}
 	})
 
@@ -71,10 +73,39 @@ func TestLintRLS(t *testing.T) {
 			t.Fatalf("enable_owner_rls: %v", err)
 		}
 
-		if err := run(ctx); err != nil {
-			t.Errorf("run() = %v, want nil -- a properly protected table is being reported", err)
+		if ps := schemaProblems(ctx, t); len(ps) > 0 {
+			t.Errorf("problems = %v, want none -- a properly protected table is being reported", ps)
 		}
 	})
+}
+
+// schemaProblems is CheckOwnerRLS without other tests' scratch tables.
+//
+// go test runs packages in parallel against one database, and cmd/migrate,
+// internal/db and internal/http each create a deliberately unprotected owner
+// table named *scratch* while they run. run() reports those too -- correctly
+// -- so the two "should be clean" assertions here look only at the schema
+// under test and at this test's own probe. The failing cases still go through
+// run(), which is what proves the exit code. (CI's first run on main caught
+// rls_scratch_65 from cmd/migrate in the middle of this test.)
+func schemaProblems(ctx context.Context, t *testing.T) []db.RLSProblem {
+	t.Helper()
+	store, err := db.New(ctx, config.DatabaseURL())
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer store.Close()
+	all, err := store.CheckOwnerRLS(ctx)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	var out []db.RLSProblem
+	for _, p := range all {
+		if !strings.Contains(p.Table, "scratch") {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // createUnprotected makes an owner-owned table, optionally half-configuring its
