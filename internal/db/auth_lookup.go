@@ -121,3 +121,53 @@ func (s *Store) OwnerBySlug(ctx context.Context, slug string) (TenantOwner, erro
 	}
 	return o, nil
 }
+
+// APIKeyLookup is what auth_lookup_api_key returns: enough to verify a
+// presented key and pick its owner, nothing to display (BR-031).
+type APIKeyLookup struct {
+	ID, OwnerID     uuid.UUID
+	KeyHash         string
+	RateLimitPerMin int
+	Revoked         bool
+}
+
+// LookupAPIKey is the third pre-owner read (000018): a key on api.<apex>
+// arrives with no owner context, and api_keys is under RLS.
+func (s *Store) LookupAPIKey(ctx context.Context, prefix string) (APIKeyLookup, error) {
+	var k APIKeyLookup
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, owner_id, key_hash, rate_limit_per_min, revoked_at IS NOT NULL
+		  FROM auth_lookup_api_key($1)`, prefix).
+		Scan(&k.ID, &k.OwnerID, &k.KeyHash, &k.RateLimitPerMin, &k.Revoked)
+	if err != nil {
+		return APIKeyLookup{}, fmt.Errorf("lookup api key: %w", err)
+	}
+	return k, nil
+}
+
+// OwnerByID is OwnerBySlug for the external lane, where the key named the owner.
+func (s *Store) OwnerByID(ctx context.Context, id uuid.UUID) (TenantOwner, error) {
+	var o TenantOwner
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, status = 'active', slug IS NOT NULL AND whatsapp IS NOT NULL AND address IS NOT NULL
+		  FROM owners WHERE id = $1`, id).Scan(&o.ID, &o.Active, &o.Live)
+	if err != nil {
+		return TenantOwner{}, fmt.Errorf("owner by id: %w", err)
+	}
+	return o, nil
+}
+
+// OriginAllowed reports whether origin is in an owner's allowed_origins --
+// one owner's when ownerID is set, any active owner's for a preflight, which
+// carries no key to name one (04-api-spec.md §4.1).
+func (s *Store) OriginAllowed(ctx context.Context, ownerID *uuid.UUID, origin string) (bool, error) {
+	var ok bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM owners
+		                WHERE status = 'active' AND $2 = ANY(allowed_origins)
+		                  AND ($1::uuid IS NULL OR id = $1::uuid))`, ownerID, origin).Scan(&ok)
+	if err != nil {
+		return false, fmt.Errorf("origin allowed: %w", err)
+	}
+	return ok, nil
+}

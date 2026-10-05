@@ -56,6 +56,10 @@ const (
 	CodeDepositAlreadyPaid   = "deposit-already-paid"   // BR-051, S1-042
 	CodeDepositNotApplicable = "deposit-not-applicable" // BR-016, S1-042
 	CodeInvoiceAlreadyPaid   = "invoice-already-paid"   // BR-060, S1-044
+
+	CodeInvalidAPIKey    = "invalid-api-key"    // BR-031, S1-080
+	CodeOriginNotAllowed = "origin-not-allowed" // BR-031, S1-080
+	CodeQuotaExceeded    = "quota-exceeded"     // BR-031, S1-080
 )
 
 // Conflict is one booking that holds a unit over the range somebody asked for.
@@ -191,6 +195,27 @@ func EmailNotVerified() *Error {
 func RateLimited(detail string) *Error {
 	return &Error{Code: CodeRateLimited, Status: http.StatusTooManyRequests,
 		Title: "Too many requests", Detail: detail}
+}
+
+// InvalidAPIKey is a key on api.<apex> that is unknown, malformed or revoked
+// -- one answer for the three (BR-031).
+func InvalidAPIKey() *Error {
+	return &Error{Code: CodeInvalidAPIKey, Status: http.StatusUnauthorized,
+		Title: "Invalid API key", Detail: "The X-API-Key is unknown or has been revoked."}
+}
+
+// OriginNotAllowed is a browser Origin outside the owner's allowed_origins.
+// A browser control, not a security one -- curl never sends it (BR-031).
+func OriginNotAllowed() *Error {
+	return &Error{Code: CodeOriginNotAllowed, Status: http.StatusForbidden,
+		Title:  "Origin not allowed",
+		Detail: "This Origin is not in the business's allowed origins. Add it on the API keys screen."}
+}
+
+// QuotaExceeded is a key past its per-minute quota (BR-031).
+func QuotaExceeded(detail string) *Error {
+	return &Error{Code: CodeQuotaExceeded, Status: http.StatusTooManyRequests,
+		Title: "API key quota exceeded", Detail: detail}
 }
 
 // RequestInFlight is the answer to a repeated Idempotency-Key whose first

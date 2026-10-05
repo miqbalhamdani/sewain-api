@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miqbalhamdani/sewain-api/internal/apikey"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
@@ -32,6 +34,7 @@ type Lanes struct {
 	Apex        string
 	ProxySecret string
 	Store       *db.Store
+	Keys        *apikey.Service
 	Limiter     *ratelimit.Limiter
 	Limits      config.PublicLimits
 }
@@ -93,6 +96,8 @@ func (l Lanes) Middleware(next http.Handler) http.Handler {
 		switch kind {
 		case laneTenant:
 			l.tenant(w, r, next, slug, publicPath, portalPath)
+		case laneExternal:
+			l.external(w, r, next, publicPath)
 		}
 	})
 }
@@ -129,6 +134,60 @@ func (l Lanes) tenant(w http.ResponseWriter, r *http.Request, next http.Handler,
 	next.ServeHTTP(w, r.WithContext(owner.NewContext(r.Context(), o.ID)))
 }
 
+// external: the key names the owner; Host is never a tenant source (BR-032).
+func (l Lanes) external(w http.ResponseWriter, r *http.Request, next http.Handler, publicPath bool) {
+	origin := r.Header.Get("Origin")
+	w.Header().Add("Vary", "Origin") // permissions differ per Origin; caches must not share them
+
+	if r.Method == http.MethodOptions { // preflight: browsers send no key here
+		ok, err := l.Store.OriginAllowed(r.Context(), nil, origin)
+		if err != nil || !ok || !publicPath {
+			writeError(w, r, apperrors.OriginNotAllowed())
+			return
+		}
+		allowCORS(w, origin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "X-API-Key, Content-Type, Idempotency-Key")
+		w.Header().Set("Access-Control-Max-Age", "600")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if !publicPath || l.Keys == nil {
+		writeError(w, r, notFoundPublic())
+		return
+	}
+	key, err := l.Keys.Resolve(r.Context(), r.Header.Get("X-API-Key"))
+	if errors.Is(err, apikey.ErrInvalid) {
+		writeError(w, r, apperrors.InvalidAPIKey())
+		return
+	}
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	if origin != "" {
+		ok, err := l.Store.OriginAllowed(r.Context(), &key.OwnerID, origin)
+		if err != nil || !ok {
+			writeError(w, r, apperrors.OriginNotAllowed())
+			return
+		}
+		allowCORS(w, origin)
+	}
+	o, err := l.Store.OwnerByID(r.Context(), key.OwnerID)
+	if err != nil || !o.Active || !o.Live {
+		writeError(w, r, notFoundPublic())
+		return
+	}
+	if !l.allow(w, r, "apikey:"+key.KeyID.String(), int64(key.RateLimitPerMin), time.Minute, quotaExceeded) {
+		return
+	}
+	next.ServeHTTP(w, r.WithContext(owner.NewContext(r.Context(), key.OwnerID)))
+}
+
+func allowCORS(w http.ResponseWriter, origin string) {
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+}
+
 func (l Lanes) allow(w http.ResponseWriter, r *http.Request, key string, limit int64, window time.Duration,
 	refuse func(string) *apperrors.Error) bool {
 	return allowRate(w, r, l.Limiter, key, limit, window, refuse)
@@ -136,6 +195,10 @@ func (l Lanes) allow(w http.ResponseWriter, r *http.Request, key string, limit i
 
 func rateLimited(wait string) *apperrors.Error {
 	return apperrors.RateLimited("Too many requests. Try again in " + wait + ".")
+}
+
+func quotaExceeded(wait string) *apperrors.Error {
+	return apperrors.QuotaExceeded("This key's per-minute quota is used up. Try again in " + wait + ".")
 }
 
 // portalToken is the {token} segment of /api/v1/portal/bookings/{token}/...

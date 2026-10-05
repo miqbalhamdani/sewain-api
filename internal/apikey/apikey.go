@@ -7,9 +7,11 @@ package apikey
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,10 +32,23 @@ const (
 	prefixLen = 8
 	secretLen = 32
 	alphabet  = "abcdefghijklmnopqrstuvwxyz0123456789"
+	// How long a verified key skips argon2id. Revocation is still read on
+	// every request, so this only saves the hash, never extends a key's life.
+	verifiedTTL = 10 * time.Minute
 )
 
+// ErrInvalid is any key that does not resolve: malformed, unknown, revoked.
+// One answer for all three (invalid-api-key).
+var ErrInvalid = errors.New("invalid api key")
+
 type Service struct {
-	store *db.Store
+	store    *db.Store
+	verified sync.Map // sha256(key) -> verifiedEntry
+}
+
+type verifiedEntry struct {
+	keyID uuid.UUID
+	until time.Time
 }
 
 func New(store *db.Store) *Service { return &Service{store: store} }
@@ -47,6 +62,12 @@ type Key struct {
 	LastUsedAt      *time.Time
 	RevokedAt       *time.Time
 	CreatedAt       time.Time
+}
+
+// Resolved is a presented key that checked out: whose it is and its quota.
+type Resolved struct {
+	KeyID, OwnerID  uuid.UUID
+	RateLimitPerMin int
 }
 
 // Create issues a key and returns its secret -- the only time it exists
@@ -130,6 +151,37 @@ func (s *Service) Revoke(ctx context.Context, id uuid.UUID) error {
 		return apperrors.NotFound("No such API key in this business.")
 	}
 	return nil
+}
+
+// Resolve checks a presented key. The prefix lookup runs every time, so a
+// revoked key fails on its next request; argon2id runs only when this process
+// has not verified that exact key in the last 10 minutes.
+func (s *Service) Resolve(ctx context.Context, presented string) (Resolved, error) {
+	if len(presented) != len(Scheme)+prefixLen+secretLen || !strings.HasPrefix(presented, Scheme) {
+		return Resolved{}, ErrInvalid
+	}
+	k, err := s.store.LookupAPIKey(ctx, presented[len(Scheme):len(Scheme)+prefixLen])
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Resolved{}, ErrInvalid
+	}
+	if err != nil {
+		return Resolved{}, err
+	}
+	if k.Revoked {
+		return Resolved{}, ErrInvalid
+	}
+	sum := sha256.Sum256([]byte(presented))
+	if v, ok := s.verified.Load(sum); !ok || v.(verifiedEntry).keyID != k.ID || time.Now().After(v.(verifiedEntry).until) {
+		if err := auth.VerifyPassword(k.KeyHash, presented); err != nil {
+			return Resolved{}, ErrInvalid
+		}
+		s.verified.Store(sum, verifiedEntry{keyID: k.ID, until: time.Now().Add(verifiedTTL)})
+	}
+	// last_used_at, throttled in the query itself.
+	_ = s.store.InOwnerTx(owner.NewContext(ctx, k.OwnerID), func(tx pgx.Tx) error {
+		return sqlcgen.New(tx).TouchApiKey(ctx, k.ID)
+	})
+	return Resolved{KeyID: k.ID, OwnerID: k.OwnerID, RateLimitPerMin: k.RateLimitPerMin}, nil
 }
 
 func random(n int) string {

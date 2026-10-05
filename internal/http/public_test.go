@@ -281,3 +281,88 @@ func TestPortal(t *testing.T) {
 		t.Errorf("backoffice does not see the renter's proof: %d %s", w.Code, w.Body)
 	}
 }
+
+// S1-079 + S1-080 + BR-031/032: secret once, the four routes only, CORS as a
+// browser control, quota per key, revocation immediate, lanes never crossed.
+func TestAPIKeys(t *testing.T) {
+	ctx := t.Context()
+	store := openAppStore(ctx, t)
+	h := harness{t, newServer(t)}
+	ownerID := uuid.Must(uuid.NewV7())
+	s := seedPublicOwner(ctx, t, store, ownerID)
+	t.Cleanup(func() {
+		c := context.WithoutCancel(ctx)
+		_ = store.InOwnerTx(owner.NewContext(c, ownerID), func(tx pgx.Tx) error {
+			_, err := tx.Exec(c, `DELETE FROM api_keys WHERE owner_id = $1`, ownerID)
+			return err
+		})
+	})
+
+	m := expect(t, h.do(bodyRequest(t, http.MethodPost, "/api/v1/api-keys", s.accessToken,
+		`{"name":"situs uji","rate_limit_per_min":3}`)), http.StatusCreated, "")
+	secret, keyID := m["secret"].(string), m["id"].(string)
+	if !strings.HasPrefix(secret, "swn_live_") || len(secret) != 49 || m["key_prefix"] != secret[9:17] {
+		t.Fatalf("created = %v", m)
+	}
+	if w := h.do(bearerRequest(t, http.MethodGet, "/api/v1/api-keys", s.accessToken)); strings.Contains(w.Body.String(), secret) {
+		t.Errorf("list shows the secret: %s", w.Body)
+	}
+
+	ext := func(method, path, key, origin string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, path, nil)
+		r.Host = "api." + testApex
+		r.Header.Set("X-Proxy-Secret", testProxySecret)
+		r.Header.Set("X-Real-IP", "10.9.9.9")
+		if key != "" {
+			r.Header.Set("X-API-Key", key)
+		}
+		if origin != "" {
+			r.Header.Set("Origin", origin)
+		}
+		return h.do(r)
+	}
+	w := ext(http.MethodGet, "/api/v1/public/resources", secret, "")
+	if w.Code != 200 || !strings.Contains(w.Body.String(), s.marker) {
+		t.Fatalf("catalogue by key = %d %s", w.Code, w.Body)
+	}
+	expect(t, ext(http.MethodGet, "/api/v1/public/resources", "", ""), http.StatusUnauthorized, "invalid-api-key")
+	w = ext(http.MethodGet, "/api/v1/public/resources", secret, "https://elsewhere.test")
+	expect(t, w, http.StatusForbidden, "origin-not-allowed")
+	if !strings.Contains(w.Header().Get("Vary"), "Origin") {
+		t.Errorf("Vary = %q, want Origin", w.Header().Get("Vary"))
+	}
+	expect(t, h.do(bodyRequest(t, http.MethodPatch, "/api/v1/settings", s.accessToken,
+		`{"allowed_origins":["https://rentalbudi.com/path"]}`)), http.StatusUnprocessableEntity, "validation-failed")
+	expect(t, h.do(bodyRequest(t, http.MethodPatch, "/api/v1/settings", s.accessToken,
+		`{"allowed_origins":["https://rentalbudi.test"]}`)), http.StatusOK, "")
+	w = ext(http.MethodGet, "/api/v1/public/resources", secret, "https://rentalbudi.test")
+	if w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != "https://rentalbudi.test" {
+		t.Errorf("allowed origin: %d ACAO=%q", w.Code, w.Header().Get("Access-Control-Allow-Origin"))
+	}
+	w = ext(http.MethodOptions, "/api/v1/public/resources", "", "https://rentalbudi.test")
+	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != "https://rentalbudi.test" {
+		t.Errorf("preflight: %d %v", w.Code, w.Header())
+	}
+
+	// The four routes only; Host never names the tenant here, the key never does there.
+	expect(t, ext(http.MethodGet, "/api/v1/bookings", secret, ""), http.StatusNotFound, "not-found")
+	expect(t, ext(http.MethodGet, "/api/v1/portal/bookings/"+s.portalToken, secret, ""), http.StatusNotFound, "not-found")
+	other := seedPublicOwner(ctx, t, store, uuid.Must(uuid.NewV7()))
+	r := tenantRequest(t, http.MethodGet, "/api/v1/public/resources", other.host, "")
+	r.Header.Set("X-API-Key", secret)
+	if w := h.do(r); !strings.Contains(w.Body.String(), other.marker) || strings.Contains(w.Body.String(), s.marker) {
+		t.Errorf("key changed the tenant on a tenant host: %s", w.Body)
+	}
+
+	// Quota 3/min: two used above, one more, then refused.
+	ext(http.MethodGet, "/api/v1/public/owner", secret, "")
+	expect(t, ext(http.MethodGet, "/api/v1/public/owner", secret, ""), http.StatusTooManyRequests, "quota-exceeded")
+
+	if w := h.do(bearerRequest(t, http.MethodDelete, "/api/v1/api-keys/"+keyID, s.accessToken)); w.Code != http.StatusNoContent {
+		t.Fatalf("revoke = %d %s", w.Code, w.Body)
+	}
+	expect(t, ext(http.MethodGet, "/api/v1/public/owner", secret, ""), http.StatusUnauthorized, "invalid-api-key")
+
+	op := seedUserIn(ctx, t, store, ownerID, "operator")
+	expect(t, h.do(bearerRequest(t, http.MethodGet, "/api/v1/api-keys", op.accessToken)), http.StatusForbidden, "permission-denied")
+}
