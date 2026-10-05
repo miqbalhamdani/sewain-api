@@ -79,8 +79,12 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
        u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
-       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding,
+       b.owner_id, o.slug AS owner_slug
   FROM bookings b
+  -- owners has no RLS; the join only reads this booking's own owner, for the
+  -- portal link (Booking.portal_url, 04-api-spec.md §5).
+  JOIN owners o         ON o.id = b.owner_id
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id
@@ -114,8 +118,12 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
        u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
-       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding,
+       b.owner_id, o.slug AS owner_slug
   FROM bookings b
+  -- owners has no RLS; the join only reads this booking's own owner, for the
+  -- portal link (Booking.portal_url, 04-api-spec.md §5).
+  JOIN owners o         ON o.id = b.owner_id
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id

@@ -53,6 +53,13 @@ type Knobs struct {
 	WhatsApp       *string
 	Address        *string
 	OperatingHours *string
+
+	// Rekening transfer yang ditampilkan portal penyewa (S1-062), dan origin
+	// situs pemilik yang boleh memanggil api.sewain.id dari browser (BR-031).
+	BankName          *string
+	BankAccountNumber *string
+	BankAccountHolder *string
+	AllowedOrigins    []string
 }
 
 // Patch is what a caller is changing. A nil field means the key was absent and
@@ -72,6 +79,12 @@ type Patch struct {
 	WhatsApp       *string
 	Address        *string
 	OperatingHours *string
+
+	BankName          *string
+	BankAccountNumber *string
+	BankAccountHolder *string
+	// nil = absent; an empty slice clears the list.
+	AllowedOrigins []string
 }
 
 // Get reads this rental's knobs. The id comes from the owner context, never
@@ -124,6 +137,10 @@ func (s *Service) Update(ctx context.Context, p Patch) (Knobs, error) {
 			Whatsapp:                   p.WhatsApp,
 			Address:                    p.Address,
 			OperatingHours:             p.OperatingHours,
+			BankName:                   p.BankName,
+			BankAccountNumber:          p.BankAccountNumber,
+			BankAccountHolder:          p.BankAccountHolder,
+			AllowedOrigins:             p.AllowedOrigins,
 		})
 		return err
 	})
@@ -152,6 +169,10 @@ func knobsOf(row sqlcgen.GetSettingsRow) Knobs {
 		WhatsApp:                   row.Whatsapp,
 		Address:                    row.Address,
 		OperatingHours:             row.OperatingHours,
+		BankName:                   row.BankName,
+		BankAccountNumber:          row.BankAccountNumber,
+		BankAccountHolder:          row.BankAccountHolder,
+		AllowedOrigins:             row.AllowedOrigins,
 	}
 }
 
@@ -202,6 +223,11 @@ func translate(err error) error {
 			"A WhatsApp number starts with +62 and has 8 to 13 digits after it, " +
 				"for example +628123456789.").
 			WithFields(apperrors.Field{Name: "whatsapp"}).WithCause(err)
+
+	case "owners_bank_account_number_format":
+		return apperrors.ValidationFailed(
+			"bank_account_number is 5 to 20 digits, with no spaces or dots.").
+			WithFields(apperrors.Field{Name: "bank_account_number"}).WithCause(err)
 
 	case "owners_no_show_tolerance_non_negative":
 		return apperrors.ValidationFailed(

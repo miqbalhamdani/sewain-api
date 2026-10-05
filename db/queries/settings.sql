@@ -5,7 +5,8 @@
 SELECT slug, booking_code_prefix, require_payment_before_pickup,
        draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
        notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
-       whatsapp, address, operating_hours
+       whatsapp, address, operating_hours,
+       bank_name, bank_account_number, bank_account_holder, allowed_origins
   FROM owners
  WHERE id = $1;
 
@@ -26,9 +27,22 @@ UPDATE owners SET
     whatsapp                      = COALESCE(sqlc.narg(whatsapp),                      whatsapp),
     address                       = COALESCE(sqlc.narg(address),                       address),
     operating_hours               = COALESCE(sqlc.narg(operating_hours),               operating_hours),
+    bank_name                     = COALESCE(sqlc.narg(bank_name),                     bank_name),
+    bank_account_number           = COALESCE(sqlc.narg(bank_account_number),           bank_account_number),
+    bank_account_holder           = COALESCE(sqlc.narg(bank_account_holder),           bank_account_holder),
+    allowed_origins               = COALESCE(sqlc.narg(allowed_origins)::text[],       allowed_origins),
     updated_at                    = now()
  WHERE id = sqlc.arg(id)
 RETURNING slug, booking_code_prefix, require_payment_before_pickup,
           draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
           notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
-          whatsapp, address, operating_hours;
+          whatsapp, address, operating_hours,
+          bank_name, bank_account_number, bank_account_holder, allowed_origins;
+
+-- name: GetOwnerProfile :one
+-- What renters see of the business: the public page (BR-096) and the portal's
+-- "cara bayar" (S1-062). owners has no RLS; the id comes from the Host lookup.
+SELECT name, slug, whatsapp, address, operating_hours,
+       bank_name, bank_account_number, bank_account_holder
+  FROM owners
+ WHERE id = $1;

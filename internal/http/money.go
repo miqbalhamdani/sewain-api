@@ -125,7 +125,7 @@ func (s *Server) UploadProof(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			return
 		}
 		userID, _ := auth.UserFromContext(r.Context())
-		p, err := s.bookings.UploadProof(r.Context(), userID, id, body.ObjectKey)
+		p, err := s.bookings.UploadProof(r.Context(), &userID, id, body.ObjectKey)
 		if err != nil {
 			writeError(w, r, err)
 			return

@@ -210,3 +210,74 @@ func TestPublicRateLimits(t *testing.T) {
 		t.Errorf("per token: %d %d", a, b)
 	}
 }
+
+// S1-053 + S1-062 + BR-002: one booking, its money and photos, a proof that
+// reaches the backoffice -- and nothing else, from nowhere else.
+func TestPortal(t *testing.T) {
+	ctx := t.Context()
+	store := openAppStore(ctx, t)
+	h := harness{t, newServer(t)}
+	ownerID := uuid.Must(uuid.NewV7())
+	s := seedPortalOwner(ctx, t, store, ownerID)
+	path := "/api/v1/portal/bookings/" + s.portalToken
+
+	w := h.do(tenantRequest(t, http.MethodGet, path, s.host, ""))
+	m := expect(t, w, http.StatusOK, "")
+	invs, _ := m["invoices"].([]any)
+	if m["code"] != "ISO-0001" || len(invs) != 1 || m["owner"].(map[string]any)["bank"] != nil {
+		t.Errorf("portal = %v", m)
+	}
+	if strings.Contains(w.Body.String(), "ISO-"+ownerID.String()) {
+		t.Errorf("portal shows the unit code (plate): %s", w.Body)
+	}
+	seedExec(ctx, t, store, ownerID, `UPDATE owners SET bank_name = 'BCA', bank_account_number = '1234567890',
+		bank_account_holder = 'Budi' WHERE id = $1`, ownerID)
+	m = expect(t, h.do(tenantRequest(t, http.MethodGet, path, s.host, "")), http.StatusOK, "")
+	if bank, _ := m["owner"].(map[string]any)["bank"].(map[string]any); bank["account_number"] != "1234567890" {
+		t.Errorf("bank = %v", m["owner"])
+	}
+
+	// Staff get the same link to send while WhatsApp is deferred (§5).
+	if bk := expect(t, h.do(bearerRequest(t, http.MethodGet, "/api/v1/bookings/"+s.bookingID, s.accessToken)),
+		http.StatusOK, ""); bk["portal_url"] != "http://"+s.host+"/booking/"+s.portalToken {
+		t.Errorf("portal_url = %v", bk["portal_url"])
+	}
+
+	b := seedPortalOwner(ctx, t, store, uuid.Must(uuid.NewV7()))
+	tampered := s.portalToken[:42] + map[bool]string{true: "A", false: "B"}[s.portalToken[42] != 'A']
+	for name, r := range map[string]*http.Request{
+		"tampered token":        tenantRequest(t, http.MethodGet, "/api/v1/portal/bookings/"+tampered, s.host, ""),
+		"token on another host": tenantRequest(t, http.MethodGet, path, b.host, ""),
+	} {
+		expect(t, h.do(r), http.StatusNotFound, "not-found")
+		_ = name
+	}
+
+	pres := expect(t, h.do(tenantRequest(t, http.MethodPost, path+"/uploads", s.host,
+		`{"content_type":"image/png","bytes":8}`)), http.StatusCreated, "")
+	key := pres["object_key"].(string)
+	if !strings.HasPrefix(key, "pending/"+ownerID.String()+"/"+s.bookingID+"/") {
+		t.Errorf("upload key %q is not scoped to the booking", key)
+	}
+	expect(t, h.do(tenantRequest(t, http.MethodPost, path+"/proofs", s.host,
+		`{"invoice_id":"`+s.invoiceID+`","object_key":"pending/`+ownerID.String()+`/`+uuid.NewString()+`"}`)),
+		http.StatusNotFound, "not-found")
+	expect(t, h.do(tenantRequest(t, http.MethodPost, path+"/proofs", s.host,
+		`{"invoice_id":"`+uuid.NewString()+`","object_key":"`+key+`"}`)), http.StatusNotFound, "not-found")
+
+	put, _ := http.NewRequestWithContext(ctx, http.MethodPut, pres["upload_url"].(string), bytes.NewReader([]byte("PNGPROOF")))
+	put.Header.Set("Content-Type", "image/png")
+	if res, err := http.DefaultClient.Do(put); err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("PUT to storage: %v %v", err, res)
+	}
+	expect(t, h.do(tenantRequest(t, http.MethodPost, path+"/proofs", s.host,
+		`{"invoice_id":"`+s.invoiceID+`","object_key":"`+key+`"}`)), http.StatusAccepted, "")
+	m = expect(t, h.do(tenantRequest(t, http.MethodGet, path, s.host, "")), http.StatusOK, "")
+	if inv := m["invoices"].([]any)[0].(map[string]any); inv["proof_pending"] != true || inv["status"] != "unpaid" {
+		t.Errorf("after upload: %v (a proof never pays anything by itself)", inv)
+	}
+	if w := h.do(bearerRequest(t, http.MethodGet, "/api/v1/invoices/"+s.invoiceID+"/proofs", s.accessToken)); w.Code != 200 ||
+		!strings.Contains(w.Body.String(), `"review_status":"pending"`) {
+		t.Errorf("backoffice does not see the renter's proof: %d %s", w.Code, w.Body)
+	}
+}

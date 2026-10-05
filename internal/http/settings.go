@@ -62,6 +62,10 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
 		WhatsApp:                   body.Whatsapp,
 		Address:                    body.Address,
 		OperatingHours:             body.OperatingHours,
+		BankName:                   body.BankName,
+		BankAccountNumber:          body.BankAccountNumber,
+		BankAccountHolder:          body.BankAccountHolder,
+		AllowedOrigins:             originsOf(body.AllowedOrigins),
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -87,5 +91,21 @@ func settingsBody(k settings.Knobs) Settings {
 		Whatsapp:                   k.WhatsApp,
 		Address:                    k.Address,
 		OperatingHours:             k.OperatingHours,
+		BankName:                   k.BankName,
+		BankAccountNumber:          k.BankAccountNumber,
+		BankAccountHolder:          k.BankAccountHolder,
+		AllowedOrigins:             k.AllowedOrigins,
 	}
+}
+
+// originsOf keeps "absent" (nil) apart from "cleared" (empty, non-nil): the
+// query COALESCEs on nil, and an empty list must still reach the column.
+func originsOf(v *[]string) []string {
+	if v == nil {
+		return nil
+	}
+	if *v == nil {
+		return []string{}
+	}
+	return *v
 }
