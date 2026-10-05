@@ -1,0 +1,147 @@
+# The bar for every change, automated.  (S1-069)
+#
+# make check is the same command a developer runs locally -- generate +
+# generated-diff (contract drift against sewain-docs main), fmt, vet, lint,
+# lint-imports, lint-rls, test (owner isolation included), test-race -- against
+# real PostgreSQL 18, Redis and MinIO, never mocks and never docker-in-docker.
+#
+# Layout matters: the Makefile reads the contract at ../docs, so this repo is
+# checked out at $GITHUB_WORKSPACE/sewain-api and sewain-docs beside it.
+#
+# The nightly run is for drift: a contract change lands in sewain-docs first,
+# and this repo goes red until it is regenerated.
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 22 * * *" # 05:00 WIB
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgres://postgres@localhost:5432/sewain_ci?sslmode=disable
+  APP_DATABASE_URL: postgres://app_user@localhost:5432/sewain_ci?sslmode=disable
+  REDIS_URL: redis://localhost:6379/0
+  OBJECT_STORE_URL: http://localhost:9000
+  ENVIRONMENT: development
+  PGHOST: localhost
+  PGUSER: postgres
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          # app_user is created by migration 000001 with no password, exactly
+          # as on a developer's machine.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:8
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run:
+        working-directory: sewain-api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sewain-api
+          fetch-depth: 0 # the snapshot migration needs the base commit
+      - uses: actions/checkout@v4
+        with:
+          repository: miqbalhamdani/sewain-docs
+          path: docs
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sewain-api/go.mod
+          cache-dependency-path: sewain-api/go.sum
+
+      # MinIO no longer publishes images (minio/minio is gone from Docker Hub),
+      # so it comes from Homebrew's Linux bottle -- the same formula, and the
+      # same release, developers install locally.
+      - name: MinIO
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install minio
+          mkdir -p "$RUNNER_TEMP/minio"
+          nohup minio server "$RUNNER_TEMP/minio" --address :9000 > "$RUNNER_TEMP/minio.log" 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && break; sleep 1; done
+          curl -sf http://localhost:9000/minio/health/live
+
+      # Pinned: sqlc stamps its version into every generated file, so another
+      # version is a diff that is not drift.
+      - name: Tools
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.13.2
+
+      - name: Database
+        run: createdb sewain_ci
+
+      # "Migrasi di snapshot": apply the previous release's migrations first,
+      # then this commit's on top -- the path production takes, not just a
+      # fresh database. The base is the PR base, else where this branch left
+      # main, else main's previous commit.
+      - name: Migration on a snapshot
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$base" ]; then
+            base=$(git merge-base HEAD origin/main)
+            [ "$base" = "$(git rev-parse HEAD)" ] && base=$(git rev-parse HEAD~1)
+          fi
+          echo "snapshot from $base"
+          git worktree add -q ../snapshot "$base"
+          (cd ../snapshot && go run ./cmd/migrate)
+          go run ./cmd/migrate
+
+      - name: Object storage
+        run: make storage-init
+
+      - name: make check
+        run: make check
+
+  verify-sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: miqbalhamdani/sewain-docs
+          path: docs
+      # The constraints this schema promises, executed (03-erd.md section 3). A
+      # migration that drops one is caught by lint-rls and the tests; a contract
+      # that drops one is caught here.
+      - name: docs verify scripts
+        working-directory: docs
+        run: |
+          for f in 03-verify-constraints.sql 03-verify-overlap-constraint.sql; do
+            db="scratch_$(basename "$f" .sql | tr '-' '_')"
+            createdb "$db"
+            echo "::group::$f"
+            psql -X -v ON_ERROR_STOP=1 -d "$db" -f "$f"
+            echo "::endgroup::"
+          done
