@@ -142,6 +142,10 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, role, status *st
 
 	var row sqlcgen.UpdateUserRow
 	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
+		losesOwner := (role != nil && *role == RoleOperator) || (status != nil && *status == "disabled")
+		if err := guardOwners(ctx, sqlcgen.New(tx), id, losesOwner); err != nil {
+			return err
+		}
 		var err error
 		row, err = sqlcgen.New(tx).UpdateUser(ctx, sqlcgen.UpdateUserParams{
 			ID: id, Role: role, Status: status,
@@ -167,6 +171,9 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, role, status *st
 func (s *Service) DisableUser(ctx context.Context, id uuid.UUID) error {
 	return s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
 		q := sqlcgen.New(tx)
+		if err := guardOwners(ctx, q, id, true); err != nil {
+			return err
+		}
 
 		affected, err := q.DisableUser(ctx, id)
 		if err != nil {
@@ -188,6 +195,26 @@ func (s *Service) DisableUser(ctx context.Context, id uuid.UUID) error {
 		}
 		return nil // already disabled; deleting twice is still deleted
 	})
+}
+
+// guardOwners refuses a change that takes owner access from the caller
+// themselves, or from the rental's last active owner -- either locks the
+// business out of its own settings for good (S1-067).
+func guardOwners(ctx context.Context, q *sqlcgen.Queries, id uuid.UUID, losesOwner bool) error {
+	if !losesOwner {
+		return nil
+	}
+	if self, _ := UserFromContext(ctx); self == id {
+		return apperrors.ValidationFailed("You cannot disable or demote your own account.")
+	}
+	owners, err := q.LockActiveOwners(ctx)
+	if err != nil {
+		return fmt.Errorf("lock owners: %w", err)
+	}
+	if len(owners) == 1 && owners[0] == id {
+		return apperrors.ValidationFailed("A business needs at least one active owner.")
+	}
+	return nil
 }
 
 func notFoundUser() error {
