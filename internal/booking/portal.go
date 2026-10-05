@@ -53,7 +53,9 @@ func (p PortalLinks) Token(ownerID, bookingID uuid.UUID) string {
 
 // Parse returns the booking a token names, if it was minted for this owner.
 func (p PortalLinks) Parse(ownerID uuid.UUID, token string) (uuid.UUID, bool) {
-	raw, err := base64.RawURLEncoding.DecodeString(token)
+	// Strict: one spelling per token. A lenient decoder ignores the two
+	// padding bits in the last character, so four strings would open one booking.
+	raw, err := base64.RawURLEncoding.Strict().DecodeString(token)
 	if err != nil || len(raw) != 16+portalMACBytes {
 		return uuid.Nil, false
 	}

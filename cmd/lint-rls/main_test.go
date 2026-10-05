@@ -19,6 +19,11 @@ import (
 // The order matters. The clean run has to pass first -- it is what proves a
 // failure in the second half is the unprotected table rather than a database
 // that was never reachable.
+// probe follows the convention every test-made owner table here shares: its
+// name contains "scratch", so schema-wide checks running in parallel can tell
+// it from the schema under test.
+const probe = "lint_rls_scratch"
+
 func TestLintRLS(t *testing.T) {
 	ctx := t.Context()
 
@@ -58,7 +63,7 @@ func TestLintRLS(t *testing.T) {
 		},
 	} {
 		t.Run("fails when an owner table has "+tt.name, func(t *testing.T) {
-			createUnprotected(ctx, t, conn, "lint_rls_probe", tt.setup)
+			createUnprotected(ctx, t, conn, probe, tt.setup)
 
 			if err := run(ctx); err == nil {
 				t.Error("run() = nil, want an error -- lint-rls would have exited 0 " +
@@ -68,7 +73,7 @@ func TestLintRLS(t *testing.T) {
 	}
 
 	t.Run("passes again once the table is protected", func(t *testing.T) {
-		table := createUnprotected(ctx, t, conn, "lint_rls_probe", ``)
+		table := createUnprotected(ctx, t, conn, probe, ``)
 		if _, err := conn.Exec(ctx, `SELECT enable_owner_rls($1)`, table); err != nil {
 			t.Fatalf("enable_owner_rls: %v", err)
 		}
@@ -79,7 +84,8 @@ func TestLintRLS(t *testing.T) {
 	})
 }
 
-// schemaProblems is CheckOwnerRLS without other tests' scratch tables.
+// schemaProblems is CheckOwnerRLS without other tests' scratch tables -- but
+// with this test's own probe.
 //
 // go test runs packages in parallel against one database, and cmd/migrate,
 // internal/db and internal/http each create a deliberately unprotected owner
@@ -101,7 +107,7 @@ func schemaProblems(ctx context.Context, t *testing.T) []db.RLSProblem {
 	}
 	var out []db.RLSProblem
 	for _, p := range all {
-		if !strings.Contains(p.Table, "scratch") {
+		if p.Table == probe || !strings.Contains(p.Table, "scratch") {
 			out = append(out, p)
 		}
 	}

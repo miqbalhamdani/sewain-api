@@ -115,6 +115,12 @@ func TestBootstrapMigration(t *testing.T) {
 			t.Fatalf("check owner RLS: %v", err)
 		}
 		for _, p := range problems {
+			// Other packages' tests make deliberately unprotected owner tables
+			// named *scratch* while this one runs (go test runs packages in
+			// parallel against one database). They are not the schema.
+			if strings.Contains(p.Table, "scratch") {
+				continue
+			}
 			t.Error(p)
 		}
 	})
