@@ -32,6 +32,8 @@ import (
 
 	httpapi "github.com/miqbalhamdani/sewain-api/internal/http"
 
+	"github.com/miqbalhamdani/sewain-api/internal/apikey"
+
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
@@ -50,7 +52,14 @@ import (
 const (
 	isoSigningKey = "isolation-suite-signing-key-32-bytes"
 	isoPassword   = "isolation suite password"
+
+	// M5: the tokenless lanes (S1-051). Tests are "behind Caddy" by sending
+	// the secret themselves; leaving it off is the forged-Host case.
+	testApex        = "sewain.test"
+	testProxySecret = "test-proxy-secret"
 )
+
+var testPortal = booking.NewPortalLinks("test-portal-secret", "http://%s.sewain.test")
 
 // route is one method-and-pattern pair registered on the router.
 type route struct {
@@ -85,6 +94,10 @@ type seeded struct {
 	customerID string
 	bookingID  string
 	invoiceID  string
+
+	// M5: the tenant host and the portal token, set by seedPublicOwner.
+	host        string
+	portalToken string
 }
 
 // isolationCase says how to exercise one route as owner A after owner B owns
@@ -324,6 +337,13 @@ func requestAsOwner(t *testing.T, id uuid.UUID) *http.Request {
 // against a wiring that only exists in tests.
 var newServer = func(t *testing.T) http.Handler {
 	t.Helper()
+	return newServerWith(t, config.PublicRateLimits())
+}
+
+// newServerWith is newServer with the public limits a test chooses -- the
+// rate-limit tests need small ones.
+func newServerWith(t *testing.T, limits config.PublicLimits) http.Handler {
+	t.Helper()
 
 	store, err := db.New(t.Context(), config.AppDatabaseURL())
 	if err != nil {
@@ -361,10 +381,15 @@ var newServer = func(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 
+	keys := apikey.New(store)
 	return httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(store), catalog.New(store),
 			customers, booking.New(store, objects).WithJobs(jobs.NewQueue(redis.Raw(), testJobs), booking.NoScanner{}), objects,
-			ratelimit.New(redis), false), signer, redis)
+			jobs.NewQueue(redis.Raw(), testJobs), ratelimit.New(redis), false).
+			WithPublic(testPortal, keys),
+		signer, redis,
+		httpapi.Lanes{Apex: testApex, ProxySecret: testProxySecret, Store: store, Keys: keys,
+			Limiter: ratelimit.New(redis), Limits: limits})
 }
 
 // --- fixtures --------------------------------------------------------------

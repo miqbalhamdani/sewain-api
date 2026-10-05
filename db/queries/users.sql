@@ -29,6 +29,11 @@ RETURNING id, email, name, role, status, last_login_at;
 UPDATE users SET status = 'disabled', updated_at = now()
  WHERE id = $1 AND status <> 'disabled';
 
+-- name: LockActiveOwners :many
+-- FOR UPDATE so two owners demoting each other at once queue up: the second
+-- re-reads after the first commits and sees one owner left (S1-067).
+SELECT id FROM users WHERE role = 'owner' AND status = 'active' FOR UPDATE;
+
 -- name: UserExists :one
 -- Distinguishes "already disabled" (204, idempotent) from "not in this rental"
 -- (404). DisableUser alone cannot: both return zero rows.

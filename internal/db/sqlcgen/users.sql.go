@@ -118,6 +118,32 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 	return items, nil
 }
 
+const lockActiveOwners = `-- name: LockActiveOwners :many
+SELECT id FROM users WHERE role = 'owner' AND status = 'active' FOR UPDATE
+`
+
+// FOR UPDATE so two owners demoting each other at once queue up: the second
+// re-reads after the first commits and sees one owner left (S1-067).
+func (q *Queries) LockActiveOwners(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockActiveOwners)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users SET
     role       = COALESCE($1,   role),

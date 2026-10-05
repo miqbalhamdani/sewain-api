@@ -1,0 +1,124 @@
+package httpapi_test
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/miqbalhamdani/sewain-api/internal/auth"
+	"github.com/miqbalhamdani/sewain-api/internal/db"
+	"github.com/miqbalhamdani/sewain-api/internal/owner"
+)
+
+// M5 phase A over HTTP: the dashboard by role, the export job, the team
+// guards. (S1-056, S1-057, S1-063, S1-067)
+
+// seedUserIn adds a signed-in user of the given role to an existing rental.
+func seedUserIn(ctx context.Context, t *testing.T, store *db.Store, ownerID uuid.UUID, role string) seeded {
+	t.Helper()
+	id := uuid.Must(uuid.NewV7())
+	email := fmt.Sprintf("m5-%s@example.com", id)
+	hash, err := auth.HashPassword(isoPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	octx := owner.NewContext(ctx, ownerID)
+	if err := store.InOwnerTx(octx, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO users (id, owner_id, email, password_hash, name, role, status, email_verified_at)
+		                        VALUES ($1, $2, $3, $4, 'M5 user', $5, 'active', now())`, id, ownerID, email, hash, role)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		c := context.WithoutCancel(ctx)
+		_ = store.InOwnerTx(owner.NewContext(c, ownerID), func(tx pgx.Tx) error {
+			_, err := tx.Exec(c, `DELETE FROM users WHERE id = $1`, id)
+			return err
+		})
+	})
+	signer, err := auth.NewSigner(isoSigningKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := auth.NewService(store, signer).Login(ctx, email, isoPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return seeded{userID: id.String(), accessToken: session.AccessToken}
+}
+
+// S1-063: both roles see the work; only the owner sees money and failed jobs
+// (BR-003), and an operator is refused the reports outright.
+func TestDashboardByRole(t *testing.T) {
+	c := newBookingClient(t)
+	c.exec(`UPDATE bookings SET status = 'picked_up' WHERE id = $1`, c.s.bookingID) // ended 5 Sep 2026: overdue
+
+	m := expect(t, c.do(http.MethodGet, "/api/v1/dashboard", ""), http.StatusOK, "")
+	overdue, _ := m["overdue"].([]any)
+	if len(overdue) != 1 || overdue[0].(map[string]any)["code"] != "ISO-0001" {
+		t.Errorf("owner overdue = %v", m["overdue"])
+	}
+	if _, ok := m["revenue_this_month"].(float64); !ok {
+		t.Errorf("owner revenue_this_month = %v, want a number", m["revenue_this_month"])
+	}
+	if _, ok := m["failed_jobs"].([]any); !ok {
+		t.Errorf("owner failed_jobs = %v, want a list", m["failed_jobs"])
+	}
+
+	op := c
+	op.token = seedUserIn(t.Context(), t, c.store, c.ownerID, "operator").accessToken
+	m = expect(t, op.do(http.MethodGet, "/api/v1/dashboard", ""), http.StatusOK, "")
+	if m["revenue_this_month"] != nil || m["failed_jobs"] != nil {
+		t.Errorf("operator sees revenue %v / failed jobs %v, want both null", m["revenue_this_month"], m["failed_jobs"])
+	}
+	if overdue, _ := m["overdue"].([]any); len(overdue) != 1 {
+		t.Errorf("operator overdue = %v, want the same work list", m["overdue"])
+	}
+	expect(t, op.do(http.MethodGet, "/api/v1/reports/revenue?from=2026-09-01T00:00:00Z&to=2026-10-01T00:00:00Z", ""),
+		http.StatusForbidden, "permission-denied")
+}
+
+// S1-057: an export is queued and answered at once; its job is readable, a
+// bad request is refused before anything is queued.
+func TestExportJob(t *testing.T) {
+	c := newBookingClient(t)
+	const period = `"from":"2026-09-01T00:00:00+07:00","to":"2026-10-01T00:00:00+07:00"`
+
+	m := expect(t, c.do(http.MethodPost, "/api/v1/reports/export", `{"report":"revenue","format":"xlsx",`+period+`}`),
+		http.StatusAccepted, "")
+	id, _ := m["job_id"].(string)
+	job := expect(t, c.do(http.MethodGet, "/api/v1/jobs/"+id, ""), http.StatusOK, "")
+	if job["status"] != "queued" || job["download_url"] != nil {
+		t.Errorf("fresh job = %v, want queued with no link", job)
+	}
+
+	expect(t, c.do(http.MethodPost, "/api/v1/reports/export", `{"report":"revenue","format":"pdf",`+period+`}`),
+		http.StatusUnprocessableEntity, "validation-failed")
+	expect(t, c.do(http.MethodPost, "/api/v1/reports/export", `{"report":"payroll","format":"csv",`+period+`}`),
+		http.StatusUnprocessableEntity, "validation-failed")
+	expect(t, c.do(http.MethodGet, "/api/v1/jobs/"+uuid.NewString(), ""), http.StatusNotFound, "not-found")
+}
+
+// S1-067: an owner cannot demote or disable themselves, and the rental never
+// loses its last active owner -- not even to a second owner whose token
+// outlives their own disabling.
+func TestTeamGuards(t *testing.T) {
+	c := newBookingClient(t)
+	self := c.s.userID
+
+	expect(t, c.do(http.MethodPatch, "/api/v1/users/"+self, `{"role":"operator"}`), http.StatusUnprocessableEntity, "validation-failed")
+	expect(t, c.do(http.MethodDelete, "/api/v1/users/"+self, ""), http.StatusUnprocessableEntity, "validation-failed")
+
+	second := seedUserIn(t.Context(), t, c.store, c.ownerID, "owner")
+	if w := c.do(http.MethodDelete, "/api/v1/users/"+second.userID, ""); w.Code != http.StatusNoContent {
+		t.Fatalf("disabling another owner = %d, want 204; body=%s", w.Code, w.Body)
+	}
+	stale := c
+	stale.token = second.accessToken
+	expect(t, stale.do(http.MethodDelete, "/api/v1/users/"+self, ""), http.StatusUnprocessableEntity, "validation-failed")
+}

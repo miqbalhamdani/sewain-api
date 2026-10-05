@@ -31,6 +31,17 @@ func (q *Queries) CancelInvoice(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const cancelInvoicesOfBookings = `-- name: CancelInvoicesOfBookings :exec
+UPDATE invoices SET status = 'cancelled', updated_at = now()
+ WHERE booking_id = ANY($1::uuid[])
+   AND status IN ('unpaid', 'gateway_pending', 'overdue') AND deleted_at IS NULL
+`
+
+func (q *Queries) CancelInvoicesOfBookings(ctx context.Context, bookingIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, cancelInvoicesOfBookings, bookingIds)
+	return err
+}
+
 const completeBooking = `-- name: CompleteBooking :exec
 UPDATE bookings SET status = 'completed', updated_at = now() WHERE id = $1
 `
@@ -84,6 +95,78 @@ func (q *Queries) DepositInvoice(ctx context.Context, bookingID *uuid.UUID) (Dep
 	var i DepositInvoiceRow
 	err := row.Scan(&i.ID, &i.Status)
 	return i, err
+}
+
+const expireDrafts = `-- name: ExpireDrafts :many
+
+UPDATE bookings b SET status = 'cancelled', cancelled_reason = 'expired', updated_at = now()
+ WHERE b.status = 'draft' AND b.expires_at IS NOT NULL AND b.expires_at < $1::timestamptz
+   AND b.deleted_at IS NULL
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id)
+RETURNING b.id
+`
+
+// ── S1-052: kedaluwarsa. Set-based, conditional, idempotent: a second run
+// finds nothing left to change. None of them touches a booking that already
+// has a handovers row (BR-057) -- once the unit has moved, only a person
+// decides what happens next.
+// BR-027: a draft past its expires_at is cancelled 'expired'. Drafts never
+// carry an invoice, so nothing else moves.
+func (q *Queries) ExpireDrafts(ctx context.Context, now time.Time) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, expireDrafts, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const expireUnpaidReserved = `-- name: ExpireUnpaidReserved :many
+UPDATE bookings b SET status = 'cancelled', cancelled_reason = 'payment_expired', updated_at = now()
+  FROM owners o
+ WHERE o.id = b.owner_id AND o.require_payment_before_pickup
+   AND b.status = 'reserved' AND b.deleted_at IS NULL
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id)
+   AND EXISTS (SELECT 1 FROM invoices i
+                 JOIN invoice_lines l ON l.invoice_id = i.id AND l.kind = 'rent'
+                WHERE i.booking_id = b.id AND i.deleted_at IS NULL
+                  AND i.status IN ('unpaid', 'overdue') AND i.due_at < $1::timestamptz)
+RETURNING b.id
+`
+
+// BR-057 + BR-038, switch ON: reserved, rent invoice still unpaid past its
+// due_at -> cancelled 'payment_expired'. The caller cancels the unpaid
+// invoices through CancelInvoicesOfBookings -- the same rule as a manual
+// cancel (BR-057 revision 3 Oct). Switch OFF never reaches here.
+func (q *Queries) ExpireUnpaidReserved(ctx context.Context, now time.Time) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, expireUnpaidReserved, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const findConflicts = `-- name: FindConflicts :many
@@ -253,8 +336,12 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
        u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
-       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding,
+       b.owner_id, o.slug AS owner_slug
   FROM bookings b
+  -- owners has no RLS; the join only reads this booking's own owner, for the
+  -- portal link (Booking.portal_url, 04-api-spec.md §5).
+  JOIN owners o         ON o.id = b.owner_id
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id
@@ -311,6 +398,8 @@ type GetBookingRow struct {
 	NOverdue            int32
 	NUnpaid             int32
 	Outstanding         int64
+	OwnerID             uuid.UUID
+	OwnerSlug           *string
 }
 
 func (q *Queries) GetBooking(ctx context.Context, id uuid.UUID) (GetBookingRow, error) {
@@ -353,6 +442,8 @@ func (q *Queries) GetBooking(ctx context.Context, id uuid.UUID) (GetBookingRow, 
 		&i.NOverdue,
 		&i.NUnpaid,
 		&i.Outstanding,
+		&i.OwnerID,
+		&i.OwnerSlug,
 	)
 	return i, err
 }
@@ -381,17 +472,31 @@ func (q *Queries) GetCustomerBlacklisted(ctx context.Context, id uuid.UUID) (boo
 	return is_blacklisted, err
 }
 
+const getDraftExpiryHours = `-- name: GetDraftExpiryHours :one
+SELECT draft_expiry_hours FROM owners WHERE id = $1
+`
+
+// BR-027: a public draft's life, per owner. owners has no RLS, hence the WHERE.
+func (q *Queries) GetDraftExpiryHours(ctx context.Context, id uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, getDraftExpiryHours, id)
+	var draft_expiry_hours int32
+	err := row.Scan(&draft_expiry_hours)
+	return draft_expiry_hours, err
+}
+
 const insertBooking = `-- name: InsertBooking :exec
 INSERT INTO bookings (id, owner_id, created_by, code, customer_id, resource_id,
                       resource_unit_id, start_at, end_at,
                       status, source, unit_price, pricing_unit, buffer_minutes,
-                      duration_qty, subtotal, deposit_amount, late_fee_per_unit)
+                      duration_qty, subtotal, deposit_amount, late_fee_per_unit,
+                      expires_at)
 VALUES ($1, $2, $3, $4,
         $5, $6, $7,
         $8, $9,
         $10, $11, $12,
         $13, $14, $15,
-        $16, $17, $18)
+        $16, $17, $18,
+        $19)
 `
 
 type InsertBookingParams struct {
@@ -413,6 +518,7 @@ type InsertBookingParams struct {
 	Subtotal       int64
 	DepositAmount  *int64
 	LateFeePerUnit *int64
+	ExpiresAt      *time.Time
 }
 
 // end_at_with_buffer is not in the column list: the BEFORE trigger fills it,
@@ -437,6 +543,7 @@ func (q *Queries) InsertBooking(ctx context.Context, arg InsertBookingParams) er
 		arg.Subtotal,
 		arg.DepositAmount,
 		arg.LateFeePerUnit,
+		arg.ExpiresAt,
 	)
 	return err
 }
@@ -554,8 +661,12 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
        u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
-       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding,
+       b.owner_id, o.slug AS owner_slug
   FROM bookings b
+  -- owners has no RLS; the join only reads this booking's own owner, for the
+  -- portal link (Booking.portal_url, 04-api-spec.md §5).
+  JOIN owners o         ON o.id = b.owner_id
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id
@@ -640,6 +751,8 @@ type ListBookingsRow struct {
 	NOverdue            int32
 	NUnpaid             int32
 	Outstanding         int64
+	OwnerID             uuid.UUID
+	OwnerSlug           *string
 }
 
 // from/to select bookings that OVERLAP the window, not ones that start in it.
@@ -704,6 +817,8 @@ func (q *Queries) ListBookings(ctx context.Context, arg ListBookingsParams) ([]L
 			&i.NOverdue,
 			&i.NUnpaid,
 			&i.Outstanding,
+			&i.OwnerID,
+			&i.OwnerSlug,
 		); err != nil {
 			return nil, err
 		}
@@ -940,6 +1055,41 @@ func (q *Queries) LockBookingForHandover(ctx context.Context, id uuid.UUID) (Loc
 		&i.RequirePaymentBeforePickup,
 	)
 	return i, err
+}
+
+const markInvoicesOverdue = `-- name: MarkInvoicesOverdue :execrows
+UPDATE invoices SET status = 'overdue', updated_at = now()
+ WHERE status = 'unpaid' AND due_at < $1::timestamptz AND deleted_at IS NULL
+`
+
+// BR-056: unpaid past due_at is 'overdue' -- a stored invoice status, unlike a
+// booking's overdue, which is derived. With the switch off this is all that
+// happens to an unpaid booking (BR-038).
+func (q *Queries) MarkInvoicesOverdue(ctx context.Context, now time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, markInvoicesOverdue, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markNoShows = `-- name: MarkNoShows :execrows
+UPDATE bookings b SET status = 'no_show', updated_at = now()
+  FROM owners o
+ WHERE o.id = b.owner_id
+   AND b.status = 'reserved' AND b.deleted_at IS NULL
+   AND b.start_at + make_interval(hours => o.no_show_tolerance_hours) < $1::timestamptz
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id)
+`
+
+// BR-057: reserved and still not picked up past start_at plus the owner's
+// tolerance (default 3h, may be 0). A no_show is not refused at pickup later.
+func (q *Queries) MarkNoShows(ctx context.Context, now time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, markNoShows, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const markPickedUp = `-- name: MarkPickedUp :exec

@@ -343,6 +343,35 @@ func (q *Queries) MarkInvoicePaid(ctx context.Context, arg MarkInvoicePaidParams
 	return err
 }
 
+const pendingProofInvoices = `-- name: PendingProofInvoices :many
+SELECT DISTINCT p.invoice_id
+  FROM payment_proofs p
+  JOIN invoices i ON i.id = p.invoice_id
+ WHERE i.booking_id = $1 AND p.review_status = 'pending'
+`
+
+// Invoices of one booking with a proof still waiting for a person (BR-062): the
+// portal says "menunggu dicek" instead of inviting a second upload.
+func (q *Queries) PendingProofInvoices(ctx context.Context, bookingID *uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, pendingProofInvoices, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var invoice_id uuid.UUID
+		if err := rows.Scan(&invoice_id); err != nil {
+			return nil, err
+		}
+		items = append(items, invoice_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const rejectProof = `-- name: RejectProof :exec
 UPDATE payment_proofs SET review_status = 'rejected', reviewed_by = $2, reviewed_at = now(), reject_reason = $3
  WHERE id = $1

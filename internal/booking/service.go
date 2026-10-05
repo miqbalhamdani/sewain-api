@@ -77,6 +77,10 @@ type Booking struct {
 	DepositDeducted  int64
 	DepositRefunded  int64
 
+	// The portal link is built from these (04-api-spec.md §5).
+	OwnerID   uuid.UUID
+	OwnerSlug *string
+
 	CustomerID          uuid.UUID
 	CustomerName        string
 	CustomerPhone       string
@@ -514,5 +518,6 @@ func bookingOf(r sqlcgen.GetBookingRow) Booking {
 		CustomerBlacklisted: r.CustomerBlacklisted,
 		ResourceID:          r.ResourceID, ResourceName: r.ResourceName,
 		UnitID: r.UnitID, UnitCode: r.UnitCode, UnitLabel: r.UnitLabel,
+		OwnerID: r.OwnerID, OwnerSlug: r.OwnerSlug,
 	}
 }

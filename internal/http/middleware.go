@@ -126,8 +126,11 @@ var routeAccessTable = map[string]routeAccess{
 	// route -- adding it without the flag is the mistake this list exists to
 	// make visible:
 	//
-	//   S1-051  POST /public/bookings
 	//           POST /invoices/{id}/lines   (discount lines, owner)
+
+	// S1-051: the one write on the public surface. Its owner comes from Host
+	// (Lanes runs first), which is what scopes the key.
+	"POST /api/v1/public/bookings": {idempotent: true},
 }
 
 // accessFor looks a request up by its route pattern. Every path parameter in
@@ -143,7 +146,14 @@ func accessFor(r *http.Request) routeAccess {
 			segs[i] = "{id}"
 		}
 	}
-	return routeAccessTable[r.Method+" "+strings.Join(segs, "/")]
+	a := routeAccessTable[r.Method+" "+strings.Join(segs, "/")]
+	// The public surface and the portal never carry a session: their owner
+	// came from Host or an API key, through Lanes (BR-030). A prefix rule, not
+	// table rows, because the portal's {token} is not a UUID.
+	if strings.HasPrefix(r.URL.Path, BasePath+"/public/") || strings.HasPrefix(r.URL.Path, BasePath+"/portal/") {
+		a.noAuth, a.preVerification = true, true
+	}
+	return a
 }
 
 // RequireVerifiedEmail is the gate on the whole backoffice (BR-006).

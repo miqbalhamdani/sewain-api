@@ -11,11 +11,48 @@ import (
 	"github.com/google/uuid"
 )
 
+const getOwnerProfile = `-- name: GetOwnerProfile :one
+SELECT name, slug, whatsapp, address, operating_hours,
+       bank_name, bank_account_number, bank_account_holder
+  FROM owners
+ WHERE id = $1
+`
+
+type GetOwnerProfileRow struct {
+	Name              string
+	Slug              *string
+	Whatsapp          *string
+	Address           *string
+	OperatingHours    *string
+	BankName          *string
+	BankAccountNumber *string
+	BankAccountHolder *string
+}
+
+// What renters see of the business: the public page (BR-096) and the portal's
+// "cara bayar" (S1-062). owners has no RLS; the id comes from the Host lookup.
+func (q *Queries) GetOwnerProfile(ctx context.Context, id uuid.UUID) (GetOwnerProfileRow, error) {
+	row := q.db.QueryRow(ctx, getOwnerProfile, id)
+	var i GetOwnerProfileRow
+	err := row.Scan(
+		&i.Name,
+		&i.Slug,
+		&i.Whatsapp,
+		&i.Address,
+		&i.OperatingHours,
+		&i.BankName,
+		&i.BankAccountNumber,
+		&i.BankAccountHolder,
+	)
+	return i, err
+}
+
 const getSettings = `-- name: GetSettings :one
 SELECT slug, booking_code_prefix, require_payment_before_pickup,
        draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
        notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
-       whatsapp, address, operating_hours
+       whatsapp, address, operating_hours,
+       bank_name, bank_account_number, bank_account_holder, allowed_origins
   FROM owners
  WHERE id = $1
 `
@@ -33,6 +70,10 @@ type GetSettingsRow struct {
 	Whatsapp                   *string
 	Address                    *string
 	OperatingHours             *string
+	BankName                   *string
+	BankAccountNumber          *string
+	BankAccountHolder          *string
+	AllowedOrigins             []string
 }
 
 // Runs inside InOwnerTx like everything else, but owners has no RLS (it IS the
@@ -54,6 +95,10 @@ func (q *Queries) GetSettings(ctx context.Context, id uuid.UUID) (GetSettingsRow
 		&i.Whatsapp,
 		&i.Address,
 		&i.OperatingHours,
+		&i.BankName,
+		&i.BankAccountNumber,
+		&i.BankAccountHolder,
+		&i.AllowedOrigins,
 	)
 	return i, err
 }
@@ -72,12 +117,17 @@ UPDATE owners SET
     whatsapp                      = COALESCE($10,                      whatsapp),
     address                       = COALESCE($11,                       address),
     operating_hours               = COALESCE($12,               operating_hours),
+    bank_name                     = COALESCE($13,                     bank_name),
+    bank_account_number           = COALESCE($14,           bank_account_number),
+    bank_account_holder           = COALESCE($15,           bank_account_holder),
+    allowed_origins               = COALESCE($16::text[],       allowed_origins),
     updated_at                    = now()
- WHERE id = $13
+ WHERE id = $17
 RETURNING slug, booking_code_prefix, require_payment_before_pickup,
           draft_expiry_hours, payment_due_hours, no_show_tolerance_hours,
           notify_pickup_reminder, notify_return_reminder, notify_overdue_reminder,
-          whatsapp, address, operating_hours
+          whatsapp, address, operating_hours,
+          bank_name, bank_account_number, bank_account_holder, allowed_origins
 `
 
 type UpdateSettingsParams struct {
@@ -93,6 +143,10 @@ type UpdateSettingsParams struct {
 	Whatsapp                   *string
 	Address                    *string
 	OperatingHours             *string
+	BankName                   *string
+	BankAccountNumber          *string
+	BankAccountHolder          *string
+	AllowedOrigins             []string
 	ID                         uuid.UUID
 }
 
@@ -109,6 +163,10 @@ type UpdateSettingsRow struct {
 	Whatsapp                   *string
 	Address                    *string
 	OperatingHours             *string
+	BankName                   *string
+	BankAccountNumber          *string
+	BankAccountHolder          *string
+	AllowedOrigins             []string
 }
 
 // COALESCE per column: a NULL argument means "the client omitted this key", so
@@ -128,6 +186,10 @@ func (q *Queries) UpdateSettings(ctx context.Context, arg UpdateSettingsParams) 
 		arg.Whatsapp,
 		arg.Address,
 		arg.OperatingHours,
+		arg.BankName,
+		arg.BankAccountNumber,
+		arg.BankAccountHolder,
+		arg.AllowedOrigins,
 		arg.ID,
 	)
 	var i UpdateSettingsRow
@@ -144,6 +206,10 @@ func (q *Queries) UpdateSettings(ctx context.Context, arg UpdateSettingsParams) 
 		&i.Whatsapp,
 		&i.Address,
 		&i.OperatingHours,
+		&i.BankName,
+		&i.BankAccountNumber,
+		&i.BankAccountHolder,
+		&i.AllowedOrigins,
 	)
 	return i, err
 }

@@ -64,3 +64,14 @@ UPDATE customers SET id_photo_key = $2, id_type = $3, updated_at = now()
 
 -- name: GetCustomerPhotoKey :one
 SELECT id_photo_key FROM customers WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: FindCustomerByPhone :one
+-- The public request form matches a renter by phone (04-api-spec.md §4). Staff
+-- type phones however they like ("0812-3456 7890"), so both sides are reduced
+-- to digits with a +62 prefix before comparing. Oldest first: a duplicate made
+-- later never shadows the record the owner has been using.
+SELECT id FROM customers
+ WHERE deleted_at IS NULL
+   AND regexp_replace(regexp_replace(phone, '[^0-9+]', '', 'g'), '^0', '+62') = sqlc.arg(phone)::text
+ ORDER BY created_at
+ LIMIT 1;

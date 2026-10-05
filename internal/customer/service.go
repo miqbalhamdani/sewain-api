@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -102,6 +103,55 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in Input) (Custo
 		return Customer{}, translate(err, "create customer")
 	}
 	return customerOf(row), nil
+}
+
+// FindOrCreateByPhone is the public request form's renter (04-api-spec.md §4):
+// the existing customer with that number, or a new one with no creator. The
+// name sent never overwrites a recorded one -- the owner's record wins. Whether
+// they are blacklisted is the booking's question, not this one's.
+//
+// ponytail: two simultaneous first requests from one number make two rows;
+// customers has no unique phone, and a later merge is cheaper than a lock here.
+func (s *Service) FindOrCreateByPhone(ctx context.Context, name, phone string) (uuid.UUID, error) {
+	ownerID, ok := owner.FromContext(ctx)
+	if !ok {
+		return uuid.Nil, db.ErrNoOwnerContext
+	}
+	phone = NormalizePhone(phone)
+	var id uuid.UUID
+	err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
+		q := sqlcgen.New(tx)
+		found, err := q.FindCustomerByPhone(ctx, phone)
+		if err == nil {
+			id = found
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		id = uuid.Must(uuid.NewV7())
+		return q.CreateCustomer(ctx, sqlcgen.CreateCustomerParams{ID: id, OwnerID: ownerID, Name: name, Phone: phone})
+	})
+	if err != nil {
+		return uuid.Nil, translate(err, "find or create customer")
+	}
+	return id, nil
+}
+
+// NormalizePhone reduces a typed number to digits with a +62 prefix:
+// "0812-345 678" and "+62812345678" are the same renter.
+func NormalizePhone(p string) string {
+	var b strings.Builder
+	for i, r := range p {
+		if (r >= '0' && r <= '9') || (r == '+' && i == 0) {
+			b.WriteRune(r)
+		}
+	}
+	out := b.String()
+	if strings.HasPrefix(out, "0") {
+		out = "+62" + out[1:]
+	}
+	return out
 }
 
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (Customer, error) {

@@ -149,7 +149,9 @@ type Proof struct {
 // UploadProof stores a proof and queues its reading. The reading is optional
 // and late by design: a failed enqueue is logged, not returned -- the proof is
 // already saved, and a person approves it either way (BR-062).
-func (s *Service) UploadProof(ctx context.Context, actorID, invoiceID uuid.UUID, pendingKey string) (Proof, error) {
+//
+// actorID is nil when the renter sent it from the portal (S1-062).
+func (s *Service) UploadProof(ctx context.Context, actorID *uuid.UUID, invoiceID uuid.UUID, pendingKey string) (Proof, error) {
 	ownerID, ok := owner.FromContext(ctx)
 	if !ok {
 		return Proof{}, db.ErrNoOwnerContext
@@ -170,7 +172,7 @@ func (s *Service) UploadProof(ctx context.Context, actorID, invoiceID uuid.UUID,
 	if err := s.store.InOwnerTx(ctx, func(tx pgx.Tx) error {
 		return sqlcgen.New(tx).InsertProof(ctx, sqlcgen.InsertProofParams{
 			ID: id, OwnerID: ownerID, InvoiceID: invoiceID, ObjectKey: final,
-			ContentType: obj.ContentType, CreatedBy: &actorID,
+			ContentType: obj.ContentType, CreatedBy: actorID,
 		})
 	}); err != nil {
 		return Proof{}, fmt.Errorf("insert proof: %w", err)

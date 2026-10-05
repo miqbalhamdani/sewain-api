@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/miqbalhamdani/sewain-api/internal/apikey"
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
@@ -111,12 +112,27 @@ func run() error {
 		checker{name: "redis", version: redis.ServerVersion},
 		objectStoreChecker(store),
 	))
+	proxySecret, err := config.ProxySecret()
+	if err != nil {
+		return err
+	}
+	portalSecret, err := config.PortalSecret()
+	if err != nil {
+		return err
+	}
+	keys := apikey.New(pool)
+	limiter := ratelimit.New(redis)
+
+	jobQueue := jobs.NewQueue(redis.Raw(), jobs.Default)
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(pool), catalog.New(pool),
-			customerSvc, booking.New(pool, store).WithJobs(jobs.NewQueue(redis.Raw(), jobs.Default), booking.NoScanner{}), store,
-			ratelimit.New(redis), !config.IsDevelopment()),
+			customerSvc, booking.New(pool, store).WithJobs(jobQueue, booking.NoScanner{}), store,
+			jobQueue, limiter, !config.IsDevelopment()).
+			WithPublic(booking.NewPortalLinks(portalSecret, config.TenantOriginFormat()), keys),
 		signer,
 		redis,
+		httpapi.Lanes{Apex: config.PublicApex(), ProxySecret: proxySecret, Store: pool, Keys: keys,
+			Limiter: limiter, Limits: config.PublicRateLimits()},
 	))
 
 	addr := ":" + config.Getenv("PORT", config.DefaultPort)

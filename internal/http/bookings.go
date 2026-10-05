@@ -41,7 +41,7 @@ func (s *Server) ListBookings(w http.ResponseWriter, r *http.Request, params Lis
 		}
 		page := BookingPage{Data: make([]Booking, 0, len(rows))}
 		for _, b := range rows {
-			page.Data = append(page.Data, bookingBody(b))
+			page.Data = append(page.Data, s.bookingBody(b))
 		}
 		if next != nil {
 			page.NextCursor = ptr(encodeBookingCursor(*next))
@@ -89,7 +89,7 @@ func (s *Server) CreateBooking(w http.ResponseWriter, r *http.Request, _ CreateB
 			writeError(w, r, err)
 			return
 		}
-		writeJSON(w, r, http.StatusCreated, bookingBody(b))
+		writeJSON(w, r, http.StatusCreated, s.bookingBody(b))
 	})(w, r)
 }
 
@@ -155,7 +155,7 @@ func (s *Server) writeBooking(w http.ResponseWriter, r *http.Request, b booking.
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusOK, bookingBody(b))
+	writeJSON(w, r, http.StatusOK, s.bookingBody(b))
 }
 
 // GetAvailability handles GET /availability.
@@ -214,7 +214,7 @@ func (s *Server) GetCalendar(w http.ResponseWriter, r *http.Request, params GetC
 	})(w, r)
 }
 
-func bookingBody(b booking.Booking) Booking {
+func (s *Server) bookingBody(b booking.Booking) Booking {
 	return Booking{
 		Id: b.ID, Code: b.Code, Status: BookingStatus(b.Status), Source: BookingSource(b.Source),
 		Customer: BookingCustomer{Id: b.CustomerID, Name: b.CustomerName, Phone: b.CustomerPhone,
@@ -230,6 +230,8 @@ func bookingBody(b booking.Booking) Booking {
 		CreatedAt: b.CreatedAt, ActualReturnAt: b.ActualReturnAt,
 		DepositWaivedAt: b.DepositWaivedAt, DepositSettledAt: b.DepositSettledAt,
 		DepositDeducted: b.DepositDeducted, DepositRefunded: b.DepositRefunded,
+		// The link staff send the renter while WhatsApp is deferred (§5).
+		PortalUrl: s.portal.URL(b.OwnerID, b.ID, b.OwnerSlug),
 	}
 }
 

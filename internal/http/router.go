@@ -24,7 +24,7 @@ const BasePath = "/api/v1"
 // The registration itself comes from openapi.yaml via oapi-codegen -- no route
 // in this file, and none hand-written anywhere else. An endpoint exists because
 // the contract says so.
-func NewRouter(srv ServerInterface, signer *auth.Signer, store IdempotencyStore) http.Handler {
+func NewRouter(srv ServerInterface, signer *auth.Signer, store IdempotencyStore, lanes Lanes) http.Handler {
 	r := chi.NewRouter()
 	// Outermost, so a span exists before anything can fail. An error raised by
 	// the authentication middleware still carries a trace id that resolves.
@@ -36,7 +36,11 @@ func NewRouter(srv ServerInterface, signer *auth.Signer, store IdempotencyStore)
 	// request should hear "no token", not "not verified". Idempotency runs
 	// last of the four because its key is scoped per owner, and there is no
 	// owner until Authenticate has run.
-	r.Use(tracing, Authenticate(signer), RequireVerifiedEmail(signer), Idempotency(store))
+	//
+	// Lanes sits before all three: it decides by Host which routes exist at all
+	// and, on the tokenless lanes, whose they are -- Idempotency's per-owner key
+	// needs that owner too (S1-051).
+	r.Use(tracing, lanes.Middleware, Authenticate(signer), RequireVerifiedEmail(signer), Idempotency(store))
 	return HandlerWithOptions(srv, ChiServerOptions{
 		BaseURL:    BasePath,
 		BaseRouter: r,

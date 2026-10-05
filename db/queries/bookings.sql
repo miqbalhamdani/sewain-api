@@ -54,13 +54,19 @@ SELECT code, start_at, end_at, status
 INSERT INTO bookings (id, owner_id, created_by, code, customer_id, resource_id,
                       resource_unit_id, start_at, end_at,
                       status, source, unit_price, pricing_unit, buffer_minutes,
-                      duration_qty, subtotal, deposit_amount, late_fee_per_unit)
+                      duration_qty, subtotal, deposit_amount, late_fee_per_unit,
+                      expires_at)
 VALUES (sqlc.arg(id), sqlc.arg(owner_id), sqlc.arg(created_by), sqlc.arg(code),
         sqlc.arg(customer_id), sqlc.arg(resource_id), sqlc.arg(resource_unit_id),
         sqlc.arg(start_at), sqlc.arg(end_at),
         sqlc.arg(status), sqlc.arg(source), sqlc.arg(unit_price),
         sqlc.arg(pricing_unit), sqlc.arg(buffer_minutes), sqlc.arg(duration_qty),
-        sqlc.arg(subtotal), sqlc.narg(deposit_amount), sqlc.narg(late_fee_per_unit));
+        sqlc.arg(subtotal), sqlc.narg(deposit_amount), sqlc.narg(late_fee_per_unit),
+        sqlc.narg(expires_at));
+
+-- name: GetDraftExpiryHours :one
+-- BR-027: a public draft's life, per owner. owners has no RLS, hence the WHERE.
+SELECT draft_expiry_hours FROM owners WHERE id = $1;
 
 -- name: GetBooking :one
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,
@@ -73,8 +79,12 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
        u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
-       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding,
+       b.owner_id, o.slug AS owner_slug
   FROM bookings b
+  -- owners has no RLS; the join only reads this booking's own owner, for the
+  -- portal link (Booking.portal_url, 04-api-spec.md §5).
+  JOIN owners o         ON o.id = b.owner_id
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id
@@ -108,8 +118,12 @@ SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buf
        c.is_blacklisted AS customer_blacklisted,
        r.id AS resource_id, r.name AS resource_name,
        u.id AS unit_id, u.code AS unit_code, u.label AS unit_label,
-       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding
+       pay.n_active, pay.n_overdue, pay.n_unpaid, pay.outstanding,
+       b.owner_id, o.slug AS owner_slug
   FROM bookings b
+  -- owners has no RLS; the join only reads this booking's own owner, for the
+  -- portal link (Booking.portal_url, 04-api-spec.md §5).
+  JOIN owners o         ON o.id = b.owner_id
   JOIN customers c      ON c.id = b.customer_id
   JOIN resources r      ON r.id = b.resource_id
   JOIN resource_units u ON u.id = b.resource_unit_id
@@ -299,3 +313,55 @@ DELETE FROM invoice_lines WHERE invoice_id = $1 AND kind = 'deposit';
 UPDATE bookings SET deposit_waived_at = now(), deposit_waived_by = $2, deposit_waiver_reason = $3,
        updated_at = now()
  WHERE id = $1;
+
+-- ── S1-052: kedaluwarsa. Set-based, conditional, idempotent: a second run
+-- finds nothing left to change. None of them touches a booking that already
+-- has a handovers row (BR-057) -- once the unit has moved, only a person
+-- decides what happens next.
+
+-- name: ExpireDrafts :many
+-- BR-027: a draft past its expires_at is cancelled 'expired'. Drafts never
+-- carry an invoice, so nothing else moves.
+UPDATE bookings b SET status = 'cancelled', cancelled_reason = 'expired', updated_at = now()
+ WHERE b.status = 'draft' AND b.expires_at IS NOT NULL AND b.expires_at < sqlc.arg(now)::timestamptz
+   AND b.deleted_at IS NULL
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id)
+RETURNING b.id;
+
+-- name: ExpireUnpaidReserved :many
+-- BR-057 + BR-038, switch ON: reserved, rent invoice still unpaid past its
+-- due_at -> cancelled 'payment_expired'. The caller cancels the unpaid
+-- invoices through CancelInvoicesOfBookings -- the same rule as a manual
+-- cancel (BR-057 revision 3 Oct). Switch OFF never reaches here.
+UPDATE bookings b SET status = 'cancelled', cancelled_reason = 'payment_expired', updated_at = now()
+  FROM owners o
+ WHERE o.id = b.owner_id AND o.require_payment_before_pickup
+   AND b.status = 'reserved' AND b.deleted_at IS NULL
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id)
+   AND EXISTS (SELECT 1 FROM invoices i
+                 JOIN invoice_lines l ON l.invoice_id = i.id AND l.kind = 'rent'
+                WHERE i.booking_id = b.id AND i.deleted_at IS NULL
+                  AND i.status IN ('unpaid', 'overdue') AND i.due_at < sqlc.arg(now)::timestamptz)
+RETURNING b.id;
+
+-- name: CancelInvoicesOfBookings :exec
+UPDATE invoices SET status = 'cancelled', updated_at = now()
+ WHERE booking_id = ANY(sqlc.arg(booking_ids)::uuid[])
+   AND status IN ('unpaid', 'gateway_pending', 'overdue') AND deleted_at IS NULL;
+
+-- name: MarkInvoicesOverdue :execrows
+-- BR-056: unpaid past due_at is 'overdue' -- a stored invoice status, unlike a
+-- booking's overdue, which is derived. With the switch off this is all that
+-- happens to an unpaid booking (BR-038).
+UPDATE invoices SET status = 'overdue', updated_at = now()
+ WHERE status = 'unpaid' AND due_at < sqlc.arg(now)::timestamptz AND deleted_at IS NULL;
+
+-- name: MarkNoShows :execrows
+-- BR-057: reserved and still not picked up past start_at plus the owner's
+-- tolerance (default 3h, may be 0). A no_show is not refused at pickup later.
+UPDATE bookings b SET status = 'no_show', updated_at = now()
+  FROM owners o
+ WHERE o.id = b.owner_id
+   AND b.status = 'reserved' AND b.deleted_at IS NULL
+   AND b.start_at + make_interval(hours => o.no_show_tolerance_hours) < sqlc.arg(now)::timestamptz
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id);

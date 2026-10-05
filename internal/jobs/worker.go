@@ -27,6 +27,10 @@ type Worker struct {
 	Backoff     func(int) time.Duration // wait before the next attempt
 	ClaimIdle   time.Duration           // a job held this long by a silent consumer is taken over
 	Block       time.Duration           // XREADGROUP wait
+
+	// OnDead runs once a job is dead-lettered -- e.g. marking a tracked job
+	// failed, so a screen polling GET /jobs/{id} stops waiting.
+	OnDead func(ctx context.Context, j Job, cause error)
 }
 
 func NewWorker(rdb *redis.Client, names Names, consumer string) *Worker {
@@ -142,6 +146,9 @@ func (w *Worker) fail(ctx context.Context, j Job, m redis.XMessage, cause error)
 		}
 	}
 	slog.ErrorContext(ctx, "job dead-lettered", "type", j.Type, "attempt", next.Attempt, "error", cause)
+	if w.OnDead != nil {
+		w.OnDead(ctx, j, cause)
+	}
 	_ = w.q.add(ctx, w.q.names.Dead, Job{Type: j.Type, OwnerID: j.OwnerID, Payload: j.Payload, Attempt: next.Attempt},
 		"error", cause.Error(), "source_id", m.ID, "failed_at", time.Now().UTC().Format(time.RFC3339))
 }

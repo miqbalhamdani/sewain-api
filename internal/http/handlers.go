@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/miqbalhamdani/sewain-api/internal/apikey"
 	"github.com/miqbalhamdani/sewain-api/internal/auth"
 	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
 	"github.com/miqbalhamdani/sewain-api/internal/customer"
+	"github.com/miqbalhamdani/sewain-api/internal/jobs"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
@@ -31,7 +33,10 @@ type Server struct {
 	customers *customer.Service
 	bookings  *booking.Service
 	objects   *storage.Store
+	jobs      *jobs.Queue
 	limiter   *ratelimit.Limiter
+	portal    booking.PortalLinks // S1-053: portal tokens and links
+	keys      *apikey.Service     // S1-079
 
 	// secureCookies is false only for local development over plain HTTP, where
 	// a Secure cookie would be dropped by the browser and nothing would work.
@@ -40,7 +45,7 @@ type Server struct {
 
 func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, catalogSvc *catalog.Service,
 	customerSvc *customer.Service, bookingSvc *booking.Service, objects *storage.Store,
-	limiter *ratelimit.Limiter, secureCookies bool) *Server {
+	jobQueue *jobs.Queue, limiter *ratelimit.Limiter, secureCookies bool) *Server {
 	return &Server{
 		auth:          authSvc,
 		settings:      settingsSvc,
@@ -48,9 +53,16 @@ func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, catalogSvc 
 		customers:     customerSvc,
 		bookings:      bookingSvc,
 		objects:       objects,
+		jobs:          jobQueue,
 		limiter:       limiter,
 		secureCookies: secureCookies,
 	}
+}
+
+// WithPublic wires the M5 surfaces: portal links (S1-053) and API keys (S1-079).
+func (s *Server) WithPublic(portal booking.PortalLinks, keys *apikey.Service) *Server {
+	s.portal, s.keys = portal, keys
+	return s
 }
 
 // Login handles POST /auth/login.

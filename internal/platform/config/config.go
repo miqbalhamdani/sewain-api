@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Defaults target a host install -- Homebrew's postgresql@18 and redis on their
@@ -152,4 +153,72 @@ func JWTSecret() (string, error) {
 		return devJWTSecret, nil
 	}
 	return "", errors.New("JWT_SECRET is required when ENVIRONMENT is not \"development\"")
+}
+
+// ── M5: the public surface and the renter portal (04-api-spec.md §4, §5) ──────
+
+const (
+	// Local only, and obviously not secrets -- both refuse them outside
+	// development, like devJWTSecret.
+	devProxySecret  = "insecure-dev-proxy-secret"
+	devPortalSecret = "insecure-dev-portal-secret-32byte"
+)
+
+// PublicApex is the domain tenant hosts live under: <slug>.<apex>, plus
+// api.<apex> for the external API. Configuration, not a constant -- the same
+// value Caddy and the web middleware read (05-backlog.md, S1-077).
+func PublicApex() string { return Getenv("PUBLIC_APEX", "sewain.localhost") }
+
+// TenantOriginFormat turns a slug into the origin a renter opens, for the
+// links the API hands out (track_url, Booking.portal_url).
+func TenantOriginFormat() string {
+	return Getenv("TENANT_ORIGIN_FORMAT", "http://%s.sewain.localhost:8088")
+}
+
+// ProxySecret is the header Caddy adds to every request it forwards. Only a
+// request carrying it may name a tenant by Host or trust X-Real-IP: without it,
+// anyone who reaches the port directly could forge Host (BR-030).
+func ProxySecret() (string, error) {
+	return secret("PROXY_SECRET", devProxySecret)
+}
+
+// PortalSecret keys the renter-portal token HMAC. Rotating it revokes every
+// portal link at once -- the tokens are never stored (04-api-spec.md §5).
+func PortalSecret() (string, error) {
+	return secret("PORTAL_SECRET", devPortalSecret)
+}
+
+func secret(key, dev string) (string, error) {
+	if v := os.Getenv(key); v != "" {
+		return v, nil
+	}
+	if IsDevelopment() {
+		return dev, nil
+	}
+	return "", fmt.Errorf("%s is required when ENVIRONMENT is not \"development\"", key)
+}
+
+// PublicLimits are 04-api-spec.md §7's numbers -- "konfigurasi, bukan
+// konstanta di kode".
+type PublicLimits struct {
+	GetPerMinIP, GetPerMinOwner     int64 // GET /public/*
+	PostPerHourIP, PostPerHourOwner int64 // POST /public/bookings
+	PortalPerMinToken               int64 // /portal/*
+}
+
+func PublicRateLimits() PublicLimits {
+	return PublicLimits{
+		GetPerMinIP:       intEnv("PUBLIC_GET_PER_MIN_IP", 60),
+		GetPerMinOwner:    intEnv("PUBLIC_GET_PER_MIN_OWNER", 600),
+		PostPerHourIP:     intEnv("PUBLIC_POST_PER_HOUR_IP", 5),
+		PostPerHourOwner:  intEnv("PUBLIC_POST_PER_HOUR_OWNER", 30),
+		PortalPerMinToken: intEnv("PORTAL_PER_MIN_TOKEN", 120),
+	}
+}
+
+func intEnv(key string, fallback int64) int64 {
+	if n, err := strconv.ParseInt(os.Getenv(key), 10, 64); err == nil && n > 0 {
+		return n
+	}
+	return fallback
 }

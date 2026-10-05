@@ -56,6 +56,10 @@ const (
 	CodeDepositAlreadyPaid   = "deposit-already-paid"   // BR-051, S1-042
 	CodeDepositNotApplicable = "deposit-not-applicable" // BR-016, S1-042
 	CodeInvoiceAlreadyPaid   = "invoice-already-paid"   // BR-060, S1-044
+
+	CodeInvalidAPIKey    = "invalid-api-key"    // BR-031, S1-080
+	CodeOriginNotAllowed = "origin-not-allowed" // BR-031, S1-080
+	CodeQuotaExceeded    = "quota-exceeded"     // BR-031, S1-080
 )
 
 // Conflict is one booking that holds a unit over the range somebody asked for.
@@ -193,6 +197,27 @@ func RateLimited(detail string) *Error {
 		Title: "Too many requests", Detail: detail}
 }
 
+// InvalidAPIKey is a key on api.<apex> that is unknown, malformed or revoked
+// -- one answer for the three (BR-031).
+func InvalidAPIKey() *Error {
+	return &Error{Code: CodeInvalidAPIKey, Status: http.StatusUnauthorized,
+		Title: "Invalid API key", Detail: "The X-API-Key is unknown or has been revoked."}
+}
+
+// OriginNotAllowed is a browser Origin outside the owner's allowed_origins.
+// A browser control, not a security one -- curl never sends it (BR-031).
+func OriginNotAllowed() *Error {
+	return &Error{Code: CodeOriginNotAllowed, Status: http.StatusForbidden,
+		Title:  "Origin not allowed",
+		Detail: "This Origin is not in the business's allowed origins. Add it on the API keys screen."}
+}
+
+// QuotaExceeded is a key past its per-minute quota (BR-031).
+func QuotaExceeded(detail string) *Error {
+	return &Error{Code: CodeQuotaExceeded, Status: http.StatusTooManyRequests,
+		Title: "API key quota exceeded", Detail: detail}
+}
+
 // RequestInFlight is the answer to a repeated Idempotency-Key whose first
 // request has not finished yet (BR-090).
 //
@@ -219,6 +244,15 @@ func BookingConflict(conflicts []Conflict) *Error {
 		Conflicts: conflicts}
 }
 
+// NothingAvailable is the public surface's booking-conflict: no unit of that
+// resource is free over the range. Same code, but never a conflicts list --
+// other renters' booking codes do not leave the backoffice (BR-025).
+func NothingAvailable() *Error {
+	return &Error{Code: CodeBookingConflict, Status: http.StatusConflict,
+		Title:  "Nothing available on that range",
+		Detail: "No unit is free over that time. Pick another time."}
+}
+
 // DurationOutOfRange names the bound that was crossed, in the resource's own
 // pricing unit (BR-021).
 func DurationOutOfRange(detail string) *Error {
@@ -235,6 +269,15 @@ func CustomerBlacklisted() *Error {
 		Title:  "Customer is blacklisted",
 		Detail: "This customer is blocked from new bookings."}).
 		WithFields(Field{Name: "customer_id"})
+}
+
+// CustomerBlacklistedPublic is BR-028 on the public page: the same code, but a
+// neutral message and no field -- the renter is told to contact the business,
+// never that or why they are blocked (04-api-spec.md §4).
+func CustomerBlacklistedPublic() *Error {
+	return &Error{Code: CodeCustomerBlacklisted, Status: http.StatusUnprocessableEntity,
+		Title:  "Request cannot be processed",
+		Detail: "This request cannot be processed. Please contact the business."}
 }
 
 // UnitNotSwappable is a swap attempted after the unit has left, or on a booking

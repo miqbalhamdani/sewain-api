@@ -107,6 +107,100 @@ func (q *Queries) HasSuccessor(ctx context.Context, rotatedFrom *uuid.UUID) (boo
 	return exists, err
 }
 
+const insertApiKey = `-- name: InsertApiKey :one
+INSERT INTO api_keys (id, owner_id, name, key_prefix, key_hash, rate_limit_per_min, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, name, key_prefix, rate_limit_per_min, last_used_at, revoked_at, created_at
+`
+
+type InsertApiKeyParams struct {
+	ID              uuid.UUID
+	OwnerID         uuid.UUID
+	Name            string
+	KeyPrefix       string
+	KeyHash         string
+	RateLimitPerMin int32
+	CreatedBy       *uuid.UUID
+}
+
+type InsertApiKeyRow struct {
+	ID              uuid.UUID
+	Name            string
+	KeyPrefix       string
+	RateLimitPerMin int32
+	LastUsedAt      *time.Time
+	RevokedAt       *time.Time
+	CreatedAt       time.Time
+}
+
+// S1-079. The secret never reaches this table: key_hash is argon2id.
+func (q *Queries) InsertApiKey(ctx context.Context, arg InsertApiKeyParams) (InsertApiKeyRow, error) {
+	row := q.db.QueryRow(ctx, insertApiKey,
+		arg.ID,
+		arg.OwnerID,
+		arg.Name,
+		arg.KeyPrefix,
+		arg.KeyHash,
+		arg.RateLimitPerMin,
+		arg.CreatedBy,
+	)
+	var i InsertApiKeyRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.KeyPrefix,
+		&i.RateLimitPerMin,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const listApiKeys = `-- name: ListApiKeys :many
+SELECT id, name, key_prefix, rate_limit_per_min, last_used_at, revoked_at, created_at
+  FROM api_keys
+ ORDER BY created_at DESC
+`
+
+type ListApiKeysRow struct {
+	ID              uuid.UUID
+	Name            string
+	KeyPrefix       string
+	RateLimitPerMin int32
+	LastUsedAt      *time.Time
+	RevokedAt       *time.Time
+	CreatedAt       time.Time
+}
+
+func (q *Queries) ListApiKeys(ctx context.Context) ([]ListApiKeysRow, error) {
+	rows, err := q.db.Query(ctx, listApiKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApiKeysRow
+	for rows.Next() {
+		var i ListApiKeysRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.KeyPrefix,
+			&i.RateLimitPerMin,
+			&i.LastUsedAt,
+			&i.RevokedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeAllUserTokens = `-- name: RevokeAllUserTokens :execrows
 UPDATE refresh_tokens SET revoked_at = now()
  WHERE user_id = $1 AND revoked_at IS NULL
@@ -129,6 +223,19 @@ func (q *Queries) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) (in
 	return result.RowsAffected(), nil
 }
 
+const revokeApiKey = `-- name: RevokeApiKey :execrows
+UPDATE api_keys SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1
+`
+
+// Revoked, never deleted (BR-031). Revoking twice is still revoked.
+func (q *Queries) RevokeApiKey(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeApiKey, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const revokeRefreshToken = `-- name: RevokeRefreshToken :execrows
 UPDATE refresh_tokens SET revoked_at = now()
  WHERE id = $1 AND revoked_at IS NULL
@@ -141,6 +248,18 @@ func (q *Queries) RevokeRefreshToken(ctx context.Context, id uuid.UUID) (int64, 
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const touchApiKey = `-- name: TouchApiKey :exec
+UPDATE api_keys SET last_used_at = now()
+ WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')
+`
+
+// last_used_at, at most once a minute per key: a write per request would turn
+// every public read into a row lock.
+func (q *Queries) TouchApiKey(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchApiKey, id)
+	return err
 }
 
 const touchLastLogin = `-- name: TouchLastLogin :exec

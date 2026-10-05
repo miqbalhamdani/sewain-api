@@ -69,3 +69,11 @@ SELECT i.id, i.booking_id, i.number, i.status, i.due_at, i.paid_at, i.created_at
         OR (i.created_at, i.id) < (sqlc.narg(cursor_at)::timestamptz, sqlc.narg(cursor_id)::uuid))
  ORDER BY i.created_at DESC, i.id DESC
  LIMIT sqlc.arg(lim);
+
+-- name: PendingProofInvoices :many
+-- Invoices of one booking with a proof still waiting for a person (BR-062): the
+-- portal says "menunggu dicek" instead of inviting a second upload.
+SELECT DISTINCT p.invoice_id
+  FROM payment_proofs p
+  JOIN invoices i ON i.id = p.invoice_id
+ WHERE i.booking_id = $1 AND p.review_status = 'pending';
