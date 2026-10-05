@@ -81,3 +81,74 @@ func (s *Server) GetIdleUnitsReport(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, http.StatusOK, body)
 	})(w, r)
 }
+
+// ExportReport handles POST /reports/export: queue it and answer at once
+// (BR-077, BR-091). The worker builds the file.
+func (s *Server) ExportReport(w http.ResponseWriter, r *http.Request) {
+	requirePermission(auth.PermReportsRead, func(w http.ResponseWriter, r *http.Request) {
+		raw, _, ok := readBody(w, r)
+		if !ok {
+			return
+		}
+		var body ExportRequest
+		if err := json.Unmarshal(raw, &body); err != nil {
+			writeError(w, r, malformed(err))
+			return
+		}
+		if !booking.ExportReports[string(body.Report)] {
+			writeError(w, r, apperrors.ValidationFailed("report is revenue, utilization, idle_units or bookings.").
+				WithFields(apperrors.Field{Name: "report"}))
+			return
+		}
+		if body.Format != Csv && body.Format != Xlsx {
+			writeError(w, r, apperrors.ValidationFailed("format is csv or xlsx.").
+				WithFields(apperrors.Field{Name: "format"}))
+			return
+		}
+		if !body.To.After(body.From) || body.To.Sub(body.From) > 366*24*time.Hour {
+			writeError(w, r, apperrors.ValidationFailed("to must be after from, and a range is at most 366 days.").
+				WithFields(apperrors.Field{Name: "to"}))
+			return
+		}
+		id, _ := owner.FromContext(r.Context())
+		jobID, err := s.jobs.Track(r.Context(), booking.JobReportExport, id, map[string]any{
+			"report": body.Report, "format": body.Format, "from": body.From, "to": body.To,
+		})
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+		writeJSON(w, r, http.StatusAccepted, map[string]string{"job_id": jobID})
+	})(w, r)
+}
+
+// GetJob handles GET /jobs/{id}. The download link is signed afresh on every
+// read, for 15 minutes (BR-077) -- asking again is how a link is renewed.
+func (s *Server) GetJob(w http.ResponseWriter, r *http.Request, jobID string) {
+	requirePermission(auth.PermReportsRead, func(w http.ResponseWriter, r *http.Request) {
+		id, _ := owner.FromContext(r.Context())
+		st, err := s.jobs.Status(r.Context(), jobID, id)
+		if errors.Is(err, jobs.ErrNoJob) {
+			writeError(w, r, apperrors.NotFound("No such job in this business."))
+			return
+		}
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+		body := Job{Id: st.ID, Status: JobStatus(st.State)}
+		if st.Error != "" {
+			body.Error = &st.Error
+		}
+		if st.State == "done" && st.FileKey != "" {
+			url, err := s.objects.PresignGet(r.Context(), st.FileKey, storage.ExportTTL)
+			if err != nil {
+				writeError(w, r, err)
+				return
+			}
+			exp := time.Now().Add(storage.ExportTTL)
+			body.DownloadUrl, body.ExpiresAt = &url, &exp
+		}
+		writeJSON(w, r, http.StatusOK, body)
+	})(w, r)
+}

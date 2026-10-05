@@ -74,4 +74,18 @@ func TestAvailabilityAndCalendarP95(t *testing.T) {
 		_, err := s.Calendar(f.ctx, from, from.AddDate(1, 0, 0), time.Now())
 		return err
 	})
+
+	// S1-057: an export of the same year finishes inside a minute, XLSX being
+	// the slower format.
+	for _, report := range []string{"revenue", "utilization", "idle_units", "bookings"} {
+		began := time.Now()
+		if _, _, _, err := s.Export(f.ctx, report, "xlsx", from, from.AddDate(1, 0, 0), time.Now()); err != nil {
+			t.Fatalf("export %s: %v", report, err)
+		}
+		took := time.Since(began)
+		t.Logf("export %s = %v", report, took)
+		if took > time.Minute {
+			t.Errorf("export %s took %v, budget is 60s", report, took)
+		}
+	}
 }

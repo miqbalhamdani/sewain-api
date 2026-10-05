@@ -10,6 +10,7 @@ import (
 	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/catalog"
 	"github.com/miqbalhamdani/sewain-api/internal/customer"
+	"github.com/miqbalhamdani/sewain-api/internal/jobs"
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/ratelimit"
 	"github.com/miqbalhamdani/sewain-api/internal/settings"
@@ -31,6 +32,7 @@ type Server struct {
 	customers *customer.Service
 	bookings  *booking.Service
 	objects   *storage.Store
+	jobs      *jobs.Queue
 	limiter   *ratelimit.Limiter
 
 	// secureCookies is false only for local development over plain HTTP, where
@@ -40,7 +42,7 @@ type Server struct {
 
 func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, catalogSvc *catalog.Service,
 	customerSvc *customer.Service, bookingSvc *booking.Service, objects *storage.Store,
-	limiter *ratelimit.Limiter, secureCookies bool) *Server {
+	jobQueue *jobs.Queue, limiter *ratelimit.Limiter, secureCookies bool) *Server {
 	return &Server{
 		auth:          authSvc,
 		settings:      settingsSvc,
@@ -48,6 +50,7 @@ func NewServer(authSvc *auth.Service, settingsSvc *settings.Service, catalogSvc 
 		customers:     customerSvc,
 		bookings:      bookingSvc,
 		objects:       objects,
+		jobs:          jobQueue,
 		limiter:       limiter,
 		secureCookies: secureCookies,
 	}

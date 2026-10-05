@@ -364,7 +364,7 @@ var newServer = func(t *testing.T) http.Handler {
 	return httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(store), catalog.New(store),
 			customers, booking.New(store, objects).WithJobs(jobs.NewQueue(redis.Raw(), testJobs), booking.NoScanner{}), objects,
-			ratelimit.New(redis), false), signer, redis)
+			jobs.NewQueue(redis.Raw(), testJobs), ratelimit.New(redis), false), signer, redis)
 }
 
 // --- fixtures --------------------------------------------------------------

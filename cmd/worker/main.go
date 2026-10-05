@@ -56,8 +56,18 @@ func run() error {
 	// Phase 1 has no proof reader: NoScanner leaves every proof "not read,
 	// check by hand" (BR-062). A real one is a Scanner, swapped in here.
 	bookings := booking.New(pool, store).WithJobs(nil, booking.NoScanner{})
+	q := jobs.NewQueue(redis.Raw(), jobs.Default)
 
 	w := jobs.NewWorker(redis.Raw(), jobs.Default, "")
+	// A tracked job that runs out of attempts tells its poller so (BR-091).
+	w.OnDead = func(ctx context.Context, j jobs.Job, cause error) {
+		var p struct {
+			JobID string `json:"job_id"`
+		}
+		if json.Unmarshal(j.Payload, &p) == nil && p.JobID != "" {
+			_ = q.SetState(ctx, p.JobID, "failed", "", "Ekspor gagal dibuat. Coba lagi.")
+		}
+	}
 	w.Handle(booking.JobScanProof, func(ctx context.Context, j jobs.Job) error {
 		var p struct {
 			ProofID uuid.UUID `json:"proof_id"`
@@ -88,6 +98,26 @@ func run() error {
 			}
 		}
 		return nil
+	})
+	w.Handle(booking.JobReportExport, func(ctx context.Context, j jobs.Job) error {
+		var p struct {
+			JobID          string `json:"job_id"`
+			Report, Format string
+			From, To       time.Time
+		}
+		if err := json.Unmarshal(j.Payload, &p); err != nil || p.JobID == "" {
+			return fmt.Errorf("%w: report.export payload %s", jobs.ErrPermanent, j.Payload)
+		}
+		_ = q.SetState(ctx, p.JobID, "running", "", "")
+		body, contentType, ext, err := bookings.Export(ctx, p.Report, p.Format, p.From, p.To, time.Now())
+		if err != nil {
+			return err
+		}
+		key := "exports/" + j.OwnerID.String() + "/" + p.JobID + "." + ext
+		if err := store.Put(ctx, key, contentType, body); err != nil {
+			return err
+		}
+		return q.SetState(ctx, p.JobID, "done", key, "")
 	})
 
 	slog.Info("worker consuming", "stream", jobs.Default.Stream)

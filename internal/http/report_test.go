@@ -52,6 +52,27 @@ func seedUserIn(ctx context.Context, t *testing.T, store *db.Store, ownerID uuid
 	return seeded{userID: id.String(), accessToken: session.AccessToken}
 }
 
+// S1-057: an export is queued and answered at once; its job is readable, a
+// bad request is refused before anything is queued.
+func TestExportJob(t *testing.T) {
+	c := newBookingClient(t)
+	const period = `"from":"2026-09-01T00:00:00+07:00","to":"2026-10-01T00:00:00+07:00"`
+
+	m := expect(t, c.do(http.MethodPost, "/api/v1/reports/export", `{"report":"revenue","format":"xlsx",`+period+`}`),
+		http.StatusAccepted, "")
+	id, _ := m["job_id"].(string)
+	job := expect(t, c.do(http.MethodGet, "/api/v1/jobs/"+id, ""), http.StatusOK, "")
+	if job["status"] != "queued" || job["download_url"] != nil {
+		t.Errorf("fresh job = %v, want queued with no link", job)
+	}
+
+	expect(t, c.do(http.MethodPost, "/api/v1/reports/export", `{"report":"revenue","format":"pdf",`+period+`}`),
+		http.StatusUnprocessableEntity, "validation-failed")
+	expect(t, c.do(http.MethodPost, "/api/v1/reports/export", `{"report":"payroll","format":"csv",`+period+`}`),
+		http.StatusUnprocessableEntity, "validation-failed")
+	expect(t, c.do(http.MethodGet, "/api/v1/jobs/"+uuid.NewString(), ""), http.StatusNotFound, "not-found")
+}
+
 // S1-067: an owner cannot demote or disable themselves, and the rental never
 // loses its last active owner -- not even to a second owner whose token
 // outlives their own disabling.

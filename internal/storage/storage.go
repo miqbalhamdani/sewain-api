@@ -11,6 +11,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -123,6 +124,19 @@ func (s *Store) Head(ctx context.Context, key string) (Object, error) {
 	return Object{Size: aws.ToInt64(out.ContentLength), ContentType: aws.ToString(out.ContentType)}, nil
 }
 
+// Put uploads bytes the server produced itself -- report exports (S1-057).
+// Everything a person uploads goes browser -> presigned PUT instead (BR-093).
+func (s *Store) Put(ctx context.Context, key, contentType string, body []byte) error {
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: &s.bucket, Key: &key, ContentType: &contentType,
+		Body: bytes.NewReader(body), ContentLength: aws.Int64(int64(len(body))),
+	})
+	if err != nil {
+		return fmt.Errorf("put %s: %w", key, err)
+	}
+	return nil
+}
+
 // Copy is store-to-store: zero bytes through this process.
 func (s *Store) Copy(ctx context.Context, src, dst string) error {
 	_, err := s.client.CopyObject(ctx, &s3.CopyObjectInput{
@@ -190,6 +204,13 @@ func (s *Store) EnsureBucket(ctx context.Context) error {
 			ID:         aws.String("expire-pending-uploads"),
 			Status:     types.ExpirationStatusEnabled,
 			Filter:     &types.LifecycleRuleFilter{Prefix: aws.String("pending/")},
+			Expiration: &types.LifecycleExpiration{Days: aws.Int32(1)},
+		}, {
+			// Report exports hold renter data; the 15-minute link is the
+			// gate, and the file itself does not outlive the day (BR-077).
+			ID:         aws.String("expire-exports"),
+			Status:     types.ExpirationStatusEnabled,
+			Filter:     &types.LifecycleRuleFilter{Prefix: aws.String("exports/")},
 			Expiration: &types.LifecycleExpiration{Days: aws.Int32(1)},
 		}}},
 	})

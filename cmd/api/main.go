@@ -111,10 +111,11 @@ func run() error {
 		checker{name: "redis", version: redis.ServerVersion},
 		objectStoreChecker(store),
 	))
+	jobQueue := jobs.NewQueue(redis.Raw(), jobs.Default)
 	mux.Handle(httpapi.BasePath+"/", httpapi.NewRouter(
 		httpapi.NewServer(authSvc, settings.New(pool), catalog.New(pool),
-			customerSvc, booking.New(pool, store).WithJobs(jobs.NewQueue(redis.Raw(), jobs.Default), booking.NoScanner{}), store,
-			ratelimit.New(redis), !config.IsDevelopment()),
+			customerSvc, booking.New(pool, store).WithJobs(jobQueue, booking.NoScanner{}), store,
+			jobQueue, ratelimit.New(redis), !config.IsDevelopment()),
 		signer,
 		redis,
 	))
