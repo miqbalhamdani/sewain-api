@@ -97,3 +97,27 @@ func (s *Store) ActiveOwnerIDs(ctx context.Context) ([]uuid.UUID, error) {
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
+
+// TenantOwner is what the Host lookup needs to decide a public request: who,
+// whether they are open for business, and whether their public page is live.
+type TenantOwner struct {
+	ID     uuid.UUID
+	Active bool
+	// Live is BR-096: slug, whatsapp and address all set. The portal needs
+	// only an active owner; the public catalogue needs Live as well.
+	Live bool
+}
+
+// OwnerBySlug resolves <slug>.<apex> to its rental (BR-030) -- the hottest
+// lookup on the public surface, served by owners_slug_unique. Like
+// ActiveOwnerIDs, a plain read: owners carries no RLS.
+func (s *Store) OwnerBySlug(ctx context.Context, slug string) (TenantOwner, error) {
+	var o TenantOwner
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, status = 'active', whatsapp IS NOT NULL AND address IS NOT NULL
+		  FROM owners WHERE slug = $1`, slug).Scan(&o.ID, &o.Active, &o.Live)
+	if err != nil {
+		return TenantOwner{}, fmt.Errorf("owner by slug: %w", err)
+	}
+	return o, nil
+}

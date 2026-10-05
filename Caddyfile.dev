@@ -1,0 +1,27 @@
+# Local stand-in for the production Caddy (S1-073), so the public page and the
+# portal can be exercised before deploy (S1-060, BR-030).  `make proxy`
+#
+#   http://<slug>.sewain.localhost:8088   public page + portal
+#   http://api.sewain.localhost:8088      external API (X-API-Key)
+#
+# *.localhost already resolves to loopback -- nothing to add to /etc/hosts.
+# Host is passed through untouched (Caddy's default); /api/* goes to the API
+# with the proxy secret, which is the only thing that lets the API trust Host
+# and X-Real-IP. Anything else goes to Next, which maps Host to the tenant.
+{
+	auto_https off
+	admin off
+}
+
+http://*.{$APEX:sewain.localhost}:{$PROXY_PORT:8088} {
+	@api path /api/*
+	handle @api {
+		reverse_proxy localhost:{$API_PORT:8080} {
+			header_up X-Proxy-Secret {$PROXY_SECRET:insecure-dev-proxy-secret}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	handle {
+		reverse_proxy localhost:{$WEB_PORT:3000}
+	}
+}

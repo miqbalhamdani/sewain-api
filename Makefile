@@ -5,7 +5,7 @@ DOCS    ?= ../docs
 # a host install, so a .env is only needed to deviate from them.
 LOAD_ENV = set -a; [ -f .env ] && . ./.env; set +a;
 
-.PHONY: dev worker scheduler db-create storage-init migrate migrate-down generate generated-diff fmt-check vet lint test test-iso test-race lint-imports lint-rls check
+.PHONY: dev worker scheduler proxy db-create storage-init migrate migrate-down generate generated-diff fmt-check vet lint test test-iso test-race lint-imports lint-rls check
 
 ## dev: run the API against host PostgreSQL and Redis
 dev:
@@ -18,6 +18,11 @@ worker:
 ## scheduler: enqueue scheduled work; only the lease holder fires (S1-040)
 scheduler:
 	@$(LOAD_ENV) go run ./cmd/scheduler
+
+## proxy: local Caddy in front of web (:3000) and api (:8080), like production --
+## http://<slug>.sewain.localhost:8088 (S1-051, S1-060). brew install caddy.
+proxy:
+	@$(LOAD_ENV) caddy run --config Caddyfile.dev --adapter caddyfile
 
 ## db-create: create the local development database if it is not there yet
 db-create:

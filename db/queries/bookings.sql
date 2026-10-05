@@ -54,13 +54,19 @@ SELECT code, start_at, end_at, status
 INSERT INTO bookings (id, owner_id, created_by, code, customer_id, resource_id,
                       resource_unit_id, start_at, end_at,
                       status, source, unit_price, pricing_unit, buffer_minutes,
-                      duration_qty, subtotal, deposit_amount, late_fee_per_unit)
+                      duration_qty, subtotal, deposit_amount, late_fee_per_unit,
+                      expires_at)
 VALUES (sqlc.arg(id), sqlc.arg(owner_id), sqlc.arg(created_by), sqlc.arg(code),
         sqlc.arg(customer_id), sqlc.arg(resource_id), sqlc.arg(resource_unit_id),
         sqlc.arg(start_at), sqlc.arg(end_at),
         sqlc.arg(status), sqlc.arg(source), sqlc.arg(unit_price),
         sqlc.arg(pricing_unit), sqlc.arg(buffer_minutes), sqlc.arg(duration_qty),
-        sqlc.arg(subtotal), sqlc.narg(deposit_amount), sqlc.narg(late_fee_per_unit));
+        sqlc.arg(subtotal), sqlc.narg(deposit_amount), sqlc.narg(late_fee_per_unit),
+        sqlc.narg(expires_at));
+
+-- name: GetDraftExpiryHours :one
+-- BR-027: a public draft's life, per owner. owners has no RLS, hence the WHERE.
+SELECT draft_expiry_hours FROM owners WHERE id = $1;
 
 -- name: GetBooking :one
 SELECT b.id, b.code, b.status, b.source, b.start_at, b.end_at, b.end_at_with_buffer,

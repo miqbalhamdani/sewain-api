@@ -1,10 +1,8 @@
 package httpapi
 
 import (
-	"log/slog"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 
 	apperrors "github.com/miqbalhamdani/sewain-api/internal/platform/errors"
@@ -27,22 +25,9 @@ const (
 // Returning a bool rather than an error so the call site reads as a guard:
 // `if !s.allow(...) { return }`.
 func (s *Server) allow(w http.ResponseWriter, r *http.Request, key string, limit int64, window time.Duration) bool {
-	ok, retryAfter, err := s.limiter.Allow(r.Context(), key, limit, window)
-	if err != nil {
-		// Allow returns true on a Redis failure by design -- refusing every
-		// registration because a cache is down turns a degraded dependency
-		// into an outage on the one endpoint that creates customers.
-		slog.WarnContext(r.Context(), "rate limiter unavailable, allowing request", "error", err)
-		return true
-	}
-	if ok {
-		return true
-	}
-
-	w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-	writeError(w, r, apperrors.RateLimited(
-		"Too many attempts. Try again in "+retryAfter.String()+"."))
-	return false
+	return allowRate(w, r, s.limiter, key, limit, window, func(wait string) *apperrors.Error {
+		return apperrors.RateLimited("Too many attempts. Try again in " + wait + ".")
+	})
 }
 
 // clientIP is the address a per-IP limit counts against.
@@ -52,7 +37,13 @@ func (s *Server) allow(w http.ResponseWriter, r *http.Request, key string, limit
 // for anyone who sets one header. When the proxy lands (S1-073) this reads the
 // hop it configures -- and that is a change made deliberately, with the proxy
 // in front of it, rather than an assumption made early.
+//
+// Behind Caddy (S1-051) it is X-Real-IP -- but only once Lanes has checked the
+// proxy secret and put it in the context. The header alone is never trusted.
 func clientIP(r *http.Request) string {
+	if ip, ok := r.Context().Value(clientIPKey{}).(string); ok {
+		return ip
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

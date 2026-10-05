@@ -219,6 +219,15 @@ func BookingConflict(conflicts []Conflict) *Error {
 		Conflicts: conflicts}
 }
 
+// NothingAvailable is the public surface's booking-conflict: no unit of that
+// resource is free over the range. Same code, but never a conflicts list --
+// other renters' booking codes do not leave the backoffice (BR-025).
+func NothingAvailable() *Error {
+	return &Error{Code: CodeBookingConflict, Status: http.StatusConflict,
+		Title:  "Nothing available on that range",
+		Detail: "No unit is free over that time. Pick another time."}
+}
+
 // DurationOutOfRange names the bound that was crossed, in the resource's own
 // pricing unit (BR-021).
 func DurationOutOfRange(detail string) *Error {
@@ -235,6 +244,15 @@ func CustomerBlacklisted() *Error {
 		Title:  "Customer is blacklisted",
 		Detail: "This customer is blocked from new bookings."}).
 		WithFields(Field{Name: "customer_id"})
+}
+
+// CustomerBlacklistedPublic is BR-028 on the public page: the same code, but a
+// neutral message and no field -- the renter is told to contact the business,
+// never that or why they are blocked (04-api-spec.md §4).
+func CustomerBlacklistedPublic() *Error {
+	return &Error{Code: CodeCustomerBlacklisted, Status: http.StatusUnprocessableEntity,
+		Title:  "Request cannot be processed",
+		Detail: "This request cannot be processed. Please contact the business."}
 }
 
 // UnitNotSwappable is a swap attempted after the unit has left, or on a booking
