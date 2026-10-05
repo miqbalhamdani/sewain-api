@@ -1,8 +1,8 @@
 // Command worker consumes the job stream.  (S1-040, BR-091)
 //
 // Separate from cmd/scheduler on purpose (CLAUDE.md): this one does the heavy,
-// externally-dependent work -- reading proofs today, exports and WhatsApp
-// later -- and scales on its own. Every handler is idempotent: delivery is
+// externally-dependent work -- reading proofs, the expiry sweep, report
+// exports, and WhatsApp later -- and scales on its own. Every handler is idempotent: delivery is
 // at-least-once.
 package main
 
@@ -14,12 +14,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/db"
 	"github.com/miqbalhamdani/sewain-api/internal/jobs"
+	"github.com/miqbalhamdani/sewain-api/internal/owner"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
 	"github.com/miqbalhamdani/sewain-api/internal/storage"
@@ -64,6 +66,28 @@ func run() error {
 			return fmt.Errorf("%w: proof.scan payload %s", jobs.ErrPermanent, j.Payload)
 		}
 		return bookings.ScanProof(ctx, p.ProofID)
+	})
+
+	// One sweep covers every rental, each in its own owner transaction, so a
+	// failure in one is logged and does not stop the rest.  (S1-052)
+	w.Handle(booking.JobExpirySweep, func(ctx context.Context, _ jobs.Job) error {
+		owners, err := pool.ActiveOwnerIDs(ctx)
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		for _, id := range owners {
+			n, err := bookings.Expire(owner.NewContext(ctx, id), now)
+			if err != nil {
+				slog.ErrorContext(ctx, "expiry sweep", "owner_id", id, "error", err)
+				continue
+			}
+			if n != (booking.Expired{}) {
+				slog.InfoContext(ctx, "expiry sweep", "owner_id", id, "drafts", n.Drafts,
+					"payment_expired", n.PaymentExpired, "no_shows", n.NoShows, "overdue_invoices", n.OverdueInvoices)
+			}
+		}
+		return nil
 	})
 
 	slog.Info("worker consuming", "stream", jobs.Default.Stream)

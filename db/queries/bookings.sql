@@ -299,3 +299,55 @@ DELETE FROM invoice_lines WHERE invoice_id = $1 AND kind = 'deposit';
 UPDATE bookings SET deposit_waived_at = now(), deposit_waived_by = $2, deposit_waiver_reason = $3,
        updated_at = now()
  WHERE id = $1;
+
+-- ── S1-052: kedaluwarsa. Set-based, conditional, idempotent: a second run
+-- finds nothing left to change. None of them touches a booking that already
+-- has a handovers row (BR-057) -- once the unit has moved, only a person
+-- decides what happens next.
+
+-- name: ExpireDrafts :many
+-- BR-027: a draft past its expires_at is cancelled 'expired'. Drafts never
+-- carry an invoice, so nothing else moves.
+UPDATE bookings b SET status = 'cancelled', cancelled_reason = 'expired', updated_at = now()
+ WHERE b.status = 'draft' AND b.expires_at IS NOT NULL AND b.expires_at < sqlc.arg(now)::timestamptz
+   AND b.deleted_at IS NULL
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id)
+RETURNING b.id;
+
+-- name: ExpireUnpaidReserved :many
+-- BR-057 + BR-038, switch ON: reserved, rent invoice still unpaid past its
+-- due_at -> cancelled 'payment_expired'. The caller cancels the unpaid
+-- invoices through CancelInvoicesOfBookings -- the same rule as a manual
+-- cancel (BR-057 revision 3 Oct). Switch OFF never reaches here.
+UPDATE bookings b SET status = 'cancelled', cancelled_reason = 'payment_expired', updated_at = now()
+  FROM owners o
+ WHERE o.id = b.owner_id AND o.require_payment_before_pickup
+   AND b.status = 'reserved' AND b.deleted_at IS NULL
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id)
+   AND EXISTS (SELECT 1 FROM invoices i
+                 JOIN invoice_lines l ON l.invoice_id = i.id AND l.kind = 'rent'
+                WHERE i.booking_id = b.id AND i.deleted_at IS NULL
+                  AND i.status IN ('unpaid', 'overdue') AND i.due_at < sqlc.arg(now)::timestamptz)
+RETURNING b.id;
+
+-- name: CancelInvoicesOfBookings :exec
+UPDATE invoices SET status = 'cancelled', updated_at = now()
+ WHERE booking_id = ANY(sqlc.arg(booking_ids)::uuid[])
+   AND status IN ('unpaid', 'gateway_pending', 'overdue') AND deleted_at IS NULL;
+
+-- name: MarkInvoicesOverdue :execrows
+-- BR-056: unpaid past due_at is 'overdue' -- a stored invoice status, unlike a
+-- booking's overdue, which is derived. With the switch off this is all that
+-- happens to an unpaid booking (BR-038).
+UPDATE invoices SET status = 'overdue', updated_at = now()
+ WHERE status = 'unpaid' AND due_at < sqlc.arg(now)::timestamptz AND deleted_at IS NULL;
+
+-- name: MarkNoShows :execrows
+-- BR-057: reserved and still not picked up past start_at plus the owner's
+-- tolerance (default 3h, may be 0). A no_show is not refused at pickup later.
+UPDATE bookings b SET status = 'no_show', updated_at = now()
+  FROM owners o
+ WHERE o.id = b.owner_id
+   AND b.status = 'reserved' AND b.deleted_at IS NULL
+   AND b.start_at + make_interval(hours => o.no_show_tolerance_hours) < sqlc.arg(now)::timestamptz
+   AND NOT EXISTS (SELECT 1 FROM handovers h WHERE h.booking_id = b.id);

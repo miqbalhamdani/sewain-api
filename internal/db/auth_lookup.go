@@ -84,3 +84,16 @@ func (s *Store) LookupRefreshToken(ctx context.Context, tokenHash string) (AuthR
 	}
 	return t, nil
 }
+
+// ActiveOwnerIDs lists every active rental, for the expiry sweep (S1-052).
+//
+// owners carries no RLS -- it is the tenant table itself -- so this is a plain
+// read, not a third SECURITY DEFINER bypass. It returns ids only; every write
+// the sweep makes still goes through InOwnerTx for one owner at a time.
+func (s *Store) ActiveOwnerIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id FROM owners WHERE status = 'active' ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("list active owners: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}

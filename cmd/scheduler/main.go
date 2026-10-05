@@ -5,8 +5,7 @@
 // two replicas or a rolling deploy never double-send. This loop is the one
 // sanctioned timer in the system -- never a time.Ticker in cmd/api.
 //
-// The schedule list is empty in M4. Draft and payment expiry (S1-052) and the
-// WhatsApp reminders (S1-054) register here.
+// WhatsApp reminders (S1-054) register here when they land.
 package main
 
 import (
@@ -17,12 +16,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+
+	"github.com/miqbalhamdani/sewain-api/internal/booking"
 	"github.com/miqbalhamdani/sewain-api/internal/jobs"
 	"github.com/miqbalhamdani/sewain-api/internal/platform/config"
 	"github.com/miqbalhamdani/sewain-api/internal/queue"
 )
 
-var schedules = []jobs.Schedule{}
+var schedules = []jobs.Schedule{
+	// Draft, payment-due and no-show expiry (S1-052). Not owner-scoped: the
+	// worker walks every active rental.
+	{Name: "expiry", Every: 5 * time.Minute, Run: func(ctx context.Context, q *jobs.Queue) error {
+		return q.Enqueue(ctx, booking.JobExpirySweep, uuid.Nil, struct{}{})
+	}},
+}
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
